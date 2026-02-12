@@ -42,7 +42,7 @@ interface BankAccountWithProfile {
   agency: string;
   account_number: string;
   account_type: string | null;
-  pix_key: string | null;
+  pix_key_masked: string | null;
   pix_key_type: string | null;
   validation_status: 'pending' | 'under_review' | 'validated' | 'returned';
   locked_for_edit: boolean;
