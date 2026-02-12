@@ -1,0 +1,307 @@
+import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { 
+  MoreHorizontal, 
+  Eye, 
+  Edit, 
+  UserPlus, 
+  Archive,
+  FileCheck,
+  FileX,
+  DollarSign,
+  User
+} from 'lucide-react';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { ProjectDetailsDialog } from './ProjectDetailsDialog';
+import { EditProjectDialog } from './EditProjectDialog';
+import { ArchiveProjectDialog } from './ArchiveProjectDialog';
+import { AssignScholarToProjectDialog } from './AssignScholarToProjectDialog';
+import type { SubprojectWithScholar, Project } from './types';
+import { useUserRole } from '@/hooks/useUserRole';
+import { getModalityLabel } from '@/lib/modality-labels';
+
+interface SubprojectsTableProps {
+  subprojects: SubprojectWithScholar[];
+  thematicProjectId: string;
+  selectedMonth: string;
+  onRefresh: () => void;
+}
+
+export function SubprojectsTable({ 
+  subprojects, 
+  thematicProjectId,
+  selectedMonth,
+  onRefresh 
+}: SubprojectsTableProps) {
+  const queryClient = useQueryClient();
+  const { hasManagerAccess, isAdmin } = useUserRole();
+  
+  const [selectedProject, setSelectedProject] = useState<SubprojectWithScholar | null>(null);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value);
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'active':
+        return <Badge className="bg-success text-success-foreground">Ativo</Badge>;
+      case 'inactive':
+        return <Badge variant="secondary">Inativo</Badge>;
+      case 'archived':
+        return <Badge variant="outline">Arquivado</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  const getReportStatusBadge = (status: string | null) => {
+    if (!status) return <Badge variant="outline" className="text-muted-foreground">—</Badge>;
+    
+    switch (status) {
+      case 'approved':
+        return <Badge className="bg-success text-success-foreground">Aprovado</Badge>;
+      case 'under_review':
+        return <Badge variant="secondary">Em análise</Badge>;
+      case 'rejected':
+        return <Badge variant="destructive">Recusado</Badge>;
+      case 'pending':
+        return <Badge variant="outline" className="border-warning text-warning">Pendente</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  const getPaymentStatusBadge = (status: string | null) => {
+    if (!status) return <Badge variant="outline" className="text-muted-foreground">—</Badge>;
+    
+    switch (status) {
+      case 'paid':
+        return <Badge className="bg-success text-success-foreground">Pago</Badge>;
+      case 'eligible':
+        return <Badge className="bg-primary text-primary-foreground">Liberado</Badge>;
+      case 'pending':
+        return <Badge variant="secondary">Pendente</Badge>;
+      case 'cancelled':
+        return <Badge variant="destructive">Bloqueado</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  const handleViewProject = (project: SubprojectWithScholar) => {
+    setSelectedProject(project);
+    setDetailsDialogOpen(true);
+  };
+
+  const handleEditProject = (project: SubprojectWithScholar) => {
+    setSelectedProject(project);
+    setEditDialogOpen(true);
+  };
+
+  const handleArchiveProject = (project: SubprojectWithScholar) => {
+    setSelectedProject(project);
+    setArchiveDialogOpen(true);
+  };
+
+  const handleAssignScholar = (project: SubprojectWithScholar) => {
+    setSelectedProject(project);
+    setAssignDialogOpen(true);
+  };
+
+  const handleProjectUpdated = () => {
+    onRefresh();
+    queryClient.invalidateQueries({ queryKey: ['projects-management'] });
+  };
+
+  // Convert SubprojectWithScholar to Project for dialogs
+  const getProjectForDialog = (subproject: SubprojectWithScholar): Project => ({
+    id: subproject.id,
+    code: subproject.code,
+    title: subproject.title,
+    orientador: subproject.orientador,
+    thematic_project_id: subproject.thematic_project_id,
+    modalidade_bolsa: subproject.modalidade_bolsa,
+    valor_mensal: subproject.valor_mensal,
+    start_date: subproject.start_date,
+    end_date: subproject.end_date,
+    coordenador_tecnico_icca: subproject.coordenador_tecnico_icca,
+    observacoes: subproject.observacoes,
+    status: subproject.status,
+    created_at: subproject.created_at,
+    updated_at: subproject.updated_at,
+  });
+
+  if (subprojects.length === 0) {
+    return (
+      <div className="text-center py-8 text-muted-foreground border rounded-lg">
+        Nenhum subprojeto cadastrado neste projeto temático.
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <ScrollArea className="max-h-[400px] rounded-lg border">
+        <Table>
+          <TableHeader className="sticky top-0 bg-card z-10">
+            <TableRow>
+              <TableHead className="w-[100px]">Código</TableHead>
+              <TableHead>Subprojeto</TableHead>
+              <TableHead>Bolsista</TableHead>
+              <TableHead>Modalidade</TableHead>
+              <TableHead className="text-right">Valor</TableHead>
+              <TableHead>Vigência</TableHead>
+              <TableHead>Relatório</TableHead>
+              <TableHead>Pagamento</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="w-[60px]">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {subprojects.map((project) => (
+              <TableRow key={project.id}>
+                <TableCell className="font-mono text-xs">{project.code}</TableCell>
+                <TableCell className="font-medium max-w-[180px] truncate" title={project.title}>
+                  {project.title}
+                </TableCell>
+                <TableCell>
+                  {project.scholar_name ? (
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{project.scholar_name}</p>
+                        {project.scholar_email && (
+                          <p className="truncate text-xs text-muted-foreground">{project.scholar_email}</p>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <Badge variant="outline" className="border-warning text-warning">
+                      Aguardando atribuição
+                    </Badge>
+                  )}
+                </TableCell>
+                <TableCell className="text-sm">
+                  {project.modalidade_bolsa ? getModalityLabel(project.modalidade_bolsa) : '—'}
+                </TableCell>
+                <TableCell className="text-right font-mono text-sm">
+                  {formatCurrency(project.valor_mensal)}
+                </TableCell>
+                <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                  {format(new Date(project.start_date), 'dd/MM/yy', { locale: ptBR })} - {format(new Date(project.end_date), 'dd/MM/yy', { locale: ptBR })}
+                </TableCell>
+                <TableCell>{getReportStatusBadge(project.report_status)}</TableCell>
+                <TableCell>{getPaymentStatusBadge(project.payment_status)}</TableCell>
+                <TableCell>{getStatusBadge(project.status)}</TableCell>
+                <TableCell>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleViewProject(project)}>
+                        <Eye className="h-4 w-4 mr-2" />
+                        Ver detalhes
+                      </DropdownMenuItem>
+                      
+                      {hasManagerAccess && (
+                        <>
+                          <DropdownMenuItem onClick={() => handleEditProject(project)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Editar subprojeto
+                          </DropdownMenuItem>
+                          
+                          {!project.scholar_name && (
+                            <DropdownMenuItem onClick={() => handleAssignScholar(project)}>
+                              <UserPlus className="h-4 w-4 mr-2" />
+                              Atribuir bolsista
+                            </DropdownMenuItem>
+                          )}
+                          
+                          <DropdownMenuSeparator />
+                          
+                          {project.status === 'active' && isAdmin && (
+                            <DropdownMenuItem 
+                              onClick={() => handleArchiveProject(project)}
+                              className="text-destructive"
+                            >
+                              <Archive className="h-4 w-4 mr-2" />
+                              Arquivar
+                            </DropdownMenuItem>
+                          )}
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </ScrollArea>
+
+      {/* Dialogs */}
+      {selectedProject && (
+        <>
+          <ProjectDetailsDialog
+            project={getProjectForDialog(selectedProject)}
+            open={detailsDialogOpen}
+            onOpenChange={setDetailsDialogOpen}
+            onClose={() => setDetailsDialogOpen(false)}
+            onProjectUpdated={handleProjectUpdated}
+          />
+          
+          <EditProjectDialog
+            project={getProjectForDialog(selectedProject)}
+            open={editDialogOpen}
+            onOpenChange={setEditDialogOpen}
+            onSuccess={handleProjectUpdated}
+          />
+          
+          <ArchiveProjectDialog
+            project={getProjectForDialog(selectedProject)}
+            open={archiveDialogOpen}
+            onOpenChange={setArchiveDialogOpen}
+            onSuccess={handleProjectUpdated}
+          />
+          
+          <AssignScholarToProjectDialog
+            project={getProjectForDialog(selectedProject)}
+            open={assignDialogOpen}
+            onOpenChange={setAssignDialogOpen}
+            onSuccess={handleProjectUpdated}
+          />
+        </>
+      )}
+    </>
+  );
+}

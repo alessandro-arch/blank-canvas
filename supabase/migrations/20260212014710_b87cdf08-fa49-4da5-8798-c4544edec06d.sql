@@ -1,0 +1,1 @@
+ALTER TABLE public.organizations ADD COLUMN email_notifications_enabled boolean NOT NULL DEFAULT true;
