@@ -176,7 +176,7 @@ const ScholarProfileView = () => {
             agency: bankData.agency,
             accountNumber: bankData.account_number,
             accountType: bankData.account_type,
-            pixKey: bankData.pix_key,
+            pixKey: bankData.pix_key_masked,
             pixKeyType: bankData.pix_key_type,
             validationStatus: bankData.validation_status,
           });

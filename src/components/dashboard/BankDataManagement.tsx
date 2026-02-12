@@ -53,7 +53,7 @@ interface BankAccountWithProfile {
   agency: string;
   account_number: string;
   account_type: string | null;
-  pix_key: string | null;
+  pix_key_masked: string | null;
   pix_key_type: string | null;
   validation_status: BankValidationStatus;
   locked_for_edit: boolean;
@@ -583,10 +583,10 @@ export function BankDataManagement() {
                     <span className="text-muted-foreground">Conta:</span>
                     <p className="font-mono">{selectedAccount.account_number}</p>
                   </div>
-                  {selectedAccount.pix_key && (
+                  {selectedAccount.pix_key_masked && (
                     <div className="col-span-2">
                       <span className="text-muted-foreground">Chave PIX:</span>
-                      <p className="font-mono">{selectedAccount.pix_key}</p>
+                      <p className="font-mono">{selectedAccount.pix_key_masked}</p>
                     </div>
                   )}
                 </div>
