@@ -10,6 +10,7 @@ import { ScholarProtectedRoute } from "@/components/auth/ScholarProtectedRoute";
 import { AdminProtectedRoute } from "@/components/auth/AdminProtectedRoute";
 
 // Public pages
+import LandingPage from "./pages/LandingPage";
 import Access from "./pages/Access";
 import ScholarLogin from "./pages/ScholarLogin";
 import AdminLogin from "./pages/AdminLogin";
@@ -61,8 +62,8 @@ const App = () => (
               {/* Legacy auth route - redirect to new access page */}
               <Route path="/auth" element={<Navigate to="/acesso" replace />} />
               
-              {/* Root redirect to access page */}
-              <Route path="/" element={<Navigate to="/acesso" replace />} />
+              {/* Landing page */}
+              <Route path="/" element={<LandingPage />} />
               
               {/* ===================== */}
               {/* Scholar Portal Routes */}
