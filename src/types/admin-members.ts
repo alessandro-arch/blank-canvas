@@ -27,6 +27,7 @@ export interface OrgInvite {
   email_sent_at: string | null;
   email_provider_id: string | null;
   send_error: string | null;
+  send_attempts: number;
 }
 
 export interface InviteDetails {

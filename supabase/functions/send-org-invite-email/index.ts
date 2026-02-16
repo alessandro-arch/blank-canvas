@@ -3,8 +3,29 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
+
+const ALLOWED_ORIGINS = [
+  'https://bolsago.innovago.app',
+  'https://boundless-start-art.lovable.app',
+];
+
+const FROM_EMAIL = 'BolsaGo <contato@innovago.app>';
+
+const roleLabels: Record<string, string> = {
+  admin: 'Administrador',
+  manager: 'Gestor',
+  reviewer: 'Avaliador',
+  beneficiary: 'Proponente',
+};
+
+function jsonRes(body: Record<string, unknown>, status: number) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -15,11 +36,13 @@ Deno.serve(async (req) => {
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
+  let inviteId: string | null = null;
+
   try {
-    // Authenticate caller
+    // 1. Authenticate caller
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return jsonRes({ error: 'Unauthorized' }, 401);
     }
 
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -29,27 +52,41 @@ Deno.serve(async (req) => {
 
     const { data: { user }, error: userError } = await userClient.auth.getUser();
     if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return jsonRes({ error: 'Unauthorized' }, 401);
     }
     const callerUserId = user.id;
 
-    const { invite_id } = await req.json();
-    if (!invite_id) {
-      return new Response(JSON.stringify({ error: 'invite_id is required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    // 2. Parse input
+    const body = await req.json();
+    inviteId = body.invite_id;
+    if (!inviteId) {
+      return jsonRes({ error: 'invite_id is required' }, 400);
     }
 
-    // Fetch invite details
+    // 3. Fetch invite
     const { data: invite, error: inviteError } = await supabaseAdmin
       .from('organization_invites')
-      .select('id, organization_id, invited_email, role, token, expires_at, status')
-      .eq('id', invite_id)
+      .select('id, organization_id, invited_email, role, token, expires_at, status, send_attempts')
+      .eq('id', inviteId)
       .single();
 
     if (inviteError || !invite) {
-      return new Response(JSON.stringify({ error: 'Invite not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return jsonRes({ error: 'Convite nao encontrado' }, 404);
     }
 
-    // Verify caller is admin of this organization
+    // 4. Validate status
+    if (invite.status !== 'pending') {
+      return jsonRes({ error: 'Convite nao esta pendente.' }, 400);
+    }
+
+    if (new Date(invite.expires_at) < new Date()) {
+      await supabaseAdmin.from('organization_invites')
+        .update({ status: 'expired' })
+        .eq('id', inviteId);
+      return jsonRes({ error: 'Convite expirado. Gere um novo convite.' }, 400);
+    }
+
+    // 5. Verify caller is admin
     const { data: memberCheck } = await supabaseAdmin
       .from('organization_members')
       .select('id')
@@ -59,7 +96,6 @@ Deno.serve(async (req) => {
       .eq('is_active', true)
       .maybeSingle();
 
-    // Also check global admin role
     const { data: globalAdmin } = await supabaseAdmin
       .from('user_roles')
       .select('id')
@@ -68,50 +104,59 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (!memberCheck && !globalAdmin) {
-      return new Response(JSON.stringify({ error: 'Forbidden: only org admins can send invite emails' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return jsonRes({ error: 'Apenas admin pode enviar convites.' }, 403);
     }
 
-    // Fetch organization name
+    // 6. Increment send_attempts
+    const newAttempts = (invite.send_attempts || 0) + 1;
+    await supabaseAdmin.from('organization_invites')
+      .update({ send_attempts: newAttempts })
+      .eq('id', inviteId);
+
+    // 7. Resolve APP_URL
+    let appUrl = Deno.env.get('APP_URL');
+    if (!appUrl) {
+      const origin = req.headers.get('origin') || req.headers.get('referer')?.replace(/\/+$/, '').split('/').slice(0, 3).join('/');
+      if (origin && ALLOWED_ORIGINS.some(a => origin.startsWith(a))) {
+        appUrl = origin;
+      } else {
+        // Record failure
+        await supabaseAdmin.from('organization_invites')
+          .update({ send_error: 'APP_URL nao configurado.' })
+          .eq('id', inviteId);
+        return jsonRes({ error: 'APP_URL nao configurado. Defina o secret APP_URL = https://bolsago.innovago.app' }, 500);
+      }
+    }
+
+    // 8. Check RESEND_API_KEY
+    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    if (!resendApiKey) {
+      await supabaseAdmin.from('organization_invites')
+        .update({ send_error: 'RESEND_API_KEY nao configurado.' })
+        .eq('id', inviteId);
+      return jsonRes({ error: 'Servico de e-mail nao configurado.' }, 500);
+    }
+
+    // 9. Fetch org name
     const { data: org } = await supabaseAdmin
       .from('organizations')
       .select('name')
       .eq('id', invite.organization_id)
       .single();
+    const orgName = org?.name || 'Organizacao';
 
-    const orgName = org?.name || 'Organização';
-
-    const resendApiKey = Deno.env.get('RESEND_API_KEY');
-    if (!resendApiKey) {
-      await supabaseAdmin.from('organization_invites').update({ send_error: 'RESEND_API_KEY not configured' }).eq('id', invite_id);
-      return new Response(JSON.stringify({ error: 'Email service not configured' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-
-    // Format role label
-    const roleLabels: Record<string, string> = {
-      admin: 'Administrador',
-      manager: 'Gestor',
-      reviewer: 'Avaliador',
-      beneficiary: 'Proponente',
-    };
+    // 10. Build email
     const roleLabel = roleLabels[invite.role] || invite.role;
-
-    // Format expiration
     const expiresDate = new Date(invite.expires_at).toLocaleDateString('pt-BR', {
-      day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
     });
 
-    // Use APP_URL env var if set, otherwise fall back to the Referer/Origin header, then to published URL
-    const appUrl = Deno.env.get('APP_URL') 
-      || req.headers.get('referer')?.replace(/\/+$/, '').split('/').slice(0, 3).join('/')
-      || req.headers.get('origin')
-      || 'https://boundless-start-art.lovable.app';
     const inviteLink = `${appUrl}/convite?token=${invite.token}`;
     const logoUrl = `${supabaseUrl}/storage/v1/object/public/email-assets/logo-innovago.png?v=1`;
 
-    const html = `
-<!DOCTYPE html>
+    const html = `<!DOCTYPE html>
 <html lang="pt-BR">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Convite InnovaGO</title></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Convite BolsaGo</title></head>
 <body style="margin:0;padding:0;background-color:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;">
 <tr><td align="center" style="padding:40px 20px;">
@@ -119,70 +164,101 @@ Deno.serve(async (req) => {
 <tr><td style="background-color:#003366;border-radius:8px 8px 0 0;padding:24px 32px;">
 <table role="presentation" width="100%"><tr>
 <td><img src="${logoUrl}" alt="InnovaGO" style="max-height:40px;width:auto;" /></td>
-<td align="right" style="vertical-align:middle;"><span style="font-size:12px;color:#fff;opacity:0.9;">BolsaGO</span></td>
+<td align="right" style="vertical-align:middle;"><span style="font-size:12px;color:#fff;opacity:0.9;">BolsaGo</span></td>
 </tr></table></td></tr>
 <tr><td style="background-color:#fff;padding:32px;">
-<h1 style="margin:0 0 16px;font-size:22px;color:#003366;">📩 Convite para ${orgName}</h1>
+<h1 style="margin:0 0 16px;font-size:22px;color:#003366;">Convite para ${orgName}</h1>
 <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.7;">
-Você foi convidado(a) para acessar a plataforma <strong>InnovaGO</strong> como <strong>${roleLabel}</strong> da organização <strong>${orgName}</strong>.
+Ola! Voce foi convidado(a) para acessar a plataforma <strong>BolsaGo</strong> como <strong>${roleLabel}</strong> da organizacao <strong>${orgName}</strong>.
+</p>
+<p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.7;">
+Clique no botao abaixo para aceitar o convite e criar sua conta (caso ainda nao tenha).
 </p>
 <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0;"><tr>
 <td style="background-color:#003366;border-radius:6px;">
 <a href="${inviteLink}" target="_blank" style="display:inline-block;padding:14px 32px;color:#fff;text-decoration:none;font-size:15px;font-weight:600;">Aceitar Convite</a>
 </td></tr></table>
-<p style="margin:0 0 8px;font-size:13px;color:#666;">⏰ Este convite expira em: <strong>${expiresDate}</strong></p>
-<p style="margin:0;font-size:13px;color:#999;">Se você não solicitou este convite, pode ignorar este e-mail com segurança.</p>
+<p style="margin:0 0 8px;font-size:13px;color:#666;">Este convite expira em: <strong>${expiresDate}</strong></p>
+<hr style="border:none;border-top:1px solid #eee;margin:16px 0;" />
+<p style="margin:0 0 4px;font-size:12px;color:#999;">Se voce nao solicitou este convite, pode ignorar este e-mail com seguranca.</p>
+<p style="margin:0;font-size:11px;color:#bbb;">Seus dados serao tratados exclusivamente para gestao de acesso e governanca do programa, conforme a LGPD.</p>
 </td></tr>
 <tr><td style="background-color:#003366;border-radius:0 0 8px 8px;padding:24px 32px;">
-<p style="margin:0;font-size:12px;color:#fff;opacity:0.8;">© InnovaGO – Sistema de Gestão de Bolsas<br/>
+<p style="margin:0;font-size:12px;color:#fff;opacity:0.8;">InnovaGO. Sistema de Gestao de Bolsas<br/>
 <a href="https://www.innovago.app" style="color:#fff;text-decoration:underline;">www.innovago.app</a></p>
 </td></tr>
 </table></td></tr></table></body></html>`;
 
+    // 11. Send via Resend
     const resend = new Resend(resendApiKey);
     const { data: emailResult, error: emailError } = await resend.emails.send({
-      from: 'InnovaGO <contato@innovago.app>',
+      from: FROM_EMAIL,
       to: [invite.invited_email],
-      subject: `Convite para acessar a InnovaGO (${orgName})`,
+      subject: `Convite para acessar o BolsaGo. InnovaGO`,
       html,
     });
 
     if (emailError) {
-      console.error('Resend error:', emailError);
-      await supabaseAdmin.from('organization_invites').update({
-        send_error: JSON.stringify(emailError).substring(0, 500),
-      }).eq('id', invite_id);
-      return new Response(JSON.stringify({ error: 'Email send failed', details: emailError }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      const errorMsg = typeof emailError === 'object' ? JSON.stringify(emailError).substring(0, 300) : String(emailError);
+      console.error('Resend error:', errorMsg);
+
+      await supabaseAdmin.from('organization_invites')
+        .update({ send_error: errorMsg })
+        .eq('id', inviteId);
+
+      // Audit: failure
+      await supabaseAdmin.from('audit_logs').insert({
+        user_id: callerUserId,
+        action: 'invite_email_failed',
+        entity_type: 'organization_invite',
+        entity_id: inviteId,
+        organization_id: invite.organization_id,
+        details: { email: invite.invited_email, role: invite.role, attempt: newAttempts },
+        user_email: user.email,
+      });
+
+      return jsonRes({ error: 'Falha ao enviar e-mail.', details: errorMsg }, 500);
     }
 
-    // Update invite with email tracking
-    await supabaseAdmin.from('organization_invites').update({
-      email_sent_at: new Date().toISOString(),
-      email_provider_id: emailResult?.id || null,
-      send_error: null,
-    }).eq('id', invite_id);
+    // 12. Success: update tracking
+    await supabaseAdmin.from('organization_invites')
+      .update({
+        email_sent_at: new Date().toISOString(),
+        email_provider_id: emailResult?.id || null,
+        send_error: null,
+      })
+      .eq('id', inviteId);
 
-    // Audit log
+    // 13. Audit: success
     await supabaseAdmin.from('audit_logs').insert({
       user_id: callerUserId,
       action: 'invite_email_sent',
       entity_type: 'organization_invite',
-      entity_id: invite_id,
+      entity_id: inviteId,
       organization_id: invite.organization_id,
-      details: { email: invite.invited_email, role: invite.role },
+      details: {
+        email: invite.invited_email,
+        role: invite.role,
+        provider_id: emailResult?.id || null,
+        attempt: newAttempts,
+      },
       user_email: user.email,
     });
 
-    console.log(`Invite email sent to ${invite.invited_email} for invite ${invite_id}`);
-
-    return new Response(JSON.stringify({ success: true, message_id: emailResult?.id }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return jsonRes({ success: true, message_id: emailResult?.id }, 200);
   } catch (error: unknown) {
     console.error('send-org-invite-email error:', error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    const errorMsg = error instanceof Error ? error.message : 'Erro desconhecido';
+
+    // Try to record error on invite
+    if (inviteId) {
+      try {
+        await supabaseAdmin.from('organization_invites')
+          .update({ send_error: errorMsg.substring(0, 300) })
+          .eq('id', inviteId);
+      } catch (_) { /* best effort */ }
+    }
+
+    return jsonRes({ error: errorMsg }, 500);
   }
 });

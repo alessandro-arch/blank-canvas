@@ -522,6 +522,7 @@ export type Database = {
           invited_email: string
           organization_id: string
           role: string
+          send_attempts: number
           send_error: string | null
           status: string
           token: string
@@ -538,6 +539,7 @@ export type Database = {
           invited_email: string
           organization_id: string
           role: string
+          send_attempts?: number
           send_error?: string | null
           status?: string
           token: string
@@ -554,6 +556,7 @@ export type Database = {
           invited_email?: string
           organization_id?: string
           role?: string
+          send_attempts?: number
           send_error?: string | null
           status?: string
           token?: string
