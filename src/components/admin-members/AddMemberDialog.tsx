@@ -1,19 +1,22 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Copy, Check } from "lucide-react";
+import { Copy, Check, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import type { OrgInvite } from "@/types/admin-members";
 
 interface AddMemberDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (email: string, role: string, expiresDays: number) => Promise<{ invite_id: string; token: string } | null>;
+  existingInvites?: OrgInvite[];
 }
 
-export function AddMemberDialog({ open, onOpenChange, onSubmit }: AddMemberDialogProps) {
+export function AddMemberDialog({ open, onOpenChange, onSubmit, existingInvites = [] }: AddMemberDialogProps) {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("manager");
   const [expiresDays, setExpiresDays] = useState("7");
@@ -22,14 +25,26 @@ export function AddMemberDialog({ open, onOpenChange, onSubmit }: AddMemberDialo
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
+  const trimmedEmail = email.trim().toLowerCase();
+
+  const pendingInvites = useMemo(() => {
+    if (!trimmedEmail) return [];
+    return existingInvites.filter(
+      (inv) =>
+        inv.invited_email.toLowerCase() === trimmedEmail &&
+        inv.status === "pending" &&
+        new Date(inv.expires_at) > new Date()
+    );
+  }, [trimmedEmail, existingInvites]);
+
   const inviteLink = inviteToken
     ? `${window.location.origin}/invite/${inviteToken}`
     : null;
 
   const handleSubmit = async () => {
-    if (!email.trim()) return;
+    if (!trimmedEmail) return;
     setLoading(true);
-    const result = await onSubmit(email.trim().toLowerCase(), role, parseInt(expiresDays) || 7);
+    const result = await onSubmit(trimmedEmail, role, parseInt(expiresDays) || 7);
     if (result?.token) {
       setInviteToken(result.token);
     }
@@ -91,6 +106,19 @@ export function AddMemberDialog({ open, onOpenChange, onSubmit }: AddMemberDialo
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
+
+            {pendingInvites.length > 0 && (
+              <Alert variant="destructive" className="border-yellow-500/50 bg-yellow-50 text-yellow-800 dark:bg-yellow-950/30 dark:text-yellow-400 [&>svg]:text-yellow-600">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  Já {pendingInvites.length === 1 ? "existe" : "existem"}{" "}
+                  <strong>{pendingInvites.length}</strong>{" "}
+                  {pendingInvites.length === 1 ? "convite pendente" : "convites pendentes"} para este e-mail.
+                  Revogue os anteriores na aba "Convites" antes de criar um novo, ou o sistema poderá bloquear a criação.
+                </AlertDescription>
+              </Alert>
+            )}
+
             <div className="space-y-2">
               <Label>Papel</Label>
               <Select value={role} onValueChange={setRole}>
@@ -121,7 +149,7 @@ export function AddMemberDialog({ open, onOpenChange, onSubmit }: AddMemberDialo
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => handleClose(false)}>Cancelar</Button>
-              <Button onClick={handleSubmit} disabled={loading || !email.trim()}>
+              <Button onClick={handleSubmit} disabled={loading || !trimmedEmail}>
                 {loading ? "Criando..." : "Gerar Convite"}
               </Button>
             </DialogFooter>
