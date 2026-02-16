@@ -198,7 +198,10 @@ export function CreateNewsDialog({ open, onOpenChange, onCreated }: CreateNewsDi
                       <>
                         <Upload className="h-6 w-6 text-muted-foreground" />
                         <span className="text-xs text-muted-foreground">
-                          Clique para selecionar uma imagem (máx. 5MB)
+                          Clique para selecionar uma imagem
+                        </span>
+                        <span className="text-[10px] text-muted-foreground/70">
+                          Tamanho recomendado: 1200 × 630px (16:9) · Máx. 5MB · JPG, PNG ou WebP
                         </span>
                       </>
                     )}
