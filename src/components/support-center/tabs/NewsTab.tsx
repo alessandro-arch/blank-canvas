@@ -14,6 +14,7 @@ interface NewsPost {
   title: string;
   summary: string | null;
   content: string;
+  cover_image_url: string | null;
   published_at: string | null;
   is_published: boolean;
   created_at: string;
@@ -38,12 +39,12 @@ export function NewsTab() {
     },
   });
 
-  // Detail view (blog-style)
+  // ─── Detail view (blog-style like Tess) ───
   if (selected) {
     return (
       <div className="flex flex-col h-full">
-        {/* Detail header */}
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+        {/* Header bar */}
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-background/95 backdrop-blur-sm sticky top-0 z-10">
           <button
             onClick={() => setSelected(null)}
             className="p-1.5 rounded-lg hover:bg-muted transition-colors"
@@ -59,9 +60,21 @@ export function NewsTab() {
           </button>
         </div>
 
-        {/* Blog content */}
         <ScrollArea className="flex-1">
-          <div className="p-5 space-y-4">
+          {/* Hero cover image */}
+          {selected.cover_image_url && (
+            <div className="relative w-full h-48 sm:h-56 overflow-hidden bg-muted">
+              <img
+                src={selected.cover_image_url}
+                alt={selected.title}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
+            </div>
+          )}
+
+          {/* Article content */}
+          <div className="px-5 py-5 space-y-4">
             <h1 className="text-xl font-bold leading-tight">{selected.title}</h1>
 
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -77,19 +90,32 @@ export function NewsTab() {
               </p>
             )}
 
-            <div className="text-sm leading-relaxed whitespace-pre-wrap">
-              {selected.content}
-            </div>
+            {/* Rich HTML content */}
+            <div
+              className="news-article-content text-sm leading-relaxed
+                [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-5 [&_h2]:mb-2
+                [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-1.5
+                [&_p]:mb-3
+                [&_blockquote]:border-l-2 [&_blockquote]:border-primary/30 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-muted-foreground [&_blockquote]:my-3
+                [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-3
+                [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-3
+                [&_li]:mb-1
+                [&_a]:text-primary [&_a]:underline
+                [&_img]:rounded-lg [&_img]:max-w-full [&_img]:my-4
+                [&_hr]:my-4 [&_hr]:border-border
+                [&_strong]:font-semibold
+                [&_em]:italic"
+              dangerouslySetInnerHTML={{ __html: selected.content }}
+            />
           </div>
         </ScrollArea>
       </div>
     );
   }
 
-  // List view
+  // ─── List view (card feed with cover images) ───
   return (
     <div className="flex flex-col h-full">
-      {/* Header with create button */}
       {hasManagerAccess && (
         <div className="px-4 pt-3 pb-1 flex justify-end">
           <Button size="sm" onClick={() => setShowCreate(true)} className="gap-1.5">
@@ -115,10 +141,21 @@ export function NewsTab() {
               <button
                 key={post.id}
                 onClick={() => setSelected(post)}
-                className="w-full text-left bg-card border border-border rounded-xl overflow-hidden hover:shadow-md transition-shadow group"
+                className="w-full text-left bg-card border border-border rounded-xl overflow-hidden hover:shadow-md transition-all group"
               >
-                {/* Card header accent */}
-                <div className="h-1.5 bg-gradient-to-r from-primary/60 to-primary/20" />
+                {/* Cover image or accent bar */}
+                {post.cover_image_url ? (
+                  <div className="relative w-full h-36 overflow-hidden bg-muted">
+                    <img
+                      src={post.cover_image_url}
+                      alt={post.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                  </div>
+                ) : (
+                  <div className="h-1.5 bg-gradient-to-r from-primary/60 to-primary/20" />
+                )}
 
                 <div className="p-4">
                   <div className="flex items-start justify-between gap-3">
