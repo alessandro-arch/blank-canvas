@@ -50,8 +50,37 @@ export function CreateNewsDialog({ open, onOpenChange, onCreated }: CreateNewsDi
       return;
     }
 
+    // Validate dimensions before uploading
+    const checkDimensions = (): Promise<{ width: number; height: number }> =>
+      new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve({ width: img.width, height: img.height });
+        img.onerror = () => resolve({ width: 0, height: 0 });
+        img.src = URL.createObjectURL(file);
+      });
+
     setUploading(true);
     try {
+      const { width, height } = await checkDimensions();
+
+      if (width > 0 && height > 0) {
+        const ratio = width / height;
+        const idealRatio = 1200 / 630;
+        const ratioDiff = Math.abs(ratio - idealRatio) / idealRatio;
+
+        if (width < 800 || height < 400) {
+          toast.warning(
+            `Imagem pequena (${width}×${height}px). Recomendado: 1200×630px para melhor qualidade.`,
+            { duration: 5000 }
+          );
+        } else if (ratioDiff > 0.15) {
+          toast.warning(
+            `Proporção diferente do recomendado (${width}×${height}px). Ideal: 16:9 (ex: 1200×630px). A imagem será recortada automaticamente.`,
+            { duration: 5000 }
+          );
+        }
+      }
+
       const ext = file.name.split(".").pop();
       const fileName = `${user.id}/${Date.now()}.${ext}`;
 
