@@ -29,7 +29,8 @@ export type AuditAction =
   | "delete_thematic_project"
   | "upload_grant_term"
   | "update_grant_term"
-  | "update_profile_admin";
+  | "update_profile_admin"
+  | "report_file_replaced";
 
 export type EntityType = 
   | "user"
