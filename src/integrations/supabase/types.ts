@@ -515,11 +515,14 @@ export type Database = {
           accepted_by: string | null
           created_at: string
           created_by: string
+          email_provider_id: string | null
+          email_sent_at: string | null
           expires_at: string
           id: string
           invited_email: string
           organization_id: string
           role: string
+          send_error: string | null
           status: string
           token: string
         }
@@ -528,11 +531,14 @@ export type Database = {
           accepted_by?: string | null
           created_at?: string
           created_by: string
+          email_provider_id?: string | null
+          email_sent_at?: string | null
           expires_at?: string
           id?: string
           invited_email: string
           organization_id: string
           role: string
+          send_error?: string | null
           status?: string
           token: string
         }
@@ -541,11 +547,14 @@ export type Database = {
           accepted_by?: string | null
           created_at?: string
           created_by?: string
+          email_provider_id?: string | null
+          email_sent_at?: string | null
           expires_at?: string
           id?: string
           invited_email?: string
           organization_id?: string
           role?: string
+          send_error?: string | null
           status?: string
           token?: string
         }

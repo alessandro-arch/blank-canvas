@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.admin-list-members]
 verify_jwt = false
+
+[functions.send-org-invite-email]
+verify_jwt = false
