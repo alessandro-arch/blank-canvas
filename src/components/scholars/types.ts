@@ -19,8 +19,6 @@ export interface ScholarWithProject {
   userId: string;
   fullName: string | null;
   email: string | null;
-  cpf: string | null;
-  phone: string | null;
   isActive: boolean;
   projectId: string | null;
   projectTitle: string | null;

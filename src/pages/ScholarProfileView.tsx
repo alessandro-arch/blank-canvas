@@ -19,8 +19,6 @@ interface ScholarProfile {
   userId: string;
   fullName: string | null;
   email: string | null;
-  cpf: string | null;
-  phone: string | null;
   institution: string | null;
   academicLevel: string | null;
   lattesUrl: string | null;
@@ -96,8 +94,6 @@ const ScholarProfileView = () => {
             userId: profileData.user_id,
             fullName: profileData.full_name,
             email: profileData.email,
-            cpf: profileData.cpf,
-            phone: profileData.phone,
             institution: profileData.institution,
             academicLevel: profileData.academic_level,
             lattesUrl: profileData.lattes_url,
@@ -203,10 +199,6 @@ const ScholarProfileView = () => {
     return new Date(dateStr).toLocaleDateString("pt-BR");
   };
 
-  const maskCpf = (cpf: string | null) => {
-    if (!cpf) return "—";
-    return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.***.***-$4");
-  };
 
   return (
     <div className="flex min-h-screen w-full bg-background">
@@ -291,16 +283,8 @@ const ScholarProfileView = () => {
                         <p className="font-medium">{profile.fullName || "—"}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">CPF</p>
-                        <p className="font-medium">{maskCpf(profile.cpf)}</p>
-                      </div>
-                      <div>
                         <p className="text-sm text-muted-foreground">E-mail</p>
                         <p className="font-medium">{profile.email || "—"}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Telefone</p>
-                        <p className="font-medium">{profile.phone || "—"}</p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Instituição</p>

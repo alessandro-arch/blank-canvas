@@ -263,8 +263,6 @@ export function ScholarsTableInCard({ scholars, onRefresh }: ScholarsTableInCard
           userId: selectedScholarForEdit.userId,
           fullName: selectedScholarForEdit.fullName,
           email: selectedScholarForEdit.email,
-          cpf: selectedScholarForEdit.cpf,
-          phone: selectedScholarForEdit.phone,
         } : null}
         onSuccess={onRefresh}
       />

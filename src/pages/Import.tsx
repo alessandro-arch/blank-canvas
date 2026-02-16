@@ -385,7 +385,6 @@ export default function Import() {
         if (selectedType === 'scholars' && row.duplicateInfo?.existingProfileId) {
           const updateData: Record<string, unknown> = {
             full_name: row.data.full_name,
-            phone: row.data.phone || null,
             origin: 'import',
           };
 

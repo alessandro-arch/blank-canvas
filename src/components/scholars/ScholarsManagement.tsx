@@ -67,7 +67,7 @@ export function ScholarsManagement() {
       // Fetch profiles for scholars, filtered by organization
       let profilesQuery = supabase
         .from('profiles')
-        .select('user_id, full_name, email, cpf, phone, is_active, origin, created_at, organization_id')
+        .select('user_id, full_name, email, is_active, origin, created_at, organization_id')
         .in('user_id', scholarUserIds);
 
       // Filter by current organization
@@ -175,8 +175,6 @@ export function ScholarsManagement() {
           userId: profile.user_id,
           fullName: profile.full_name,
           email: profile.email,
-          cpf: profile.cpf,
-          phone: profile.phone,
           isActive: profile.is_active,
           projectId: project?.id || null,
           projectTitle: project?.title || null,
@@ -277,7 +275,6 @@ export function ScholarsManagement() {
         !searchTerm ||
         scholar.fullName?.toLowerCase().includes(searchLower) ||
         scholar.email?.toLowerCase().includes(searchLower) ||
-        scholar.cpf?.includes(searchTerm) ||
         scholar.projectTitle?.toLowerCase().includes(searchLower) ||
         scholar.projectCode?.toLowerCase().includes(searchLower);
 
