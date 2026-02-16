@@ -957,7 +957,11 @@ export type Database = {
           id: string
           installment_number: number
           observations: string | null
+          old_file_url: string | null
           reference_month: string
+          replace_reason: string | null
+          replaced_at: string | null
+          replaced_by: string | null
           resubmission_deadline: string | null
           reviewed_at: string | null
           reviewed_by: string | null
@@ -974,7 +978,11 @@ export type Database = {
           id?: string
           installment_number: number
           observations?: string | null
+          old_file_url?: string | null
           reference_month: string
+          replace_reason?: string | null
+          replaced_at?: string | null
+          replaced_by?: string | null
           resubmission_deadline?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -991,7 +999,11 @@ export type Database = {
           id?: string
           installment_number?: number
           observations?: string | null
+          old_file_url?: string | null
           reference_month?: string
+          replace_reason?: string | null
+          replaced_at?: string | null
+          replaced_by?: string | null
           resubmission_deadline?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null

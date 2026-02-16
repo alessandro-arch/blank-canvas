@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   FileSearch,
@@ -42,6 +43,7 @@ import { toast } from "sonner";
 import { format, parseISO, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ReportsThematicCard } from "./ReportsThematicCard";
+import { ReplaceReportFileDialog } from "./ReplaceReportFileDialog";
 import { cn } from "@/lib/utils";
 
 interface ReportWithDetails {
@@ -79,8 +81,10 @@ interface ThematicReportsGroup {
 export function ReportsReviewManagement() {
   const { user } = useAuth();
   const { logAction } = useAuditLog();
+  const [searchParams, setSearchParams] = useSearchParams();
   
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>(searchParams.get("status") || "all");
+  const [monthFilter, setMonthFilter] = useState<string>(searchParams.get("mes") || "all");
   const [searchTerm, setSearchTerm] = useState("");
   const [sponsorFilter, setSponsorFilter] = useState<string>("all");
   
@@ -90,6 +94,32 @@ export function ReportsReviewManagement() {
   const [feedback, setFeedback] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
+
+  // Replace file dialog state
+  const [replaceDialogOpen, setReplaceDialogOpen] = useState(false);
+  const [reportToReplace, setReportToReplace] = useState<ReportWithDetails | null>(null);
+
+  // Helper to update query params
+  const updateQueryParams = (updates: Record<string, string>) => {
+    const newParams = new URLSearchParams(searchParams);
+    Object.entries(updates).forEach(([k, v]) => {
+      if (v && v !== "all") newParams.set(k, v);
+      else newParams.delete(k);
+    });
+    // Keep tab param
+    if (!newParams.has("tab")) newParams.set("tab", "relatorios");
+    setSearchParams(newParams, { replace: true });
+  };
+
+  const handleStatusFilterChange = (val: string) => {
+    setStatusFilter(val);
+    updateQueryParams({ status: val, mes: monthFilter });
+  };
+
+  const handleMonthFilterChange = (val: string) => {
+    setMonthFilter(val);
+    updateQueryParams({ mes: val, status: statusFilter });
+  };
 
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['reports-management'],
@@ -181,6 +211,12 @@ export function ReportsReviewManagement() {
     return [...new Set(data?.thematicProjects?.map(p => p.sponsor_name) || [])];
   }, [data?.thematicProjects]);
 
+  // Get unique months for filter
+  const availableMonths = useMemo(() => {
+    const months = [...new Set(data?.reports?.map(r => r.reference_month) || [])];
+    return months.sort().reverse();
+  }, [data?.reports]);
+
   // Group reports by thematic project and apply filters
   const filteredGroups = useMemo(() => {
     if (!data) return [];
@@ -195,8 +231,9 @@ export function ReportsReviewManagement() {
         report.project_code.toLowerCase().includes(searchLower);
       
       const matchesStatus = statusFilter === "all" || report.status === statusFilter;
+      const matchesMonth = monthFilter === "all" || report.reference_month === monthFilter;
       
-      return matchesSearch && matchesStatus;
+      return matchesSearch && matchesStatus && matchesMonth;
     });
 
     // Group by thematic project
@@ -232,7 +269,7 @@ export function ReportsReviewManagement() {
     });
 
     return groups;
-  }, [data, searchTerm, statusFilter, sponsorFilter]);
+  }, [data, searchTerm, statusFilter, sponsorFilter, monthFilter]);
 
   const handleViewPdf = async (fileUrl: string) => {
     setPdfLoading(true);
@@ -381,13 +418,22 @@ export function ReportsReviewManagement() {
     }
   };
 
-  // Calculate global stats
+  // Calculate filtered stats (respecting month filter)
   const globalStats = useMemo(() => {
     const allReports = data?.reports || [];
+    const monthReports = monthFilter === "all" ? allReports : allReports.filter(r => r.reference_month === monthFilter);
     return {
-      underReview: allReports.filter(r => r.status === 'under_review').length,
+      underReview: monthReports.filter(r => r.status === 'under_review').length,
+      approved: monthReports.filter(r => r.status === 'approved').length,
+      rejected: monthReports.filter(r => r.status === 'rejected').length,
+      total: monthReports.length,
     };
-  }, [data?.reports]);
+  }, [data?.reports, monthFilter]);
+
+  const handleReplaceFile = (report: ReportWithDetails) => {
+    setReportToReplace(report);
+    setReplaceDialogOpen(true);
+  };
 
   const handleExportCSV = () => {
     const allFilteredReports = filteredGroups.flatMap(g => g.reports);
@@ -459,8 +505,21 @@ export function ReportsReviewManagement() {
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Filtered Stats */}
+        {!isLoading && (
+          <div className="flex flex-wrap gap-4 text-sm">
+            <span className="text-muted-foreground">
+              {monthFilter !== "all" ? `Mês: ${monthFilter}` : "Todos os meses"} —
+            </span>
+            <span><strong className="text-warning">{globalStats.underReview}</strong> em análise</span>
+            <span><strong className="text-success">{globalStats.approved}</strong> aprovados</span>
+            <span><strong className="text-destructive">{globalStats.rejected}</strong> devolvidos</span>
+            <span><strong>{globalStats.total}</strong> total</span>
+          </div>
+        )}
+
         {/* Filters */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <div className="relative lg:col-span-2">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -470,8 +529,26 @@ export function ReportsReviewManagement() {
               className="pl-10"
             />
           </div>
+
+          <Select value={monthFilter} onValueChange={handleMonthFilterChange}>
+            <SelectTrigger>
+              <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
+              <SelectValue placeholder="Mês/Ano" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os meses</SelectItem>
+              {availableMonths.map(month => {
+                try {
+                  const [y, m] = month.split("-").map(Number);
+                  const d = new Date(y, m - 1, 1);
+                  const label = format(d, "MMMM/yyyy", { locale: ptBR });
+                  return <SelectItem key={month} value={month}>{label.charAt(0).toUpperCase() + label.slice(1)}</SelectItem>;
+                } catch { return <SelectItem key={month} value={month}>{month}</SelectItem>; }
+              })}
+            </SelectContent>
+          </Select>
           
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
             <SelectTrigger>
               <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
               <SelectValue placeholder="Status" />
@@ -532,6 +609,7 @@ export function ReportsReviewManagement() {
                 group={group}
                 onViewPdf={handleViewPdf}
                 onReview={handleOpenReview}
+                onReplaceFile={handleReplaceFile}
               />
             ))
           )}
@@ -619,6 +697,17 @@ export function ReportsReviewManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Replace File Dialog */}
+      {reportToReplace && (
+        <ReplaceReportFileDialog
+          open={replaceDialogOpen}
+          onOpenChange={setReplaceDialogOpen}
+          report={reportToReplace}
+          onViewPdf={handleViewPdf}
+          onSuccess={() => refetch()}
+        />
+      )}
     </Card>
   );
 }

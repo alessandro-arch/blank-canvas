@@ -26,6 +26,7 @@ import {
   Calendar,
   Eye,
   FileText,
+  FileUp,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
@@ -67,6 +68,7 @@ interface ReportsThematicCardProps {
   group: ThematicReportsGroup;
   onViewPdf: (fileUrl: string) => void;
   onReview: (report: ReportWithDetails) => void;
+  onReplaceFile: (report: ReportWithDetails) => void;
 }
 
 const statusConfig: Record<string, { label: string; icon: typeof Clock; className: string }> = {
@@ -85,7 +87,7 @@ function formatReferenceMonth(refMonth: string): string {
   }
 }
 
-export function ReportsThematicCard({ group, onViewPdf, onReview }: ReportsThematicCardProps) {
+export function ReportsThematicCard({ group, onViewPdf, onReview, onReplaceFile }: ReportsThematicCardProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   // Calculate KPIs
@@ -281,6 +283,15 @@ export function ReportsThematicCard({ group, onViewPdf, onReview }: ReportsThema
                               >
                                 <Eye className="w-4 h-4" />
                                 Ver PDF
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1.5"
+                                onClick={() => onReplaceFile(report)}
+                                title="Trocar arquivo"
+                              >
+                                <FileUp className="w-4 h-4" />
                               </Button>
                               {report.status === "under_review" && (
                                 <Button
