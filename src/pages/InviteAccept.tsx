@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,8 +8,18 @@ import { Loader2, CheckCircle, XCircle, Building2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { InviteDetails } from "@/types/admin-members";
 
-const InviteAccept = () => {
-  const { token } = useParams<{ token: string }>();
+const roleRedirects: Record<string, string> = {
+  admin: "/admin/painel",
+  manager: "/admin/painel",
+  reviewer: "/admin/painel",
+  beneficiary: "/bolsista/painel",
+  proponente: "/bolsista/painel",
+};
+
+const InviteAcceptPage = () => {
+  const [searchParams] = useSearchParams();
+  const { token: pathToken } = useParams<{ token: string }>();
+  const token = searchParams.get("token") || pathToken || null;
   const { session, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -17,10 +27,15 @@ const InviteAccept = () => {
   const [loading, setLoading] = useState(true);
   const [accepting, setAccepting] = useState(false);
   const [accepted, setAccepted] = useState(false);
+  const [acceptedRole, setAcceptedRole] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchInvite = async () => {
-      if (!token) return;
+      if (!token) {
+        setInvite({ valid: false, error: "Token não informado" });
+        setLoading(false);
+        return;
+      }
       const { data, error } = await supabase.rpc("get_invite_details", { p_token: token });
       if (error) {
         setInvite({ valid: false, error: error.message });
@@ -32,6 +47,13 @@ const InviteAccept = () => {
     fetchInvite();
   }, [token]);
 
+  // Auto-accept when user is logged in and invite is valid
+  useEffect(() => {
+    if (session && invite?.valid && !accepted && !accepting && token) {
+      handleAccept();
+    }
+  }, [session, invite?.valid]);
+
   const handleAccept = async () => {
     if (!token) return;
     setAccepting(true);
@@ -41,9 +63,13 @@ const InviteAccept = () => {
       setAccepting(false);
       return;
     }
+    const result = data as any;
+    const role = result?.role || invite?.role || "manager";
+    setAcceptedRole(role);
     setAccepted(true);
     toast({ title: "Convite aceito com sucesso!" });
-    setTimeout(() => navigate("/admin/painel"), 2000);
+    const redirect = roleRedirects[role] || "/admin/painel";
+    setTimeout(() => navigate(redirect, { replace: true }), 2000);
   };
 
   if (loading || authLoading) {
@@ -61,10 +87,13 @@ const InviteAccept = () => {
           <CardHeader className="text-center">
             <XCircle className="h-12 w-12 text-destructive mx-auto mb-2" />
             <CardTitle>Convite Inválido</CardTitle>
-            <CardDescription>{invite?.error || "Este convite não é válido."}</CardDescription>
+            <CardDescription>{invite?.error || "Este convite não é válido ou expirou."}</CardDescription>
           </CardHeader>
-          <CardContent className="text-center">
-            <Button variant="outline" onClick={() => navigate("/")}>Ir para o início</Button>
+          <CardContent className="flex flex-col gap-3 text-center">
+            <Button variant="outline" onClick={() => navigate("/acesso")}>Ir para o início</Button>
+            <a href="mailto:contato@innovago.app" className="text-sm text-muted-foreground hover:text-primary underline">
+              Falar com suporte
+            </a>
           </CardContent>
         </Card>
       </div>
@@ -72,13 +101,16 @@ const InviteAccept = () => {
   }
 
   if (accepted) {
+    const roleLabel = acceptedRole === "admin" ? "Administrador" : acceptedRole === "manager" ? "Gestor" : acceptedRole === "reviewer" ? "Avaliador" : "Proponente";
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="max-w-md w-full">
           <CardHeader className="text-center">
             <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-2" />
             <CardTitle>Convite Aceito!</CardTitle>
-            <CardDescription>Você agora é {invite.role} da organização {invite.organization_name}. Redirecionando...</CardDescription>
+            <CardDescription>
+              Você agora é {roleLabel} da organização {invite.organization_name}. Redirecionando...
+            </CardDescription>
           </CardHeader>
         </Card>
       </div>
@@ -86,6 +118,7 @@ const InviteAccept = () => {
   }
 
   if (!session) {
+    const redirectPath = `/convite?token=${token}`;
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="max-w-md w-full">
@@ -97,10 +130,10 @@ const InviteAccept = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
-            <Button onClick={() => navigate(`/admin/login?redirect=/invite/${token}`)}>
+            <Button onClick={() => navigate(`/admin/login?redirect=${encodeURIComponent(redirectPath)}`)}>
               Fazer Login
             </Button>
-            <Button variant="outline" onClick={() => navigate(`/criar-conta?redirect=/invite/${token}`)}>
+            <Button variant="outline" onClick={() => navigate(`/criar-conta?redirect=${encodeURIComponent(redirectPath)}`)}>
               Criar Conta
             </Button>
           </CardContent>
@@ -109,26 +142,18 @@ const InviteAccept = () => {
     );
   }
 
+  // Logged in but waiting for auto-accept
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="max-w-md w-full">
         <CardHeader className="text-center">
-          <Building2 className="h-12 w-12 text-primary mx-auto mb-2" />
-          <CardTitle>Convite para {invite.organization_name}</CardTitle>
-          <CardDescription>
-            Você foi convidado como <strong>{invite.role}</strong>.
-          </CardDescription>
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
+          <CardTitle>Aceitando convite...</CardTitle>
+          <CardDescription>Aguarde enquanto processamos seu convite para {invite.organization_name}.</CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <Button onClick={handleAccept} disabled={accepting}>
-            {accepting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-            Aceitar Convite
-          </Button>
-          <Button variant="outline" onClick={() => navigate("/")}>Recusar</Button>
-        </CardContent>
       </Card>
     </div>
   );
 };
 
-export default InviteAccept;
+export default InviteAcceptPage;

@@ -44,14 +44,12 @@ export function useAdminMembers() {
       toast({ title: "Erro ao carregar membros", description: err.message, variant: "destructive" });
     }
 
-    // Fetch pending invites
+    // Fetch ALL invites (not just pending)
     try {
       const { data } = await (supabase as any)
         .from("organization_invites")
         .select("*")
         .eq("organization_id", orgId)
-        .eq("status", "pending")
-        .gt("expires_at", new Date().toISOString())
         .order("created_at", { ascending: false });
       setInvites((data || []) as OrgInvite[]);
     } catch {
@@ -105,9 +103,45 @@ export function useAdminMembers() {
       toast({ title: "Erro ao criar convite", description: error.message, variant: "destructive" });
       return null;
     }
+    const result = data as unknown as { invite_id: string; token: string };
     toast({ title: "Convite criado com sucesso!" });
+
+    // Send invite email automatically
+    await sendInviteEmail(result.invite_id);
+
     await fetchMembers();
-    return data as unknown as { invite_id: string; token: string };
+    return result;
+  };
+
+  const sendInviteEmail = async (inviteId: string) => {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+      const res = await fetch(`${supabaseUrl}/functions/v1/send-org-invite-email`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          apikey: anonKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ invite_id: inviteId }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        toast({ title: "Aviso", description: `Convite criado, mas falha ao enviar e-mail: ${err.error}`, variant: "destructive" });
+        return false;
+      }
+      toast({ title: "E-mail de convite enviado!" });
+      return true;
+    } catch (err: any) {
+      console.error("Error sending invite email:", err);
+      toast({ title: "Aviso", description: "Convite criado, mas falha ao enviar e-mail.", variant: "destructive" });
+      return false;
+    }
   };
 
   const revokeInvite = async (inviteId: string) => {
@@ -124,6 +158,14 @@ export function useAdminMembers() {
     return true;
   };
 
+  const resendInviteEmail = async (inviteId: string) => {
+    const success = await sendInviteEmail(inviteId);
+    if (success) {
+      await fetchMembers();
+    }
+    return success;
+  };
+
   return {
     members,
     invites,
@@ -132,6 +174,7 @@ export function useAdminMembers() {
     toggleMemberActive,
     createInvite,
     revokeInvite,
+    resendInviteEmail,
     refreshMembers: fetchMembers,
   };
 }

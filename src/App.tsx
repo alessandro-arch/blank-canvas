@@ -61,7 +61,8 @@ const App = () => (
               <Route path="/criar-conta" element={<ScholarSignup />} />
               <Route path="/acesso-negado" element={<AccessDenied />} />
               
-              {/* Public invite accept page */}
+              {/* Public invite accept pages */}
+              <Route path="/convite" element={<InviteAccept />} />
               <Route path="/invite/:token" element={<InviteAccept />} />
               
               {/* Legacy auth route - redirect to new access page */}
