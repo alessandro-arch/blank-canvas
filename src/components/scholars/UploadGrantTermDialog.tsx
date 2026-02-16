@@ -111,12 +111,22 @@ export function UploadGrantTermDialog({
 
       let dbError;
 
-      if (existingTerm) {
+      // Always check for existing record to avoid duplicates
+      const { data: existingRecords } = await supabase
+        .from("grant_terms")
+        .select("id")
+        .eq("user_id", scholarUserId)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      const existingRecordId = existingTerm?.id || existingRecords?.[0]?.id;
+
+      if (existingRecordId) {
         // Update existing
         const { error } = await supabase
           .from("grant_terms")
           .update(termData)
-          .eq("id", existingTerm.id);
+          .eq("id", existingRecordId);
         dbError = error;
       } else {
         // Insert new

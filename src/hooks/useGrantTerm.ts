@@ -41,6 +41,8 @@ export function useGrantTerm(userId: string | undefined): UseGrantTermReturn {
         .from("grant_terms")
         .select("*")
         .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (fetchError) {
