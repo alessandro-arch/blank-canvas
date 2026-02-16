@@ -12,8 +12,9 @@ import {
   Search,
   Calendar,
   Building2,
-  Send,
   Download,
+  Users,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,79 +35,57 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Table,
+  TableBody,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAuditLog } from "@/hooks/useAuditLog";
 import { toast } from "sonner";
 import { format, parseISO, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ReportsThematicCard } from "./ReportsThematicCard";
 import { ReplaceReportFileDialog } from "./ReplaceReportFileDialog";
+import { ScholarReportRow, type ScholarRow, type ReportRecord } from "./ScholarReportRow";
 import { cn } from "@/lib/utils";
-
-interface ReportWithDetails {
-  id: string;
-  user_id: string;
-  reference_month: string;
-  installment_number: number;
-  file_url: string;
-  file_name: string;
-  observations: string | null;
-  status: string;
-  feedback: string | null;
-  submitted_at: string;
-  reviewed_at: string | null;
-  reviewed_by: string | null;
-  resubmission_deadline: string | null;
-  scholar_name: string;
-  scholar_email: string;
-  project_title: string;
-  project_code: string;
-  enrollment_id: string;
-  payment_id: string | null;
-  thematic_project_id: string;
-  thematic_project_title: string;
-}
-
-interface ThematicReportsGroup {
-  id: string;
-  title: string;
-  sponsor_name: string;
-  status: string;
-  reports: ReportWithDetails[];
-}
 
 export function ReportsReviewManagement() {
   const { user } = useAuth();
   const { logAction } = useAuditLog();
   const [searchParams, setSearchParams] = useSearchParams();
-  
+
   const [statusFilter, setStatusFilter] = useState<string>(searchParams.get("status") || "all");
-  const [monthFilter, setMonthFilter] = useState<string>(searchParams.get("mes") || "all");
+  const [monthFilter, setMonthFilter] = useState<string>(searchParams.get("mes") || "");
   const [searchTerm, setSearchTerm] = useState("");
-  const [sponsorFilter, setSponsorFilter] = useState<string>("all");
-  
+  const [thematicFilter, setThematicFilter] = useState<string>("all");
+
   // Review dialog state
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
-  const [selectedReport, setSelectedReport] = useState<ReportWithDetails | null>(null);
+  const [selectedReport, setSelectedReport] = useState<ReportRecord | null>(null);
+  const [selectedScholar, setSelectedScholar] = useState<ScholarRow | null>(null);
   const [feedback, setFeedback] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
 
   // Replace file dialog state
   const [replaceDialogOpen, setReplaceDialogOpen] = useState(false);
-  const [reportToReplace, setReportToReplace] = useState<ReportWithDetails | null>(null);
+  const [reportToReplace, setReportToReplace] = useState<{
+    id: string; user_id: string; scholar_name: string; project_code: string;
+    reference_month: string; file_url: string; file_name: string; status: string;
+  } | null>(null);
 
   // Helper to update query params
   const updateQueryParams = (updates: Record<string, string>) => {
     const newParams = new URLSearchParams(searchParams);
     Object.entries(updates).forEach(([k, v]) => {
-      if (v && v !== "all") newParams.set(k, v);
+      if (v && v !== "all" && v !== "") newParams.set(k, v);
       else newParams.delete(k);
     });
-    // Keep tab param
     if (!newParams.has("tab")) newParams.set("tab", "relatorios");
     setSearchParams(newParams, { replace: true });
   };
@@ -121,172 +100,171 @@ export function ReportsReviewManagement() {
     updateQueryParams({ mes: val, status: statusFilter });
   };
 
+  // Main data query
   const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ['reports-management'],
+    queryKey: ["reports-management-v2"],
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
     queryFn: async () => {
-      // Fetch thematic projects
-      const { data: thematicProjects, error: thematicError } = await supabase
-        .from('thematic_projects')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (thematicError) throw thematicError;
-
-      // Fetch reports
-      const { data: reportsData, error: reportsError } = await supabase
-        .from("reports")
-        .select("*")
-        .order("submitted_at", { ascending: false });
-
-      if (reportsError) throw reportsError;
-
-      if (!reportsData || reportsData.length === 0) {
-        return { thematicProjects: thematicProjects || [], reports: [] };
-      }
-
-      // Get unique user IDs
-      const userIds = [...new Set(reportsData.map(r => r.user_id))];
-
-      // Fetch profiles
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("user_id, full_name, email")
-        .in("user_id", userIds);
-
-      // Fetch enrollments with project info
-      const { data: enrollments } = await supabase
-        .from("enrollments")
-        .select(`
-          id,
-          user_id,
+      // Fetch all needed data in parallel
+      const [
+        { data: thematicProjects, error: tpErr },
+        { data: reportsData, error: repErr },
+        { data: enrollments, error: enrErr },
+        { data: bankAccounts, error: bankErr },
+      ] = await Promise.all([
+        supabase.from("thematic_projects").select("*").order("created_at", { ascending: false }),
+        supabase.from("reports").select("*").order("submitted_at", { ascending: false }),
+        supabase.from("enrollments").select(`
+          id, user_id, status,
           project:projects(id, title, code, thematic_project_id)
-        `)
-        .in("user_id", userIds);
+        `).eq("status", "active"),
+        supabase.from("bank_accounts").select("user_id"),
+      ]);
 
-      // Fetch payments
-      const { data: payments } = await supabase
-        .from("payments")
-        .select("id, user_id, reference_month, enrollment_id")
-        .in("user_id", userIds);
+      if (tpErr) throw tpErr;
+      if (repErr) throw repErr;
+      if (enrErr) throw enrErr;
 
-      // Build thematic project map
-      const thematicMap = new Map(
-        (thematicProjects || []).map(tp => [tp.id, tp])
-      );
+      // Get unique user IDs from enrollments
+      const enrolledUserIds = [...new Set((enrollments || []).map(e => e.user_id))];
 
-      // Build enriched reports
-      const enrichedReports: ReportWithDetails[] = reportsData.map(report => {
-        const profile = profiles?.find(p => p.user_id === report.user_id);
-        const enrollment = enrollments?.find(e => e.user_id === report.user_id);
-        const payment = payments?.find(p => 
-          p.user_id === report.user_id && 
-          p.reference_month === report.reference_month
-        );
-        const project = enrollment?.project as { id: string; title: string; code: string; thematic_project_id: string } | null;
-        const thematicProjectId = project?.thematic_project_id || '';
-        const thematicProject = thematicMap.get(thematicProjectId);
+      // Fetch profiles for enrolled users
+      const { data: profiles } = enrolledUserIds.length > 0
+        ? await supabase
+            .from("profiles")
+            .select("user_id, full_name, email, is_active")
+            .in("user_id", enrolledUserIds)
+        : { data: [] };
 
-        return {
-          ...report,
-          scholar_name: profile?.full_name || "Nome não disponível",
-          scholar_email: profile?.email || "",
-          project_title: project?.title || "Projeto não encontrado",
-          project_code: project?.code || "",
-          enrollment_id: enrollment?.id || "",
-          payment_id: payment?.id || null,
-          thematic_project_id: thematicProjectId,
-          thematic_project_title: thematicProject?.title || "Projeto Temático não encontrado",
-        };
+      // Build bank data set
+      const bankUserIds = new Set((bankAccounts || []).map(b => b.user_id));
+
+      // Build thematic map
+      const thematicMap = new Map((thematicProjects || []).map(tp => [tp.id, tp]));
+
+      // Build reports map per user
+      const reportsByUser = new Map<string, ReportRecord[]>();
+      (reportsData || []).forEach(r => {
+        const list = reportsByUser.get(r.user_id) || [];
+        list.push(r as ReportRecord);
+        reportsByUser.set(r.user_id, list);
       });
 
-      return { thematicProjects: thematicProjects || [], reports: enrichedReports };
+      // Get available months from reports
+      const allMonths = [...new Set((reportsData || []).map(r => r.reference_month))].sort().reverse();
+
+      // Build scholar rows from enrollments
+      const scholarRows: ScholarRow[] = [];
+      const seenUsers = new Set<string>();
+
+      (enrollments || []).forEach(enrollment => {
+        if (seenUsers.has(enrollment.user_id)) return;
+        seenUsers.add(enrollment.user_id);
+
+        const profile = (profiles || []).find(p => p.user_id === enrollment.user_id);
+        const project = enrollment.project as { id: string; title: string; code: string; thematic_project_id: string } | null;
+        const thematicProjectId = project?.thematic_project_id || "";
+        const thematicProject = thematicMap.get(thematicProjectId);
+        const userReports = reportsByUser.get(enrollment.user_id) || [];
+
+        scholarRows.push({
+          user_id: enrollment.user_id,
+          full_name: profile?.full_name || "Nome não disponível",
+          email: profile?.email || "",
+          is_active: profile?.is_active ?? true,
+          has_bank_data: bankUserIds.has(enrollment.user_id),
+          project_title: project?.title || "Projeto não encontrado",
+          project_code: project?.code || "",
+          thematic_project_title: thematicProject?.title || "",
+          enrollment_id: enrollment.id,
+          current_report: null, // Will be set based on month filter
+          all_reports: userReports.sort((a, b) => b.reference_month.localeCompare(a.reference_month)),
+        });
+      });
+
+      return {
+        scholars: scholarRows,
+        thematicProjects: thematicProjects || [],
+        availableMonths: allMonths,
+      };
     },
   });
 
-  // Get unique sponsors for filter
-  const sponsors = useMemo(() => {
-    return [...new Set(data?.thematicProjects?.map(p => p.sponsor_name) || [])];
-  }, [data?.thematicProjects]);
+  // Auto-select current month if none selected
+  const effectiveMonth = useMemo(() => {
+    if (monthFilter) return monthFilter;
+    if (data?.availableMonths && data.availableMonths.length > 0) {
+      return data.availableMonths[0]; // Most recent
+    }
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  }, [monthFilter, data?.availableMonths]);
 
-  // Get unique months for filter
-  const availableMonths = useMemo(() => {
-    const months = [...new Set(data?.reports?.map(r => r.reference_month) || [])];
-    return months.sort().reverse();
-  }, [data?.reports]);
-
-  // Group reports by thematic project and apply filters
-  const filteredGroups = useMemo(() => {
+  // Apply filters and set current_report for selected month
+  const filteredScholars = useMemo(() => {
     if (!data) return [];
-
     const searchLower = searchTerm.toLowerCase();
 
-    // Filter reports
-    let filteredReports = data.reports.filter(report => {
-      const matchesSearch = 
-        !searchTerm ||
-        report.scholar_name.toLowerCase().includes(searchLower) ||
-        report.project_code.toLowerCase().includes(searchLower);
-      
-      const matchesStatus = statusFilter === "all" || report.status === statusFilter;
-      const matchesMonth = monthFilter === "all" || report.reference_month === monthFilter;
-      
-      return matchesSearch && matchesStatus && matchesMonth;
-    });
+    return data.scholars
+      .map(s => {
+        // Set current report for the selected month
+        const currentReport = s.all_reports.find(r => r.reference_month === effectiveMonth) || null;
+        return { ...s, current_report: currentReport };
+      })
+      .filter(s => {
+        // Search filter
+        if (searchTerm) {
+          const matches =
+            s.full_name.toLowerCase().includes(searchLower) ||
+            s.email.toLowerCase().includes(searchLower) ||
+            s.project_code.toLowerCase().includes(searchLower);
+          if (!matches) return false;
+        }
 
-    // Group by thematic project
-    const groupedMap = new Map<string, ReportWithDetails[]>();
-    filteredReports.forEach(report => {
-      const key = report.thematic_project_id;
-      if (!groupedMap.has(key)) {
-        groupedMap.set(key, []);
-      }
-      groupedMap.get(key)!.push(report);
-    });
+        // Status filter
+        if (statusFilter !== "all") {
+          const reportStatus = s.current_report?.status || "pending";
+          if (statusFilter === "pending" && reportStatus !== "pending") return false;
+          if (statusFilter !== "pending" && reportStatus !== statusFilter) return false;
+        }
 
-    // Build groups with thematic project info
-    const groups: ThematicReportsGroup[] = [];
-    data.thematicProjects.forEach(tp => {
-      const reports = groupedMap.get(tp.id) || [];
-      
-      // Filter by sponsor
-      if (sponsorFilter !== 'all' && tp.sponsor_name !== sponsorFilter) {
-        return;
-      }
-      
-      // Only include thematic projects with reports
-      if (reports.length > 0) {
-        groups.push({
-          id: tp.id,
-          title: tp.title,
-          sponsor_name: tp.sponsor_name,
-          status: tp.status,
-          reports,
-        });
-      }
-    });
+        // Thematic project filter
+        if (thematicFilter !== "all") {
+          const thematic = data.thematicProjects.find(tp => tp.id === thematicFilter);
+          if (!thematic || s.thematic_project_title !== thematic.title) return false;
+        }
 
-    return groups;
-  }, [data, searchTerm, statusFilter, sponsorFilter, monthFilter]);
+        return true;
+      });
+  }, [data, searchTerm, statusFilter, thematicFilter, effectiveMonth]);
 
+  // Stats for the selected month
+  const monthStats = useMemo(() => {
+    if (!data) return { pending: 0, underReview: 0, approved: 0, rejected: 0, total: 0 };
+    const scholars = data.scholars.map(s => ({
+      ...s,
+      current_report: s.all_reports.find(r => r.reference_month === effectiveMonth) || null,
+    }));
+    const total = scholars.length;
+    const pending = scholars.filter(s => !s.current_report).length;
+    const underReview = scholars.filter(s => s.current_report?.status === "under_review").length;
+    const approved = scholars.filter(s => s.current_report?.status === "approved").length;
+    const rejected = scholars.filter(s => s.current_report?.status === "rejected").length;
+    return { pending, underReview, approved, rejected, total };
+  }, [data, effectiveMonth]);
+
+  // PDF viewing
   const handleViewPdf = async (fileUrl: string) => {
     setPdfLoading(true);
-    // Open window synchronously to avoid popup blocker
     const newWindow = window.open("about:blank", "_blank");
     try {
-      const { data, error } = await supabase.storage
-        .from("reports")
-        .createSignedUrl(fileUrl, 900); // 15 minutes
-
+      const { data, error } = await supabase.storage.from("reports").createSignedUrl(fileUrl, 900);
       if (error) throw error;
       if (data?.signedUrl) {
-        if (newWindow) {
-          newWindow.location.href = data.signedUrl;
-        } else {
-          toast.error("Permita pop-ups no navegador para visualizar o arquivo");
-        }
+        if (newWindow) newWindow.location.href = data.signedUrl;
+        else toast.error("Permita pop-ups no navegador para visualizar o arquivo");
       } else {
         newWindow?.close();
       }
@@ -300,8 +278,10 @@ export function ReportsReviewManagement() {
     }
   };
 
-  const handleOpenReview = (report: ReportWithDetails) => {
+  // Review actions
+  const handleOpenReview = (report: ReportRecord, scholar: ScholarRow) => {
     setSelectedReport(report);
+    setSelectedScholar(scholar);
     setFeedback("");
     setReviewDialogOpen(true);
   };
@@ -309,11 +289,8 @@ export function ReportsReviewManagement() {
   const handleApprove = async () => {
     if (!selectedReport || !user) return;
     setSubmitting(true);
-
     try {
       const now = new Date().toISOString();
-
-      // Update report status
       const { error: reportError } = await supabase
         .from("reports")
         .update({
@@ -323,32 +300,15 @@ export function ReportsReviewManagement() {
           feedback: feedback || null,
         })
         .eq("id", selectedReport.id);
-
       if (reportError) throw reportError;
 
-      // Update payment status to eligible
-      if (selectedReport.payment_id) {
-        const { error: paymentError } = await supabase
-          .from("payments")
-          .update({
-            status: "eligible",
-            report_id: selectedReport.id,
-          })
-          .eq("id", selectedReport.payment_id);
-
-        if (paymentError) {
-          console.error("Error updating payment:", paymentError);
-        }
-      }
-
-      // Log audit
       await logAction({
         action: "approve_report",
         entityType: "report",
         entityId: selectedReport.id,
         details: {
           scholar_id: selectedReport.user_id,
-          scholar_name: selectedReport.scholar_name,
+          scholar_name: selectedScholar?.full_name,
           reference_month: selectedReport.reference_month,
           feedback: feedback || null,
         },
@@ -367,42 +327,35 @@ export function ReportsReviewManagement() {
 
   const handleReject = async () => {
     if (!selectedReport || !user) return;
-    
     if (!feedback.trim()) {
       toast.error("O parecer é obrigatório para devolução");
       return;
     }
-
     setSubmitting(true);
-
     try {
       const now = new Date();
       const deadline = addDays(now, 5);
-
-      // Update report status
       const { error: reportError } = await supabase
         .from("reports")
         .update({
           status: "rejected",
           reviewed_at: now.toISOString(),
           reviewed_by: user.id,
-          feedback: feedback,
+          feedback,
           resubmission_deadline: deadline.toISOString(),
         })
         .eq("id", selectedReport.id);
-
       if (reportError) throw reportError;
 
-      // Log audit
       await logAction({
         action: "reject_report",
         entityType: "report",
         entityId: selectedReport.id,
         details: {
           scholar_id: selectedReport.user_id,
-          scholar_name: selectedReport.scholar_name,
+          scholar_name: selectedScholar?.full_name,
           reference_month: selectedReport.reference_month,
-          feedback: feedback,
+          feedback,
           resubmission_deadline: deadline.toISOString(),
         },
       });
@@ -418,62 +371,73 @@ export function ReportsReviewManagement() {
     }
   };
 
-  // Calculate filtered stats (respecting month filter)
-  const globalStats = useMemo(() => {
-    const allReports = data?.reports || [];
-    const monthReports = monthFilter === "all" ? allReports : allReports.filter(r => r.reference_month === monthFilter);
-    return {
-      underReview: monthReports.filter(r => r.status === 'under_review').length,
-      approved: monthReports.filter(r => r.status === 'approved').length,
-      rejected: monthReports.filter(r => r.status === 'rejected').length,
-      total: monthReports.length,
-    };
-  }, [data?.reports, monthFilter]);
-
-  const handleReplaceFile = (report: ReportWithDetails) => {
-    setReportToReplace(report);
+  // Replace file
+  const handleReplaceFile = (report: ReportRecord, scholar: ScholarRow) => {
+    setReportToReplace({
+      id: report.id,
+      user_id: report.user_id,
+      scholar_name: scholar.full_name,
+      project_code: scholar.project_code,
+      reference_month: report.reference_month,
+      file_url: report.file_url,
+      file_name: report.file_name,
+      status: report.status,
+    });
     setReplaceDialogOpen(true);
   };
 
+  // Send reminder
+  const handleSendReminder = async (scholar: ScholarRow) => {
+    toast.info(`Lembrete enviado para ${scholar.full_name}`);
+    // Future: integrate with messaging system
+  };
+
+  // CSV export
   const handleExportCSV = () => {
-    const allFilteredReports = filteredGroups.flatMap(g => g.reports);
-    if (allFilteredReports.length === 0) {
-      toast.error("Nenhum relatório para exportar");
+    if (filteredScholars.length === 0) {
+      toast.error("Nenhum dado para exportar");
       return;
     }
-
     const statusLabels: Record<string, string> = {
+      pending: "Pendente",
       under_review: "Em Análise",
       approved: "Aprovado",
       rejected: "Devolvido",
     };
-
-    const headers = ["Bolsista", "Email", "Projeto", "Código", "Projeto Temático", "Mês Ref.", "Parcela", "Status", "Enviado em", "Avaliado em"];
-    const rows = allFilteredReports.map(r => [
-      r.scholar_name,
-      r.scholar_email,
-      r.project_title,
-      r.project_code,
-      r.thematic_project_title,
-      r.reference_month,
-      r.installment_number,
-      statusLabels[r.status] || r.status,
-      r.submitted_at ? format(parseISO(r.submitted_at), "dd/MM/yyyy") : "",
-      r.reviewed_at ? format(parseISO(r.reviewed_at), "dd/MM/yyyy") : "",
+    const headers = ["Bolsista", "Email", "Projeto", "Código", "Projeto Temático", "Mês Ref.", "Status", "Enviado em"];
+    const rows = filteredScholars.map(s => [
+      s.full_name,
+      s.email,
+      s.project_title,
+      s.project_code,
+      s.thematic_project_title,
+      effectiveMonth,
+      statusLabels[s.current_report?.status || "pending"] || "Pendente",
+      s.current_report?.submitted_at ? format(parseISO(s.current_report.submitted_at), "dd/MM/yyyy") : "",
     ]);
-
     const csvContent = [headers, ...rows]
       .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
       .join("\n");
-
     const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `relatorios_${format(new Date(), "yyyy-MM-dd")}.csv`;
+    link.download = `relatorios_${effectiveMonth}_${format(new Date(), "yyyy-MM-dd")}.csv`;
     link.click();
     URL.revokeObjectURL(url);
     toast.success("CSV exportado com sucesso!");
+  };
+
+  // Format month label
+  const formatMonthLabel = (m: string) => {
+    try {
+      const [y, mo] = m.split("-").map(Number);
+      const d = new Date(y, mo - 1, 1);
+      const label = format(d, "MMMM/yyyy", { locale: ptBR });
+      return label.charAt(0).toUpperCase() + label.slice(1);
+    } catch {
+      return m;
+    }
   };
 
   return (
@@ -486,9 +450,11 @@ export function ReportsReviewManagement() {
               Avaliação de Relatórios
             </CardTitle>
             <CardDescription>
-              {globalStats.underReview > 0 
-                ? `${globalStats.underReview} relatório(s) aguardando análise`
-                : "Acompanhe relatórios por projeto temático"
+              {monthStats.underReview > 0
+                ? `${monthStats.underReview} relatório(s) aguardando análise`
+                : monthStats.pending > 0
+                  ? `${monthStats.pending} bolsista(s) sem relatório enviado`
+                  : "Acompanhe relatórios por bolsista"
               }
             </CardDescription>
           </div>
@@ -504,50 +470,73 @@ export function ReportsReviewManagement() {
           </div>
         </div>
       </CardHeader>
+
       <CardContent className="space-y-6">
-        {/* Filtered Stats */}
+        {/* KPI Stats for month */}
         {!isLoading && (
-          <div className="flex flex-wrap gap-4 text-sm">
-            <span className="text-muted-foreground">
-              {monthFilter !== "all" ? `Mês: ${monthFilter}` : "Todos os meses"} —
-            </span>
-            <span><strong className="text-warning">{globalStats.underReview}</strong> em análise</span>
-            <span><strong className="text-success">{globalStats.approved}</strong> aprovados</span>
-            <span><strong className="text-destructive">{globalStats.rejected}</strong> devolvidos</span>
-            <span><strong>{globalStats.total}</strong> total</span>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div className="p-3 rounded-lg bg-muted/50 text-center">
+              <p className="text-2xl font-bold text-foreground">{monthStats.total}</p>
+              <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                <Users className="w-3 h-3" /> Total
+              </p>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/50 text-center">
+              <p className="text-2xl font-bold text-muted-foreground">{monthStats.pending}</p>
+              <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                <AlertTriangle className="w-3 h-3" /> Pendentes
+              </p>
+            </div>
+            <div className="p-3 rounded-lg bg-warning/10 text-center">
+              <p className="text-2xl font-bold text-warning">{monthStats.underReview}</p>
+              <p className="text-xs text-warning flex items-center justify-center gap-1">
+                <Clock className="w-3 h-3" /> Em Análise
+              </p>
+            </div>
+            <div className="p-3 rounded-lg bg-success/10 text-center">
+              <p className="text-2xl font-bold text-success">{monthStats.approved}</p>
+              <p className="text-xs text-success flex items-center justify-center gap-1">
+                <CheckCircle className="w-3 h-3" /> Aprovados
+              </p>
+            </div>
+            <div className="p-3 rounded-lg bg-destructive/10 text-center">
+              <p className="text-2xl font-bold text-destructive">{monthStats.rejected}</p>
+              <p className="text-xs text-destructive flex items-center justify-center gap-1">
+                <XCircle className="w-3 h-3" /> Devolvidos
+              </p>
+            </div>
           </div>
         )}
 
         {/* Filters */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {/* Month filter - primary */}
+          <Select value={effectiveMonth} onValueChange={handleMonthFilterChange}>
+            <SelectTrigger className="border-primary/30 bg-primary/5">
+              <Calendar className="h-4 w-4 mr-2 text-primary" />
+              <SelectValue placeholder="Mês/Ano" />
+            </SelectTrigger>
+            <SelectContent>
+              {(data?.availableMonths || []).map(month => (
+                <SelectItem key={month} value={month}>
+                  {formatMonthLabel(month)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Search */}
           <div className="relative lg:col-span-2">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por bolsista ou código..."
+              placeholder="Buscar por nome, email ou código..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
             />
           </div>
 
-          <Select value={monthFilter} onValueChange={handleMonthFilterChange}>
-            <SelectTrigger>
-              <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
-              <SelectValue placeholder="Mês/Ano" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os meses</SelectItem>
-              {availableMonths.map(month => {
-                try {
-                  const [y, m] = month.split("-").map(Number);
-                  const d = new Date(y, m - 1, 1);
-                  const label = format(d, "MMMM/yyyy", { locale: ptBR });
-                  return <SelectItem key={month} value={month}>{label.charAt(0).toUpperCase() + label.slice(1)}</SelectItem>;
-                } catch { return <SelectItem key={month} value={month}>{month}</SelectItem>; }
-              })}
-            </SelectContent>
-          </Select>
-          
+          {/* Status filter */}
           <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
             <SelectTrigger>
               <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
@@ -555,63 +544,75 @@ export function ReportsReviewManagement() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os status</SelectItem>
+              <SelectItem value="pending">Pendentes</SelectItem>
               <SelectItem value="under_review">Em Análise</SelectItem>
               <SelectItem value="approved">Aprovados</SelectItem>
               <SelectItem value="rejected">Devolvidos</SelectItem>
             </SelectContent>
           </Select>
 
-          <Select value={sponsorFilter} onValueChange={setSponsorFilter}>
+          {/* Thematic project filter */}
+          <Select value={thematicFilter} onValueChange={setThematicFilter}>
             <SelectTrigger>
               <Building2 className="h-4 w-4 mr-2 text-muted-foreground" />
-              <SelectValue placeholder="Financiador" />
+              <SelectValue placeholder="Projeto Temático" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos os financiadores</SelectItem>
-              {sponsors.map(sponsor => (
-                <SelectItem key={sponsor} value={sponsor}>{sponsor}</SelectItem>
+              <SelectItem value="all">Todos os projetos</SelectItem>
+              {(data?.thematicProjects || []).map(tp => (
+                <SelectItem key={tp.id} value={tp.id}>{tp.title}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
-        {/* Thematic Project Cards */}
-        <div className="space-y-4">
+        {/* Scholar Table */}
+        <div className="rounded-lg border overflow-hidden">
           {isLoading ? (
-            Array.from({ length: 2 }).map((_, i) => (
-              <Card key={i}>
-                <CardContent className="p-6">
-                  <div className="flex gap-4">
-                    <Skeleton className="w-12 h-12 rounded-lg" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-4 w-20" />
-                      <Skeleton className="h-6 w-full max-w-lg" />
-                      <Skeleton className="h-4 w-32" />
-                    </div>
-                    <div className="flex gap-6">
-                      <Skeleton className="w-16 h-16" />
-                      <Skeleton className="w-16 h-16" />
-                      <Skeleton className="w-16 h-16" />
-                    </div>
+            <div className="p-6 space-y-4">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex gap-4 items-center">
+                  <Skeleton className="w-8 h-8 rounded-full" />
+                  <div className="flex-1 space-y-1">
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="h-3 w-24" />
                   </div>
-                </CardContent>
-              </Card>
-            ))
-          ) : filteredGroups.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground border rounded-lg">
+                  <Skeleton className="h-6 w-20" />
+                  <Skeleton className="h-4 w-20" />
+                </div>
+              ))}
+            </div>
+          ) : filteredScholars.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
               <FileSearch className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Nenhum relatório encontrado</p>
+              <p className="text-sm">Nenhum bolsista encontrado para os filtros selecionados</p>
             </div>
           ) : (
-            filteredGroups.map(group => (
-              <ReportsThematicCard
-                key={group.id}
-                group={group}
-                onViewPdf={handleViewPdf}
-                onReview={handleOpenReview}
-                onReplaceFile={handleReplaceFile}
-              />
-            ))
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Bolsista</TableHead>
+                  <TableHead>Projeto</TableHead>
+                  <TableHead>Relatório do mês</TableHead>
+                  <TableHead>Enviado em</TableHead>
+                  <TableHead>Prazo</TableHead>
+                  <TableHead className="w-[120px]">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredScholars.map(scholar => (
+                  <ScholarReportRow
+                    key={scholar.user_id}
+                    scholar={scholar}
+                    selectedMonth={effectiveMonth}
+                    onViewPdf={handleViewPdf}
+                    onReview={handleOpenReview}
+                    onReplaceFile={handleReplaceFile}
+                    onSendReminder={handleSendReminder}
+                  />
+                ))}
+              </TableBody>
+            </Table>
           )}
         </div>
       </CardContent>
@@ -624,21 +625,23 @@ export function ReportsReviewManagement() {
               <FileSearch className="w-5 h-5 text-primary" />
               Avaliar Relatório
             </DialogTitle>
-            <DialogDescription>
-              Analise o relatório e forneça seu parecer
-            </DialogDescription>
+            <DialogDescription>Analise o relatório e forneça seu parecer</DialogDescription>
           </DialogHeader>
 
-          {selectedReport && (
+          {selectedReport && selectedScholar && (
             <div className="space-y-4">
               <div className="p-4 bg-muted/50 rounded-lg space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Bolsista</span>
-                  <span className="font-medium">{selectedReport.scholar_name}</span>
+                  <span className="font-medium">{selectedScholar.full_name}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Projeto</span>
-                  <span className="font-medium">{selectedReport.project_code}</span>
+                  <span className="font-medium">{selectedScholar.project_code}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Competência</span>
+                  <span className="font-medium">{formatMonthLabel(selectedReport.reference_month)}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Arquivo</span>
@@ -662,35 +665,20 @@ export function ReportsReviewManagement() {
                   onChange={(e) => setFeedback(e.target.value)}
                   rows={4}
                 />
-                <p className="text-xs text-muted-foreground">
-                  * Obrigatório para devolução
-                </p>
+                <p className="text-xs text-muted-foreground">* Obrigatório para devolução</p>
               </div>
             </div>
           )}
 
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button 
-              variant="outline" 
-              onClick={() => setReviewDialogOpen(false)}
-              disabled={submitting}
-            >
+            <Button variant="outline" onClick={() => setReviewDialogOpen(false)} disabled={submitting}>
               Cancelar
             </Button>
-            <Button
-              variant="destructive"
-              onClick={handleReject}
-              disabled={submitting}
-              className="gap-2"
-            >
+            <Button variant="destructive" onClick={handleReject} disabled={submitting} className="gap-2">
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
               Devolver
             </Button>
-            <Button
-              onClick={handleApprove}
-              disabled={submitting}
-              className="gap-2"
-            >
+            <Button onClick={handleApprove} disabled={submitting} className="gap-2">
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
               Aprovar
             </Button>
