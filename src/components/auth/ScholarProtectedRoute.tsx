@@ -33,7 +33,7 @@ export function ScholarProtectedRoute({ children }: ScholarProtectedRouteProps) 
 
   // If user is admin/manager, redirect them to admin panel
   if (hasManagerAccess) {
-    return <Navigate to="/admin/painel" replace />;
+    return <Navigate to="/admin/dashboard" replace />;
   }
 
   // Only scholars can access scholar routes

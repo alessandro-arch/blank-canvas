@@ -33,6 +33,8 @@ import ChangePassword from "./pages/ChangePassword";
 
 // Admin pages (reusing existing)
 import ManagerDashboard from "./pages/ManagerDashboard";
+import ExecutiveDashboard from "./pages/ExecutiveDashboard";
+import OperacaoBolsas from "./pages/OperacaoBolsas";
 import AdminIccaDashboard from "./pages/AdminIccaDashboard";
 import ThematicProjectsList from "./pages/ThematicProjectsList";
 import ThematicProjectDetail from "./pages/ThematicProjectDetail";
@@ -132,6 +134,16 @@ const App = () => (
                   <ManagerDashboard />
                 </AdminProtectedRoute>
               } />
+              <Route path="/admin/dashboard" element={
+                <AdminProtectedRoute>
+                  <ExecutiveDashboard />
+                </AdminProtectedRoute>
+              } />
+              <Route path="/admin/operacao" element={
+                <AdminProtectedRoute>
+                  <OperacaoBolsas />
+                </AdminProtectedRoute>
+              } />
               <Route path="/admin/importar" element={
                 <AdminProtectedRoute>
                   <Import />
@@ -191,7 +203,7 @@ const App = () => (
               } />
               
               {/* Legacy routes - redirect to new paths */}
-              <Route path="/painel-gestor" element={<Navigate to="/admin/painel" replace />} />
+              <Route path="/painel-gestor" element={<Navigate to="/admin/dashboard" replace />} />
               <Route path="/importar" element={<Navigate to="/admin/importar" replace />} />
               <Route path="/projetos-tematicos" element={<Navigate to="/admin/projetos-tematicos" replace />} />
               <Route path="/projetos-tematicos/:id" element={<Navigate to="/admin/projetos-tematicos/:id" replace />} />

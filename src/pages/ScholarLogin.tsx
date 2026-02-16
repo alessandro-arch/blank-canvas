@@ -31,7 +31,7 @@ export default function ScholarLogin() {
     if (user && !roleLoading) {
       if (hasManagerAccess) {
         // Admin/manager trying to access scholar portal - redirect to admin
-        navigate("/admin/painel", { replace: true });
+        navigate("/admin/dashboard", { replace: true });
       } else if (role === "scholar") {
         navigate("/bolsista/painel", { replace: true });
       }

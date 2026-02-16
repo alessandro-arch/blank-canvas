@@ -51,7 +51,8 @@ const scholarNavigation: NavItem[] = [
 
 const adminNavigation: NavItem[] = [
   { name: "Dashboard Estratégico", icon: Globe, href: "/admin/dashboard-icca", adminOnly: true, section: "Governança" },
-  { name: "Painel Gestor", icon: Users, href: "/admin/painel", managerOnly: true },
+  { name: "Dashboard Executivo", icon: LayoutDashboard, href: "/admin/dashboard", managerOnly: true },
+  { name: "Operação de Bolsas", icon: Users, href: "/admin/operacao", managerOnly: true },
   { name: "Projetos Temáticos", icon: FolderOpen, href: "/admin/projetos-tematicos", managerOnly: true },
   { name: "Mensagens", icon: Send, href: "/admin/mensagens", managerOnly: true },
   { name: "Documentos", icon: FileText, href: "/admin/documentos", managerOnly: true },

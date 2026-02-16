@@ -33,7 +33,7 @@ export default function AdminLogin() {
         // Scholar trying to access admin portal - redirect to scholar portal
         navigate("/bolsista/painel", { replace: true });
       } else if (hasManagerAccess) {
-        navigate("/admin/painel", { replace: true });
+        navigate("/admin/dashboard", { replace: true });
       }
     }
   }, [user, role, roleLoading, hasManagerAccess, isScholar, navigate]);

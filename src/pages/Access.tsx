@@ -73,7 +73,7 @@ export default function Access() {
   // Redirect authenticated users to their portal
   if (!authLoading && !roleLoading && user && role) {
     if (hasManagerAccess) {
-      return <Navigate to="/admin/painel" replace />;
+      return <Navigate to="/admin/dashboard" replace />;
     }
     if (role === "scholar") {
       return <Navigate to="/bolsista/painel" replace />;
