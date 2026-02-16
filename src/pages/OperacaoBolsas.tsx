@@ -18,7 +18,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   FileText, DollarSign, FolderOpen, XCircle, Users,
-  Calendar, Search, Download, Filter,
+  Calendar, Search, Download, Filter, Landmark,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { ReportsReviewManagement } from "@/components/dashboard/ReportsReviewManagement";
 import { PaymentsManagement } from "@/components/dashboard/PaymentsManagement";
 import { ProjectsManagement } from "@/components/projects/ProjectsManagement";
+import { BankDataManagement } from "@/components/dashboard/BankDataManagement";
 
 const OperacaoBolsas = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -145,7 +146,7 @@ const OperacaoBolsas = () => {
 
               {/* Tabs */}
               <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-                <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">
+                <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
                   <TabsTrigger value="relatorios" className="gap-2">
                     <FileText className="h-4 w-4" />
                     <span className="hidden sm:inline">Relatórios</span>
@@ -173,6 +174,10 @@ const OperacaoBolsas = () => {
                       </Badge>
                     )}
                   </TabsTrigger>
+                  <TabsTrigger value="dados-bancarios" className="gap-2">
+                    <Landmark className="h-4 w-4" />
+                    <span className="hidden sm:inline">Dados Bancários</span>
+                  </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="relatorios" className="mt-0">
@@ -185,6 +190,10 @@ const OperacaoBolsas = () => {
 
                 <TabsContent value="projetos" className="mt-0">
                   <ProjectsManagement />
+                </TabsContent>
+
+                <TabsContent value="dados-bancarios" className="mt-0">
+                  <BankDataManagement />
                 </TabsContent>
               </Tabs>
             </div>
