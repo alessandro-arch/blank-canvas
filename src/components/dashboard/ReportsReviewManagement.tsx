@@ -252,9 +252,10 @@ export function ReportsReviewManagement() {
       } else {
         newWindow?.close();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error opening PDF:", error);
-      toast.error("Erro ao abrir PDF");
+      const isNotFound = error?.statusCode === "404" || error?.message?.includes("not found");
+      toast.error(isNotFound ? "Arquivo PDF não encontrado no storage" : "Erro ao abrir PDF");
       newWindow?.close();
     } finally {
       setPdfLoading(false);
