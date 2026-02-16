@@ -12,6 +12,7 @@ import {
   Calendar,
   Building2,
   Send,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -388,6 +389,47 @@ export function ReportsReviewManagement() {
     };
   }, [data?.reports]);
 
+  const handleExportCSV = () => {
+    const allFilteredReports = filteredGroups.flatMap(g => g.reports);
+    if (allFilteredReports.length === 0) {
+      toast.error("Nenhum relatório para exportar");
+      return;
+    }
+
+    const statusLabels: Record<string, string> = {
+      under_review: "Em Análise",
+      approved: "Aprovado",
+      rejected: "Devolvido",
+    };
+
+    const headers = ["Bolsista", "Email", "Projeto", "Código", "Projeto Temático", "Mês Ref.", "Parcela", "Status", "Enviado em", "Avaliado em"];
+    const rows = allFilteredReports.map(r => [
+      r.scholar_name,
+      r.scholar_email,
+      r.project_title,
+      r.project_code,
+      r.thematic_project_title,
+      r.reference_month,
+      r.installment_number,
+      statusLabels[r.status] || r.status,
+      r.submitted_at ? format(parseISO(r.submitted_at), "dd/MM/yyyy") : "",
+      r.reviewed_at ? format(parseISO(r.reviewed_at), "dd/MM/yyyy") : "",
+    ]);
+
+    const csvContent = [headers, ...rows]
+      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `relatorios_${format(new Date(), "yyyy-MM-dd")}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success("CSV exportado com sucesso!");
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -404,10 +446,16 @@ export function ReportsReviewManagement() {
               }
             </CardDescription>
           </div>
-          <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
-            <RefreshCw className={cn("h-4 w-4 mr-2", isFetching && "animate-spin")} />
-            Atualizar
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={isLoading}>
+              <Download className="h-4 w-4 mr-2" />
+              CSV
+            </Button>
+            <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
+              <RefreshCw className={cn("h-4 w-4 mr-2", isFetching && "animate-spin")} />
+              Atualizar
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
