@@ -17,6 +17,7 @@ import AdminLogin from "./pages/AdminLogin";
 import PasswordRecovery from "./pages/PasswordRecovery";
 import ScholarSignup from "./pages/ScholarSignup";
 import AccessDenied from "./pages/AccessDenied";
+import OrgMemberSignup from "./pages/OrgMemberSignup";
 import NotFound from "./pages/NotFound";
 
 // Scholar pages (reusing existing)
@@ -65,6 +66,7 @@ const App = () => (
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/recuperar-senha" element={<PasswordRecovery />} />
               <Route path="/criar-conta" element={<ScholarSignup />} />
+              <Route path="/criar-conta-membro" element={<OrgMemberSignup />} />
               <Route path="/acesso-negado" element={<AccessDenied />} />
               
               {/* Public invite accept pages */}
