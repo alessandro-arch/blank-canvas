@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, CheckCircle, XCircle, Building2 } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, Building2, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { InviteDetails } from "@/types/admin-members";
 
@@ -47,12 +47,14 @@ const InviteAcceptPage = () => {
     fetchInvite();
   }, [token]);
 
-  // Auto-accept when user is logged in and invite is valid
+  const isEmailMismatch = session && invite?.valid && invite.email && session.user.email !== invite.email;
+
+  // Auto-accept when user is logged in, invite is valid, and email matches
   useEffect(() => {
-    if (session && invite?.valid && !accepted && !accepting && token) {
+    if (session && invite?.valid && !accepted && !accepting && token && !isEmailMismatch) {
       handleAccept();
     }
-  }, [session, invite?.valid]);
+  }, [session, invite?.valid, isEmailMismatch]);
 
   const handleAccept = async () => {
     if (!token) return;
@@ -135,6 +137,33 @@ const InviteAcceptPage = () => {
             </Button>
             <Button variant="outline" onClick={() => navigate(`/criar-conta-membro?redirect=${encodeURIComponent(redirectPath)}`)}>
               Criar Conta
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Email mismatch - show clear message
+  if (isEmailMismatch) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="max-w-md w-full">
+          <CardHeader className="text-center">
+            <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-2" />
+            <CardTitle>E-mail diferente</CardTitle>
+            <CardDescription>
+              Este convite foi enviado para <strong>{invite.email}</strong>, mas você está logado como <strong>{session.user.email}</strong>.
+              <br /><br />
+              Faça logout e entre com o e-mail correto para aceitar o convite.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <Button onClick={async () => { await supabase.auth.signOut(); }}>
+              Fazer Logout
+            </Button>
+            <Button variant="outline" onClick={() => navigate("/acesso")}>
+              Ir para o início
             </Button>
           </CardContent>
         </Card>
