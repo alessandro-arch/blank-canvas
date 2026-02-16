@@ -1,29 +1,68 @@
+import { useState } from "react";
 import { FileText, Download, Eye, CheckCircle, Info, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGrantTerm } from "@/hooks/useGrantTerm";
+import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 export function GrantTermSection() {
   const { user } = useAuth();
-  const { grantTerm, loading, error, signedUrl } = useGrantTerm(user?.id);
+  const { grantTerm, loading, error } = useGrantTerm(user?.id);
 
-  const handleView = () => {
-    if (signedUrl) {
-      window.open(signedUrl, "_blank");
+  const [viewLoading, setViewLoading] = useState(false);
+
+  const handleView = async () => {
+    if (!grantTerm) return;
+    const newWindow = window.open("about:blank", "_blank");
+    setViewLoading(true);
+    try {
+      const { data, error } = await supabase.storage
+        .from("grant-terms")
+        .createSignedUrl(grantTerm.fileUrl, 900);
+      if (error) throw error;
+      if (data?.signedUrl) {
+        if (newWindow) {
+          newWindow.location.href = data.signedUrl;
+        } else {
+          window.location.href = data.signedUrl;
+        }
+      } else {
+        newWindow?.close();
+        toast.error("Link de acesso não disponível");
+      }
+    } catch (err) {
+      console.error("Error opening grant term:", err);
+      newWindow?.close();
+      toast.error("Erro ao abrir o termo de outorga");
+    } finally {
+      setViewLoading(false);
     }
   };
 
   const handleDownload = async () => {
-    if (signedUrl && grantTerm) {
-      const link = document.createElement("a");
-      link.href = signedUrl;
-      link.download = grantTerm.fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+    if (!grantTerm) return;
+    try {
+      const { data, error } = await supabase.storage
+        .from("grant-terms")
+        .createSignedUrl(grantTerm.fileUrl, 900);
+      if (error) throw error;
+      if (data?.signedUrl) {
+        const link = document.createElement("a");
+        link.href = data.signedUrl;
+        link.download = grantTerm.fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        toast.error("Link de acesso não disponível");
+      }
+    } catch (err) {
+      console.error("Error downloading grant term:", err);
+      toast.error("Erro ao baixar o termo de outorga");
     }
   };
 
@@ -154,7 +193,7 @@ export function GrantTermSection() {
             size="sm" 
             className="gap-1.5 text-primary hover:text-primary"
             onClick={handleView}
-            disabled={!signedUrl}
+            disabled={viewLoading}
           >
             <Eye className="w-4 h-4" />
             <span className="hidden sm:inline">Visualizar</span>
@@ -164,7 +203,7 @@ export function GrantTermSection() {
             size="sm" 
             className="gap-1.5"
             onClick={handleDownload}
-            disabled={!signedUrl}
+            disabled={false}
           >
             <Download className="w-4 h-4" />
             <span className="hidden sm:inline">Baixar</span>
