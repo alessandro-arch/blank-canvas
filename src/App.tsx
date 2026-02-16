@@ -5,6 +5,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { OrganizationProvider } from "@/contexts/OrganizationContext";
+import { SupportCenterProvider } from "@/contexts/SupportCenterContext";
+import { SupportCenterFAB } from "@/components/support-center/SupportCenterFAB";
+import { SupportCenterDrawer } from "@/components/support-center/SupportCenterDrawer";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ScholarProtectedRoute } from "@/components/auth/ScholarProtectedRoute";
 import { AdminProtectedRoute } from "@/components/auth/AdminProtectedRoute";
@@ -56,6 +59,7 @@ const App = () => (
     <TooltipProvider>
       <AuthProvider>
         <OrganizationProvider>
+          <SupportCenterProvider>
           <Toaster />
           <Sonner />
           <BrowserRouter>
@@ -202,7 +206,10 @@ const App = () => (
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
+            <SupportCenterFAB />
+            <SupportCenterDrawer />
           </BrowserRouter>
+          </SupportCenterProvider>
         </OrganizationProvider>
       </AuthProvider>
     </TooltipProvider>
