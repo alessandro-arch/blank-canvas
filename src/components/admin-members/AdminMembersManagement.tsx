@@ -265,7 +265,7 @@ export function AdminMembersManagement() {
         </CardContent>
       </Card>
 
-      <AddMemberDialog open={addOpen} onOpenChange={setAddOpen} onSubmit={createInvite} />
+      <AddMemberDialog open={addOpen} onOpenChange={setAddOpen} onSubmit={createInvite} existingInvites={invites} />
       <EditMemberDialog
         open={!!editMember}
         onOpenChange={(open) => !open && setEditMember(null)}
