@@ -13,9 +13,9 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
+import { Loader2, ImagePlus } from "lucide-react";
+import { RichTextEditor } from "./RichTextEditor";
 
 interface CreateNewsDialogProps {
   open: boolean;
@@ -28,6 +28,7 @@ export function CreateNewsDialog({ open, onOpenChange, onCreated }: CreateNewsDi
   const { currentOrganization } = useOrganizationContext();
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
+  const [coverImageUrl, setCoverImageUrl] = useState("");
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
 
@@ -40,6 +41,7 @@ export function CreateNewsDialog({ open, onOpenChange, onCreated }: CreateNewsDi
         title: title.trim(),
         summary: summary.trim() || null,
         content: content.trim(),
+        cover_image_url: coverImageUrl.trim() || null,
         created_by: user.id,
         organization_id: currentOrganization?.id || null,
         is_published: true,
@@ -51,6 +53,7 @@ export function CreateNewsDialog({ open, onOpenChange, onCreated }: CreateNewsDi
       toast.success("Publicação criada com sucesso");
       setTitle("");
       setSummary("");
+      setCoverImageUrl("");
       setContent("");
       onCreated();
     } catch (err: any) {
@@ -62,10 +65,10 @@ export function CreateNewsDialog({ open, onOpenChange, onCreated }: CreateNewsDi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nova Publicação</DialogTitle>
-          <DialogDescription>Crie uma nova notícia para sua organização.</DialogDescription>
+          <DialogDescription>Crie uma notícia com formatação rica para sua organização.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -90,13 +93,38 @@ export function CreateNewsDialog({ open, onOpenChange, onCreated }: CreateNewsDi
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="news-content">Conteúdo *</Label>
-            <Textarea
-              id="news-content"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
+            <Label htmlFor="news-cover">
+              <span className="flex items-center gap-1.5">
+                <ImagePlus className="h-4 w-4" />
+                URL da imagem de capa
+              </span>
+            </Label>
+            <Input
+              id="news-cover"
+              value={coverImageUrl}
+              onChange={(e) => setCoverImageUrl(e.target.value)}
+              placeholder="https://exemplo.com/imagem.jpg (opcional)"
+            />
+            {coverImageUrl && (
+              <div className="relative rounded-lg overflow-hidden h-32 bg-muted">
+                <img
+                  src={coverImageUrl}
+                  alt="Preview capa"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = "none";
+                  }}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Conteúdo *</Label>
+            <RichTextEditor
+              content={content}
+              onChange={setContent}
               placeholder="Escreva o conteúdo completo da publicação..."
-              rows={8}
             />
           </div>
         </div>

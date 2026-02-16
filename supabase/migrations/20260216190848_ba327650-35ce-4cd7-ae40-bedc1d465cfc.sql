@@ -1,0 +1,1 @@
+ALTER TABLE public.news_posts ADD COLUMN cover_image_url TEXT;

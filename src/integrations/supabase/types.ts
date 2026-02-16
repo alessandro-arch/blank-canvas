@@ -509,6 +509,7 @@ export type Database = {
       news_posts: {
         Row: {
           content: string
+          cover_image_url: string | null
           created_at: string
           created_by: string
           id: string
@@ -521,6 +522,7 @@ export type Database = {
         }
         Insert: {
           content: string
+          cover_image_url?: string | null
           created_at?: string
           created_by: string
           id?: string
@@ -533,6 +535,7 @@ export type Database = {
         }
         Update: {
           content?: string
+          cover_image_url?: string | null
           created_at?: string
           created_by?: string
           id?: string
