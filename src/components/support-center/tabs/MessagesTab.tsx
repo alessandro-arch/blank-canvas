@@ -1,13 +1,14 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Mail, Send, ChevronRight, Filter, Loader2 } from "lucide-react";
+import { Mail, Send, ChevronRight, Loader2, Check, ChevronsUpDown, Link as LinkIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -21,11 +22,16 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { toast } from "@/hooks/use-toast";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useOrganizationContext } from "@/contexts/OrganizationContext";
+import { useUserRole } from "@/hooks/useUserRole";
 
 export function MessagesTab() {
   const { user } = useAuth();
@@ -203,61 +209,211 @@ export function MessagesTab() {
 function ComposeDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { currentOrganization } = useOrganizationContext();
+  const { role } = useUserRole();
+  const isManagerOrAdmin = role === "manager" || role === "admin";
+
+  const orgId = currentOrganization?.id;
+
+  const [recipientId, setRecipientId] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [linkUrl, setLinkUrl] = useState("");
   const [sending, setSending] = useState(false);
+  const [recipientSearchOpen, setRecipientSearchOpen] = useState(false);
+  const [recipientSearch, setRecipientSearch] = useState("");
+
+  // Fetch recipients scoped to org
+  const { data: recipients = [] } = useQuery({
+    queryKey: ["compose-recipients", orgId],
+    queryFn: async () => {
+      let query = supabase
+        .from("profiles")
+        .select("user_id, full_name, email")
+        .order("full_name");
+      if (orgId) {
+        query = query.eq("organization_id", orgId);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data || []).filter((p: any) => p.user_id !== user?.id);
+    },
+    enabled: open && isManagerOrAdmin,
+  });
+
+  const filteredRecipients = useMemo(() => {
+    if (!recipientSearch) return recipients;
+    const s = recipientSearch.toLowerCase();
+    return recipients.filter((p: any) =>
+      p.full_name?.toLowerCase().includes(s) || p.email?.toLowerCase().includes(s)
+    );
+  }, [recipients, recipientSearch]);
+
+  const selectedRecipient = recipients.find((r: any) => r.user_id === recipientId);
+
+  const resetForm = () => {
+    setRecipientId("");
+    setSubject("");
+    setBody("");
+    setLinkUrl("");
+    setRecipientSearch("");
+  };
 
   const handleSend = async () => {
     if (!subject.trim() || !body.trim()) {
-      toast({ title: "Preencha assunto e mensagem.", variant: "destructive" });
+      toast.error("Preencha assunto e mensagem.");
       return;
     }
+
     setSending(true);
     try {
-      // For MVP, send as support message to self (system inbox)
-      const { error } = await supabase.from("messages").insert({
-        recipient_id: user!.id,
-        sender_id: user!.id,
-        subject,
-        body,
-        type: "GESTOR",
-        event_type: "SUPPORT",
-      });
-      if (error) throw error;
-      toast({ title: "Mensagem enviada." });
-      setSubject("");
-      setBody("");
+      if (isManagerOrAdmin && recipientId) {
+        // Send via edge function for managers/admins
+        const response = await supabase.functions.invoke("send-message-email", {
+          body: {
+            recipient_id: recipientId,
+            subject,
+            body,
+            link_url: linkUrl || undefined,
+            organization_id: orgId || undefined,
+          },
+        });
+        if (response.error) throw response.error;
+        const emailNote = response.data?.email_sent === false ? " (e-mail não enviado)" : "";
+        toast.success(`Mensagem enviada!${emailNote}`);
+      } else {
+        // Scholar: send as support message
+        const { error } = await supabase.from("messages").insert({
+          recipient_id: user!.id,
+          sender_id: user!.id,
+          subject,
+          body,
+          type: "GESTOR",
+          event_type: "SUPPORT",
+          organization_id: orgId || null,
+          link_url: linkUrl || null,
+        });
+        if (error) throw error;
+        toast.success("Mensagem enviada.");
+      }
+
+      resetForm();
       onOpenChange(false);
       queryClient.invalidateQueries({ queryKey: ["support-center-messages"] });
+      queryClient.invalidateQueries({ queryKey: ["unread-messages-count"] });
     } catch (e: any) {
-      toast({ title: "Erro ao enviar.", description: e.message, variant: "destructive" });
+      console.error("Erro ao enviar:", e);
+      toast.error("Erro ao enviar mensagem.");
     } finally {
       setSending(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) resetForm(); onOpenChange(v); }}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Nova Mensagem</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Send className="w-5 h-5" />
+            Nova Mensagem
+          </DialogTitle>
+          <DialogDescription>
+            {isManagerOrAdmin
+              ? "Envie uma mensagem para um membro da organização."
+              : "Envie uma mensagem de suporte."}
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
-          <Input
-            placeholder="Assunto"
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-          />
-          <Textarea
-            placeholder="Escreva sua mensagem..."
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            rows={5}
-          />
+          {/* Recipient autocomplete for managers/admins */}
+          {isManagerOrAdmin && (
+            <div className="space-y-1.5">
+              <Label>Destinatário *</Label>
+              <Popover open={recipientSearchOpen} onOpenChange={setRecipientSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={recipientSearchOpen}
+                    className="w-full justify-between font-normal h-9 text-sm"
+                  >
+                    {selectedRecipient
+                      ? (selectedRecipient.full_name || selectedRecipient.email || "Sem nome")
+                      : "Buscar destinatário..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                  <Command shouldFilter={false}>
+                    <CommandInput
+                      placeholder="Buscar por nome ou e-mail..."
+                      value={recipientSearch}
+                      onValueChange={setRecipientSearch}
+                    />
+                    <CommandList>
+                      <CommandEmpty>Nenhum destinatário encontrado.</CommandEmpty>
+                      <CommandGroup>
+                        {filteredRecipients.map((r: any) => (
+                          <CommandItem
+                            key={r.user_id}
+                            value={r.user_id}
+                            onSelect={() => {
+                              setRecipientId(r.user_id);
+                              setRecipientSearchOpen(false);
+                              setRecipientSearch("");
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", recipientId === r.user_id ? "opacity-100" : "opacity-0")} />
+                            <div className="flex flex-col">
+                              <span className="text-sm">{r.full_name || "Sem nome"}</span>
+                              {r.email && <span className="text-xs text-muted-foreground">{r.email}</span>}
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <Label>Assunto *</Label>
+            <Input
+              placeholder="Assunto"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              maxLength={200}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Mensagem *</Label>
+            <Textarea
+              placeholder="Escreva sua mensagem..."
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={5}
+              maxLength={5000}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-1.5">
+              <LinkIcon className="w-3.5 h-3.5" />
+              Link (opcional)
+            </Label>
+            <Input
+              placeholder="https://..."
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              type="url"
+            />
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={handleSend} disabled={sending}>
+          <Button onClick={handleSend} disabled={sending || (isManagerOrAdmin && !recipientId)}>
             {sending && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
             Enviar
           </Button>
