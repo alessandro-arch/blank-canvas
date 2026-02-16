@@ -7,10 +7,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserPlus, Search, Pencil, UserX, UserCheck, Clock, Mail } from "lucide-react";
-import { useAdminMembers } from "@/hooks/useAdminMembers";
+import { useAdminMembers, type AdminMember } from "@/hooks/useAdminMembers";
 import { AddMemberDialog } from "./AddMemberDialog";
 import { EditMemberDialog } from "./EditMemberDialog";
-import type { OrgMember } from "@/types/admin-members";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -20,12 +19,12 @@ export function AdminMembersManagement() {
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [addOpen, setAddOpen] = useState(false);
-  const [editMember, setEditMember] = useState<OrgMember | null>(null);
+  const [editMember, setEditMember] = useState<AdminMember | null>(null);
 
   const filtered = useMemo(() => {
     return members.filter((m) => {
-      const name = m.profiles?.full_name || "";
-      const email = m.profiles?.email || "";
+      const name = m.full_name || "";
+      const email = m.email || "";
       const matchSearch = !search || name.toLowerCase().includes(search.toLowerCase()) || email.toLowerCase().includes(search.toLowerCase());
       const matchRole = roleFilter === "all" || m.role === roleFilter;
       const matchStatus = statusFilter === "all" || (statusFilter === "active" ? m.is_active : !m.is_active);
@@ -56,6 +55,23 @@ export function AdminMembersManagement() {
       </Card>
     );
   }
+
+  // Adapter for EditMemberDialog which expects OrgMember shape
+  const editMemberAdapter = editMember ? {
+    id: editMember.id,
+    user_id: editMember.user_id,
+    organization_id: editMember.organization_id,
+    role: editMember.role,
+    is_active: editMember.is_active,
+    permissions: editMember.permissions,
+    created_at: editMember.created_at,
+    updated_at: editMember.updated_at,
+    profiles: {
+      full_name: editMember.full_name,
+      email: editMember.email,
+      avatar_url: editMember.avatar_url,
+    },
+  } : null;
 
   return (
     <>
@@ -130,9 +146,9 @@ export function AdminMembersManagement() {
                 {filtered.map((m) => (
                   <TableRow key={m.id} className={!m.is_active ? "opacity-50" : ""}>
                     <TableCell className="font-medium">
-                      {m.profiles?.full_name || "—"}
+                      {m.full_name || "—"}
                     </TableCell>
-                    <TableCell>{m.profiles?.email || "—"}</TableCell>
+                    <TableCell>{m.email || "—"}</TableCell>
                     <TableCell>{roleBadge(m.role)}</TableCell>
                     <TableCell>
                       {m.is_active ? (
@@ -208,7 +224,7 @@ export function AdminMembersManagement() {
       <EditMemberDialog
         open={!!editMember}
         onOpenChange={(open) => !open && setEditMember(null)}
-        member={editMember}
+        member={editMemberAdapter}
         onUpdateRole={updateMemberRole}
         onToggleActive={toggleMemberActive}
       />
