@@ -101,7 +101,7 @@ export default function ScholarMessages() {
 
   const getSenderLabel = (message: Message) => {
     if (message.type === "SYSTEM") return "Sistema";
-    return message.sender_profile?.full_name || "Gestor";
+    return "Gestor";
   };
 
   const getSenderIcon = (message: Message) => {

@@ -315,7 +315,7 @@ Deno.serve(async (req) => {
       .eq('user_id', user.id)
       .single();
 
-    const senderName = senderProfile?.full_name || 'Equipe de Gestão';
+    const senderName = 'Equipe de Gestão';
     const recipientName = recipientProfile.full_name || 'Bolsista';
 
     // Use org_id from request if provided; otherwise resolve from recipient
