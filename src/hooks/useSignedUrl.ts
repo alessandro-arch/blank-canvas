@@ -56,6 +56,9 @@ export async function openReportPdf(filePath: string): Promise<void> {
     return;
   }
 
+  // Open window synchronously to avoid popup blocker
+  const newWindow = window.open("about:blank", "_blank");
+
   try {
     const { data, error } = await supabase.storage
       .from("reports")
@@ -64,17 +67,25 @@ export async function openReportPdf(filePath: string): Promise<void> {
     if (error) {
       console.error("Error creating signed URL:", error);
       toast.error("Erro ao gerar link de acesso ao arquivo");
+      newWindow?.close();
       return;
     }
 
     if (data?.signedUrl) {
-      window.open(data.signedUrl, "_blank");
+      if (newWindow) {
+        newWindow.location.href = data.signedUrl;
+      } else {
+        // Fallback if popup was still blocked
+        window.location.href = data.signedUrl;
+      }
     } else {
       toast.error("Link de acesso não disponível");
+      newWindow?.close();
     }
   } catch (err) {
     console.error("Error opening PDF:", err);
     toast.error("Erro ao abrir o arquivo");
+    newWindow?.close();
   }
 }
 
@@ -103,7 +114,7 @@ export async function downloadReportPdf(filePath: string, fileName?: string): Pr
       const link = document.createElement("a");
       link.href = data.signedUrl;
       link.download = fileName || "relatorio.pdf";
-      link.target = "_blank";
+      // download attribute handles it, no need for target="_blank"
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -141,7 +152,7 @@ export async function downloadPaymentReceipt(filePath: string, fileName?: string
       const link = document.createElement("a");
       link.href = data.signedUrl;
       link.download = fileName || "comprovante.pdf";
-      link.target = "_blank";
+      // download attribute handles it, no need for target="_blank"
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

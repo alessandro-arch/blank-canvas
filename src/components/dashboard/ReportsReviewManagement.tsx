@@ -235,6 +235,8 @@ export function ReportsReviewManagement() {
 
   const handleViewPdf = async (fileUrl: string) => {
     setPdfLoading(true);
+    // Open window synchronously to avoid popup blocker
+    const newWindow = window.open("about:blank", "_blank");
     try {
       const { data, error } = await supabase.storage
         .from("reports")
@@ -242,11 +244,18 @@ export function ReportsReviewManagement() {
 
       if (error) throw error;
       if (data?.signedUrl) {
-        window.open(data.signedUrl, "_blank");
+        if (newWindow) {
+          newWindow.location.href = data.signedUrl;
+        } else {
+          window.location.href = data.signedUrl;
+        }
+      } else {
+        newWindow?.close();
       }
     } catch (error) {
       console.error("Error opening PDF:", error);
       toast.error("Erro ao abrir PDF");
+      newWindow?.close();
     } finally {
       setPdfLoading(false);
     }
