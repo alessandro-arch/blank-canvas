@@ -77,8 +77,8 @@ export async function openReportPdf(filePath: string): Promise<void> {
       if (newWindow) {
         newWindow.location.href = data.signedUrl;
       } else {
-        // Fallback if popup was still blocked
-        window.location.href = data.signedUrl;
+        // Don't navigate in same tab - inform user about popup blocker
+        toast.error("Permita pop-ups no navegador para visualizar o arquivo");
       }
     } else {
       toast.error("Link de acesso não disponível");

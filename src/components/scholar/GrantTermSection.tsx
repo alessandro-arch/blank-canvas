@@ -28,7 +28,7 @@ export function GrantTermSection() {
         if (newWindow) {
           newWindow.location.href = data.signedUrl;
         } else {
-          window.location.href = data.signedUrl;
+          toast.error("Permita pop-ups no navegador para visualizar o arquivo");
         }
       } else {
         newWindow?.close();
