@@ -39,6 +39,8 @@ import Import from "./pages/Import";
 import AuditTrail from "./pages/AuditTrail";
 import ScholarMessages from "./pages/ScholarMessages";
 import AdminMessages from "./pages/AdminMessages";
+import AdminMembers from "./pages/AdminMembers";
+import InviteAccept from "./pages/InviteAccept";
 
 const queryClient = new QueryClient();
 
@@ -58,6 +60,9 @@ const App = () => (
               <Route path="/recuperar-senha" element={<PasswordRecovery />} />
               <Route path="/criar-conta" element={<ScholarSignup />} />
               <Route path="/acesso-negado" element={<AccessDenied />} />
+              
+              {/* Public invite accept page */}
+              <Route path="/invite/:token" element={<InviteAccept />} />
               
               {/* Legacy auth route - redirect to new access page */}
               <Route path="/auth" element={<Navigate to="/acesso" replace />} />
@@ -132,6 +137,11 @@ const App = () => (
               <Route path="/admin/projetos-tematicos/:id" element={
                 <AdminProtectedRoute>
                   <ThematicProjectDetail />
+                </AdminProtectedRoute>
+              } />
+              <Route path="/admin/membros" element={
+                <AdminProtectedRoute>
+                  <AdminMembers />
                 </AdminProtectedRoute>
               } />
               <Route path="/admin/documentos" element={

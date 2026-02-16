@@ -24,6 +24,7 @@ export type Database = {
           id: string
           ip_address: string | null
           new_value: Json | null
+          organization_id: string | null
           previous_value: Json | null
           user_agent: string | null
           user_email: string | null
@@ -38,6 +39,7 @@ export type Database = {
           id?: string
           ip_address?: string | null
           new_value?: Json | null
+          organization_id?: string | null
           previous_value?: Json | null
           user_agent?: string | null
           user_email?: string | null
@@ -52,12 +54,21 @@ export type Database = {
           id?: string
           ip_address?: string | null
           new_value?: Json | null
+          organization_id?: string | null
           previous_value?: Json | null
           user_agent?: string | null
           user_email?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       bank_accounts: {
         Row: {
@@ -498,11 +509,57 @@ export type Database = {
         }
         Relationships: []
       }
+      org_invites: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          created_by: string
+          email: string
+          expires_at: string
+          id: string
+          organization_id: string
+          role: string
+          token: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          created_by: string
+          email: string
+          expires_at?: string
+          id?: string
+          organization_id: string
+          role: string
+          token: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          created_by?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          organization_id?: string
+          role?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_invites_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_members: {
         Row: {
           created_at: string
           id: string
+          is_active: boolean
           organization_id: string
+          permissions: Json | null
           role: string
           updated_at: string
           user_id: string
@@ -510,7 +567,9 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          is_active?: boolean
           organization_id: string
+          permissions?: Json | null
           role?: string
           updated_at?: string
           user_id: string
@@ -518,7 +577,9 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          is_active?: boolean
           organization_id?: string
+          permissions?: Json | null
           role?: string
           updated_at?: string
           user_id?: string
@@ -916,6 +977,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_org_invite: { Args: { p_token: string }; Returns: Json }
+      create_org_invite: {
+        Args: { p_email: string; p_organization_id: string; p_role: string }
+        Returns: Json
+      }
+      get_invite_details: { Args: { p_token: string }; Returns: Json }
       get_user_organizations: { Args: never; Returns: string[] }
       has_role: {
         Args: {
