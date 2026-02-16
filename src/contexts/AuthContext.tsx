@@ -21,10 +21,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+
+        // Fallback: ensure profile exists after login/signup
+        if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+          setTimeout(async () => {
+            try {
+              await supabase.rpc('ensure_profile_exists');
+            } catch (e) {
+              console.warn('ensure_profile_exists fallback:', e);
+            }
+          }, 0);
+        }
       }
     );
 

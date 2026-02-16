@@ -1085,6 +1085,7 @@ export type Database = {
         }
         Returns: Json
       }
+      ensure_profile_exists: { Args: never; Returns: Json }
       get_invite_details: { Args: { p_token: string }; Returns: Json }
       get_user_organizations: { Args: never; Returns: string[] }
       has_role: {
