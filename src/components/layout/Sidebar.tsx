@@ -56,7 +56,7 @@ const adminNavigation: NavItem[] = [
   { name: "Mensagens", icon: Send, href: "/admin/mensagens", managerOnly: true },
   { name: "Documentos", icon: FileText, href: "/admin/documentos", managerOnly: true },
   { name: "Códigos de Convite", icon: Ticket, href: "/admin/codigos-convite", managerOnly: true, section: "Gestão Institucional" },
-  { name: "Membros Admin", icon: UserCog, href: "/admin/membros", managerOnly: true },
+  { name: "Membros Admin", icon: UserCog, href: "/admin/membros", adminOnly: true },
   { name: "Importar Dados", icon: Upload, href: "/admin/importar", managerOnly: true },
   { name: "Organizações", icon: Building2, href: "/admin/organizacoes", adminOnly: true },
   { name: "Trilha de Auditoria", icon: ShieldAlert, href: "/admin/trilha-auditoria", adminOnly: true },
