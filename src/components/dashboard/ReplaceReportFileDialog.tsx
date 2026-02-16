@@ -166,26 +166,26 @@ export function ReplaceReportFileDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-hidden">
           {/* Report info */}
           <div className="p-3 bg-muted/50 rounded-lg space-y-1.5 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Bolsista</span>
-              <span className="font-medium">{report.scholar_name}</span>
+            <div className="flex justify-between gap-4">
+              <span className="text-muted-foreground flex-shrink-0">Bolsista</span>
+              <span className="font-medium truncate text-right">{report.scholar_name}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Projeto</span>
-              <span className="font-medium">{report.project_code}</span>
+            <div className="flex justify-between gap-4">
+              <span className="text-muted-foreground flex-shrink-0">Projeto</span>
+              <span className="font-medium truncate text-right">{report.project_code}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Mês Referência</span>
-              <span className="font-medium">{report.reference_month}</span>
+            <div className="flex justify-between gap-4">
+              <span className="text-muted-foreground flex-shrink-0">Mês Referência</span>
+              <span className="font-medium text-right">{report.reference_month}</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Arquivo Atual</span>
-              <Button variant="link" size="sm" className="p-0 h-auto gap-1" onClick={() => onViewPdf(report.file_url)}>
-                <Eye className="w-3 h-3" />
-                {report.file_name}
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-muted-foreground flex-shrink-0">Arquivo Atual</span>
+              <Button variant="link" size="sm" className="p-0 h-auto gap-1 max-w-[60%] justify-end" onClick={() => onViewPdf(report.file_url)}>
+                <Eye className="w-3 h-3 flex-shrink-0" />
+                <span className="truncate">{report.file_name}</span>
               </Button>
             </div>
           </div>
@@ -220,11 +220,11 @@ export function ReplaceReportFileDialog({
                 <input ref={fileInputRef} type="file" accept=".pdf,application/pdf" onChange={handleFileChange} className="hidden" />
               </div>
             ) : (
-              <div className="mt-2 flex items-center gap-3 p-3 rounded-lg bg-success/10 border border-success/20">
-                <div className="w-8 h-8 rounded-lg bg-success/20 flex items-center justify-center">
+              <div className="mt-2 flex items-center gap-3 p-3 rounded-lg bg-success/10 border border-success/20 overflow-hidden">
+                <div className="w-8 h-8 rounded-lg bg-success/20 flex items-center justify-center flex-shrink-0">
                   <FileText className="w-4 h-4 text-success" />
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 overflow-hidden">
                   <p className="text-sm font-medium truncate">{file.name}</p>
                   <p className="text-xs text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
                 </div>
