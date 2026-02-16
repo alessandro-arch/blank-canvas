@@ -285,7 +285,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { recipient_id, subject, body } = await req.json();
+    const { recipient_id, subject, body, link_url, organization_id: reqOrgId } = await req.json();
 
     if (!recipient_id || !subject || !body) {
       return new Response(JSON.stringify({ error: 'Missing required fields: recipient_id, subject, body' }), {
@@ -318,28 +318,30 @@ Deno.serve(async (req) => {
     const senderName = senderProfile?.full_name || 'Equipe de Gestão';
     const recipientName = recipientProfile.full_name || 'Bolsista';
 
-    // Get org_id from recipient's thematic project enrollment
-    let orgId: string | null = null;
-    const { data: enrollmentOrg } = await supabaseAdmin
-      .from('enrollments')
-      .select('project_id')
-      .eq('user_id', recipient_id)
-      .limit(1)
-      .single();
-    
-    if (enrollmentOrg) {
-      const { data: projectData } = await supabaseAdmin
-        .from('projects')
-        .select('thematic_project_id')
-        .eq('id', enrollmentOrg.project_id)
+    // Use org_id from request if provided; otherwise resolve from recipient
+    let orgId: string | null = reqOrgId || null;
+    if (!orgId) {
+      const { data: enrollmentOrg } = await supabaseAdmin
+        .from('enrollments')
+        .select('project_id')
+        .eq('user_id', recipient_id)
+        .limit(1)
         .single();
-      if (projectData) {
-        const { data: tpData } = await supabaseAdmin
-          .from('thematic_projects')
-          .select('organization_id')
-          .eq('id', projectData.thematic_project_id)
+      
+      if (enrollmentOrg) {
+        const { data: projectData } = await supabaseAdmin
+          .from('projects')
+          .select('thematic_project_id')
+          .eq('id', enrollmentOrg.project_id)
           .single();
-        orgId = tpData?.organization_id || null;
+        if (projectData) {
+          const { data: tpData } = await supabaseAdmin
+            .from('thematic_projects')
+            .select('organization_id')
+            .eq('id', projectData.thematic_project_id)
+            .single();
+          orgId = tpData?.organization_id || null;
+        }
       }
     }
 
@@ -354,6 +356,7 @@ Deno.serve(async (req) => {
         type: 'GESTOR',
         event_type: 'GENERAL',
         organization_id: orgId,
+        link_url: link_url || null,
       })
       .select('id')
       .single();

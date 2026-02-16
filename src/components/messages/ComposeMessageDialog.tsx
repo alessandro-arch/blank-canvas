@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -7,8 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { Send, FileText } from "lucide-react";
+import { Send, FileText, Check, ChevronsUpDown, Link as LinkIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useOrganizationContext } from "@/contexts/OrganizationContext";
 
 interface ComposeMessageDialogProps {
   open: boolean;
@@ -19,38 +23,59 @@ interface ComposeMessageDialogProps {
 
 export function ComposeMessageDialog({ open, onOpenChange, preselectedRecipientId, preselectedRecipientName }: ComposeMessageDialogProps) {
   const queryClient = useQueryClient();
+  const { currentOrganization } = useOrganizationContext();
   const [recipientId, setRecipientId] = useState(preselectedRecipientId || "");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [linkUrl, setLinkUrl] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState("");
+  const [recipientSearchOpen, setRecipientSearchOpen] = useState(false);
+  const [recipientSearch, setRecipientSearch] = useState("");
 
-  // Fetch scholars for recipient selection
+  const orgId = currentOrganization?.id;
+
+  // Fetch profiles scoped to current organization
   const { data: scholars = [] } = useQuery({
-    queryKey: ["scholars-for-messages"],
+    queryKey: ["scholars-for-messages", orgId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("profiles")
         .select("user_id, full_name, email")
         .order("full_name");
+      if (orgId) {
+        query = query.eq("organization_id", orgId);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return data || [];
     },
     enabled: open && !preselectedRecipientId,
   });
 
-  // Fetch message templates
+  // Fetch message templates scoped to org
   const { data: templates = [] } = useQuery({
-    queryKey: ["message-templates"],
+    queryKey: ["message-templates", orgId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("message_templates")
-        .select("*")
-        .order("name");
+      let query = supabase.from("message_templates").select("*").order("name");
+      if (orgId) {
+        query = query.or(`organization_id.eq.${orgId},organization_id.is.null`);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return data || [];
     },
     enabled: open,
   });
+
+  const filteredScholars = useMemo(() => {
+    if (!recipientSearch) return scholars;
+    const s = recipientSearch.toLowerCase();
+    return scholars.filter((p: any) =>
+      p.full_name?.toLowerCase().includes(s) || p.email?.toLowerCase().includes(s)
+    );
+  }, [scholars, recipientSearch]);
+
+  const selectedScholar = scholars.find((s: any) => s.user_id === recipientId);
 
   const sendMessage = useMutation({
     mutationFn: async () => {
@@ -58,7 +83,13 @@ export function ComposeMessageDialog({ open, onOpenChange, preselectedRecipientI
       if (!session) throw new Error("Não autenticado");
 
       const response = await supabase.functions.invoke("send-message-email", {
-        body: { recipient_id: recipientId, subject, body },
+        body: {
+          recipient_id: recipientId,
+          subject,
+          body,
+          link_url: linkUrl || undefined,
+          organization_id: orgId || undefined,
+        },
       });
 
       if (response.error) throw response.error;
@@ -68,6 +99,8 @@ export function ComposeMessageDialog({ open, onOpenChange, preselectedRecipientI
       const emailNote = data?.email_sent === false ? " (e-mail não enviado)" : "";
       toast.success(`Mensagem enviada com sucesso!${emailNote}`);
       queryClient.invalidateQueries({ queryKey: ["sent-messages"] });
+      queryClient.invalidateQueries({ queryKey: ["support-center-messages"] });
+      queryClient.invalidateQueries({ queryKey: ["unread-messages-count"] });
       resetForm();
       onOpenChange(false);
     },
@@ -81,7 +114,9 @@ export function ComposeMessageDialog({ open, onOpenChange, preselectedRecipientI
     if (!preselectedRecipientId) setRecipientId("");
     setSubject("");
     setBody("");
+    setLinkUrl("");
     setSelectedTemplate("");
+    setRecipientSearch("");
   };
 
   const applyTemplate = (templateId: string) => {
@@ -89,7 +124,6 @@ export function ComposeMessageDialog({ open, onOpenChange, preselectedRecipientI
     const template = templates.find((t: any) => t.id === templateId);
     if (template) {
       setSubject(template.subject);
-      // Only set body if it's not a placeholder like {{body}}
       const templateBody = template.body;
       if (templateBody && !templateBody.trim().startsWith('{{')) {
         setBody(templateBody);
@@ -117,7 +151,7 @@ export function ComposeMessageDialog({ open, onOpenChange, preselectedRecipientI
             Nova Mensagem
           </DialogTitle>
           <DialogDescription>
-            Envie uma mensagem para o bolsista. Ele receberá no sistema e por e-mail.
+            Envie uma mensagem para um membro da organização. Ele receberá no sistema e por e-mail.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -141,7 +175,7 @@ export function ComposeMessageDialog({ open, onOpenChange, preselectedRecipientI
             </div>
           )}
 
-          {/* Recipient */}
+          {/* Recipient with autocomplete */}
           {preselectedRecipientId ? (
             <div className="space-y-2">
               <Label>Destinatário</Label>
@@ -150,18 +184,52 @@ export function ComposeMessageDialog({ open, onOpenChange, preselectedRecipientI
           ) : (
             <div className="space-y-2">
               <Label>Destinatário *</Label>
-              <Select value={recipientId} onValueChange={setRecipientId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o bolsista..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {scholars.map((s: any) => (
-                    <SelectItem key={s.user_id} value={s.user_id}>
-                      {s.full_name || s.email || "Sem nome"}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={recipientSearchOpen} onOpenChange={setRecipientSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={recipientSearchOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    {selectedScholar
+                      ? (selectedScholar.full_name || selectedScholar.email || "Sem nome")
+                      : "Buscar destinatário..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                  <Command shouldFilter={false}>
+                    <CommandInput
+                      placeholder="Buscar por nome ou e-mail..."
+                      value={recipientSearch}
+                      onValueChange={setRecipientSearch}
+                    />
+                    <CommandList>
+                      <CommandEmpty>Nenhum destinatário encontrado.</CommandEmpty>
+                      <CommandGroup>
+                        {filteredScholars.map((s: any) => (
+                          <CommandItem
+                            key={s.user_id}
+                            value={s.user_id}
+                            onSelect={() => {
+                              setRecipientId(s.user_id);
+                              setRecipientSearchOpen(false);
+                              setRecipientSearch("");
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", recipientId === s.user_id ? "opacity-100" : "opacity-0")} />
+                            <div className="flex flex-col">
+                              <span className="text-sm">{s.full_name || "Sem nome"}</span>
+                              {s.email && <span className="text-xs text-muted-foreground">{s.email}</span>}
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
           )}
 
@@ -183,8 +251,22 @@ export function ComposeMessageDialog({ open, onOpenChange, preselectedRecipientI
               value={body}
               onChange={(e) => setBody(e.target.value)}
               placeholder="Escreva sua mensagem..."
-              rows={8}
+              rows={6}
               maxLength={5000}
+            />
+          </div>
+
+          {/* Link URL (optional) */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-1.5">
+              <LinkIcon className="w-4 h-4" />
+              Link (opcional)
+            </Label>
+            <Input
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              placeholder="https://..."
+              type="url"
             />
           </div>
 
