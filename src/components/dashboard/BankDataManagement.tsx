@@ -615,10 +615,6 @@ export function BankDataManagement() {
                     <span className="text-muted-foreground">E-mail:</span>
                     <p className="font-medium">{selectedAccount.profile?.email || '—'}</p>
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">CPF:</span>
-                    <p className="font-mono">{selectedAccount.profile?.cpf || '—'}</p>
-                  </div>
                 </div>
               </div>
 
