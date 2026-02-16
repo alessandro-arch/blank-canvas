@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import { unformatCPF } from "@/lib/cpf-validator";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 type BankAccount = Database["public"]["Tables"]["bank_accounts"]["Row"];
@@ -71,10 +72,17 @@ export function useScholarProfile(): UseScholarProfileReturn {
     setError(null);
 
     try {
-      // Fetch profile data
+      // Fetch profile data (no longer contains cpf/phone)
       const { data: profileData, error: profileError } = await supabase
         .from("profiles")
         .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      // Fetch sensitive data (cpf/phone) from profiles_sensitive
+      const { data: sensitiveData, error: sensitiveError } = await supabase
+        .from("profiles_sensitive")
+        .select("cpf, phone")
         .eq("user_id", user.id)
         .maybeSingle();
 
@@ -84,22 +92,24 @@ export function useScholarProfile(): UseScholarProfileReturn {
       } else if (profileData) {
         setPersonalData({
           name: profileData.full_name || "",
-          cpf: profileData.cpf || "",
+          cpf: sensitiveData?.cpf || "",
           email: profileData.email || user.email || "",
-          phone: profileData.phone || "",
+          phone: sensitiveData?.phone || "",
           institution: profileData.institution || "",
           academicLevel: profileData.academic_level || "",
           lattesUrl: profileData.lattes_url || "",
         });
         setLastUpdated(profileData.updated_at);
-        // CPF is locked if it was already filled
-        setCpfLocked(!!profileData.cpf && profileData.cpf.length > 0);
+        setCpfLocked(!!sensitiveData?.cpf && sensitiveData.cpf.length > 0);
       } else {
-        // No profile found, use auth email
         setPersonalData({
           ...emptyPersonalData,
           email: user.email || "",
         });
+      }
+
+      if (sensitiveError) {
+        console.error("Error fetching sensitive data:", sensitiveError);
       }
 
       // Fetch bank account data
@@ -156,16 +166,10 @@ export function useScholarProfile(): UseScholarProfileReturn {
 
       const updateData: Record<string, string | null> = {
         full_name: normalizeValue(data.name ?? personalData.name),
-        phone: normalizeValue(data.phone ?? personalData.phone),
         institution: normalizeValue(data.institution ?? personalData.institution),
         academic_level: normalizeValue(data.academicLevel ?? personalData.academicLevel),
         lattes_url: normalizeValue(data.lattesUrl ?? personalData.lattesUrl),
       };
-
-      // Only include CPF if it's not locked (first time filling)
-      if (!cpfLocked && data.cpf) {
-        updateData.cpf = normalizeValue(data.cpf);
-      }
 
       const { error: updateError } = await supabase
         .from("profiles")
@@ -177,6 +181,27 @@ export function useScholarProfile(): UseScholarProfileReturn {
         return { success: false, error: "Erro ao salvar dados pessoais. Tente novamente." };
       }
 
+      // Save PII (cpf/phone) to profiles_sensitive via RPC
+      const hasCpfChange = !cpfLocked && data.cpf;
+      const hasPhoneChange = data.phone !== undefined;
+
+      if (hasCpfChange || hasPhoneChange) {
+        const rpcParams: Record<string, string | undefined> = {};
+        if (hasCpfChange && data.cpf) {
+          rpcParams.p_cpf = unformatCPF(data.cpf);
+        }
+        if (hasPhoneChange) {
+          rpcParams.p_phone = data.phone?.replace(/\D/g, "") || undefined;
+        }
+
+        const { error: sensitiveError } = await supabase.rpc("upsert_sensitive_profile", rpcParams);
+
+        if (sensitiveError) {
+          console.error("Error saving sensitive data:", sensitiveError);
+          return { success: false, error: "Erro ao salvar dados sensíveis. Tente novamente." };
+        }
+      }
+
       // Update local state
       setPersonalData(prev => ({
         ...prev,
@@ -184,7 +209,6 @@ export function useScholarProfile(): UseScholarProfileReturn {
         cpf: cpfLocked ? prev.cpf : (data.cpf ?? prev.cpf),
       }));
 
-      // Lock CPF after first save
       if (!cpfLocked && data.cpf) {
         setCpfLocked(true);
       }

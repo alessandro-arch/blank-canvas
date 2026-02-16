@@ -67,7 +67,6 @@ interface BankAccountWithProfile {
   profile: {
     full_name: string | null;
     email: string | null;
-    cpf: string | null;
   } | null;
   thematic_project_id: string;
   thematic_project_title: string;
@@ -188,7 +187,7 @@ export function BankDataManagement() {
       // Fetch profiles
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('user_id, full_name, email, cpf, thematic_project_id')
+        .select('user_id, full_name, email, thematic_project_id')
         .in('user_id', userIds);
 
       if (profilesError) throw profilesError;
@@ -328,7 +327,6 @@ export function BankDataManagement() {
         !searchTerm ||
         account.profile?.full_name?.toLowerCase().includes(searchLower) ||
         account.profile?.email?.toLowerCase().includes(searchLower) ||
-        account.profile?.cpf?.includes(searchLower) ||
         account.bank_name.toLowerCase().includes(searchLower)
       );
       

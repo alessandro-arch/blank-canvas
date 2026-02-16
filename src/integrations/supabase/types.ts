@@ -795,7 +795,6 @@ export type Database = {
         Row: {
           academic_level: string | null
           avatar_url: string | null
-          cpf: string | null
           created_at: string
           email: string | null
           full_name: string | null
@@ -809,7 +808,6 @@ export type Database = {
           organization_id: string | null
           origin: string | null
           partner_company_id: string | null
-          phone: string | null
           thematic_project_id: string | null
           updated_at: string
           user_id: string
@@ -817,7 +815,6 @@ export type Database = {
         Insert: {
           academic_level?: string | null
           avatar_url?: string | null
-          cpf?: string | null
           created_at?: string
           email?: string | null
           full_name?: string | null
@@ -831,7 +828,6 @@ export type Database = {
           organization_id?: string | null
           origin?: string | null
           partner_company_id?: string | null
-          phone?: string | null
           thematic_project_id?: string | null
           updated_at?: string
           user_id: string
@@ -839,7 +835,6 @@ export type Database = {
         Update: {
           academic_level?: string | null
           avatar_url?: string | null
-          cpf?: string | null
           created_at?: string
           email?: string | null
           full_name?: string | null
@@ -853,7 +848,6 @@ export type Database = {
           organization_id?: string | null
           origin?: string | null
           partner_company_id?: string | null
-          phone?: string | null
           thematic_project_id?: string | null
           updated_at?: string
           user_id?: string
@@ -1112,6 +1106,10 @@ export type Database = {
       }
       is_org_admin: { Args: { p_org_id: string }; Returns: boolean }
       is_org_admin_or_manager: { Args: { p_org_id: string }; Returns: boolean }
+      upsert_sensitive_profile: {
+        Args: { p_cpf?: string; p_phone?: string }
+        Returns: Json
+      }
       user_can_access_profile_by_org: {
         Args: { p_user_id: string }
         Returns: boolean

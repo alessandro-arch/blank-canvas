@@ -39,8 +39,6 @@ interface ScholarData {
   userId: string;
   fullName: string | null;
   email: string | null;
-  cpf: string | null;
-  phone: string | null;
   isActive: boolean;
   projectTitle: string | null;
   projectCode: string | null;
@@ -119,7 +117,7 @@ export function ScholarsTableFiltered() {
       // Fetch profiles for scholars
       const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
-        .select("user_id, full_name, email, cpf, phone, is_active, origin, created_at")
+        .select("user_id, full_name, email, is_active, origin, created_at")
         .in("user_id", scholarUserIds);
 
       if (profilesError) throw profilesError;
@@ -189,8 +187,6 @@ export function ScholarsTableFiltered() {
           userId: profile.user_id,
           fullName: profile.full_name,
           email: profile.email,
-          cpf: profile.cpf,
-          phone: profile.phone,
           isActive: profile.is_active,
           projectTitle: project?.title || null,
           projectCode: project?.code || null,
@@ -228,8 +224,7 @@ export function ScholarsTableFiltered() {
       const matchesSearch = 
         !searchTerm ||
         scholar.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        scholar.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        scholar.cpf?.includes(searchTerm);
+        scholar.email?.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesStatus = 
         statusFilter === "Todos" ||

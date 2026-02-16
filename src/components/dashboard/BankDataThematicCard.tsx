@@ -54,7 +54,6 @@ interface BankAccountWithProfile {
   profile: {
     full_name: string | null;
     email: string | null;
-    cpf: string | null;
   } | null;
   thematic_project_id: string;
   thematic_project_title: string;
@@ -134,11 +133,6 @@ export function BankDataThematicCard({
     return value.slice(0, 2) + '****' + value.slice(-2);
   };
 
-  const maskCPF = (cpf: string | null, revealed: boolean) => {
-    if (!cpf) return '—';
-    if (revealed) return cpf;
-    return cpf.replace(/(\d{3})\.(\d{3})\.(\d{3})-(\d{2})/, '***.$2.***-**');
-  };
 
   return (
     <Card className="overflow-hidden">
@@ -269,7 +263,6 @@ export function BankDataThematicCard({
                 <TableHeader>
                   <TableRow>
                     <TableHead>Bolsista</TableHead>
-                    <TableHead>CPF</TableHead>
                     <TableHead>Banco</TableHead>
                     <TableHead>Agência</TableHead>
                     <TableHead>Conta</TableHead>
@@ -306,9 +299,6 @@ export function BankDataThematicCard({
                                 </span>
                               </div>
                             </div>
-                          </TableCell>
-                          <TableCell className="font-mono text-sm">
-                            {maskCPF(account.profile?.cpf || null, isRevealed)}
                           </TableCell>
                           <TableCell>
                             <span className="font-medium">{account.bank_name}</span>
