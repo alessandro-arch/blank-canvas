@@ -619,7 +619,7 @@ export function ReportsReviewManagement() {
 
       {/* Review Dialog */}
       <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg overflow-hidden">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileSearch className="w-5 h-5 text-primary" />
@@ -629,29 +629,29 @@ export function ReportsReviewManagement() {
           </DialogHeader>
 
           {selectedReport && selectedScholar && (
-            <div className="space-y-4">
-              <div className="p-4 bg-muted/50 rounded-lg space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Bolsista</span>
-                  <span className="font-medium">{selectedScholar.full_name}</span>
+            <div className="space-y-4 overflow-hidden">
+              <div className="p-4 bg-muted/50 rounded-lg space-y-2 overflow-hidden">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-sm text-muted-foreground flex-shrink-0">Bolsista</span>
+                  <span className="font-medium truncate text-right">{selectedScholar.full_name}</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Projeto</span>
-                  <span className="font-medium">{selectedScholar.project_code}</span>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-sm text-muted-foreground flex-shrink-0">Projeto</span>
+                  <span className="font-medium truncate text-right">{selectedScholar.project_code}</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Competência</span>
-                  <span className="font-medium">{formatMonthLabel(selectedReport.reference_month)}</span>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-sm text-muted-foreground flex-shrink-0">Competência</span>
+                  <span className="font-medium text-right">{formatMonthLabel(selectedReport.reference_month)}</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Arquivo</span>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-sm text-muted-foreground flex-shrink-0">Arquivo</span>
                   <Button
                     variant="link"
                     size="sm"
-                    className="p-0 h-auto"
+                    className="p-0 h-auto max-w-[60%] justify-end"
                     onClick={() => handleViewPdf(selectedReport.file_url)}
                   >
-                    {selectedReport.file_name}
+                    <span className="truncate">{selectedReport.file_name}</span>
                   </Button>
                 </div>
               </div>
