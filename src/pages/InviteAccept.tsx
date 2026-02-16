@@ -133,7 +133,7 @@ const InviteAcceptPage = () => {
             <Button onClick={() => navigate(`/admin/login?redirect=${encodeURIComponent(redirectPath)}`)}>
               Fazer Login
             </Button>
-            <Button variant="outline" onClick={() => navigate(`/criar-conta?redirect=${encodeURIComponent(redirectPath)}`)}>
+            <Button variant="outline" onClick={() => navigate(`/criar-conta-membro?redirect=${encodeURIComponent(redirectPath)}`)}>
               Criar Conta
             </Button>
           </CardContent>
