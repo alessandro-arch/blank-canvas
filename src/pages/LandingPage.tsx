@@ -55,7 +55,7 @@ const HeroSection = () => {
           Organize, acompanhe e comprove atividades de Pesquisa, Desenvolvimento e Inovação com rastreabilidade e conformidade regulatória.
         </p>
         <button onClick={() => navigate("/acesso")} className="bg-foreground text-white text-[14px] font-medium px-7 py-3 rounded-lg hover:opacity-90 transition-opacity">
-          Conhecer agora
+          Acesse o seu perfil
         </button>
       </div>
       <div className="flex justify-center mt-12">
