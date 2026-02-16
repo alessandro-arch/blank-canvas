@@ -42,7 +42,13 @@ import AdminMessages from "./pages/AdminMessages";
 import AdminMembers from "./pages/AdminMembers";
 import InviteAccept from "./pages/InviteAccept";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
