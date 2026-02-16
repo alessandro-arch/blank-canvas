@@ -27,12 +27,11 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    const { data: { user }, error: userError } = await userClient.auth.getUser();
+    if (userError || !user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
-    const callerUserId = claimsData.claims.sub;
+    const callerUserId = user.id;
 
     const { invite_id } = await req.json();
     if (!invite_id) {
@@ -166,7 +165,7 @@ Você foi convidado(a) para acessar a plataforma <strong>InnovaGO</strong> como 
       entity_id: invite_id,
       organization_id: invite.organization_id,
       details: { email: invite.invited_email, role: invite.role },
-      user_email: claimsData.claims.email,
+      user_email: user.email,
     });
 
     console.log(`Invite email sent to ${invite.invited_email} for invite ${invite_id}`);
