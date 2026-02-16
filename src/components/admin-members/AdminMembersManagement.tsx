@@ -224,7 +224,7 @@ export function AdminMembersManagement() {
           </div>
 
           {/* Pending Invites */}
-          {invites.length > 0 && (
+          {invites.filter(i => i.status === 'pending').length > 0 && (
             <div className="mt-6">
               <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
                 <Clock className="h-4 w-4" /> Convites Pendentes
@@ -240,7 +240,7 @@ export function AdminMembersManagement() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {invites.map((inv) => (
+                    {invites.filter(i => i.status === 'pending').map((inv) => (
                       <TableRow key={inv.id}>
                         <TableCell className="flex items-center gap-2">
                           <Mail className="h-4 w-4 text-muted-foreground" />
