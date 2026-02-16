@@ -1,0 +1,1 @@
+DELETE FROM grant_terms WHERE id = 'b573da71-09be-4bb9-8eac-aea906bbb829';
