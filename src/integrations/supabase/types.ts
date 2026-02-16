@@ -509,43 +509,49 @@ export type Database = {
         }
         Relationships: []
       }
-      org_invites: {
+      organization_invites: {
         Row: {
           accepted_at: string | null
+          accepted_by: string | null
           created_at: string
           created_by: string
-          email: string
           expires_at: string
           id: string
+          invited_email: string
           organization_id: string
           role: string
+          status: string
           token: string
         }
         Insert: {
           accepted_at?: string | null
+          accepted_by?: string | null
           created_at?: string
           created_by: string
-          email: string
           expires_at?: string
           id?: string
+          invited_email: string
           organization_id: string
           role: string
+          status?: string
           token: string
         }
         Update: {
           accepted_at?: string | null
+          accepted_by?: string | null
           created_at?: string
           created_by?: string
-          email?: string
           expires_at?: string
           id?: string
+          invited_email?: string
           organization_id?: string
           role?: string
+          status?: string
           token?: string
         }
         Relationships: [
           {
-            foreignKeyName: "org_invites_organization_id_fkey"
+            foreignKeyName: "organization_invites_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -979,7 +985,12 @@ export type Database = {
     Functions: {
       accept_org_invite: { Args: { p_token: string }; Returns: Json }
       create_org_invite: {
-        Args: { p_email: string; p_organization_id: string; p_role: string }
+        Args: {
+          p_email: string
+          p_expires_days?: number
+          p_organization_id: string
+          p_role: string
+        }
         Returns: Json
       }
       get_invite_details: { Args: { p_token: string }; Returns: Json }
@@ -1003,6 +1014,8 @@ export type Database = {
         }
         Returns: string
       }
+      is_org_admin: { Args: { p_org_id: string }; Returns: boolean }
+      is_org_admin_or_manager: { Args: { p_org_id: string }; Returns: boolean }
       user_can_access_profile_by_org: {
         Args: { p_user_id: string }
         Returns: boolean

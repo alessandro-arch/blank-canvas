@@ -6,20 +6,34 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { UserPlus, Search, Pencil, UserX, UserCheck, Clock, Mail } from "lucide-react";
-import { useAdminMembers, type AdminMember } from "@/hooks/useAdminMembers";
+import { UserPlus, Search, Pencil, UserX, UserCheck, Clock, Mail, Users, XCircle, ShieldCheck } from "lucide-react";
+import { useAdminMembers } from "@/hooks/useAdminMembers";
 import { AddMemberDialog } from "./AddMemberDialog";
 import { EditMemberDialog } from "./EditMemberDialog";
+import type { AdminMemberFlat } from "@/types/admin-members";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
+const ROLE_LABELS: Record<string, string> = {
+  admin: "Admin",
+  manager: "Manager",
+  reviewer: "Reviewer",
+  beneficiary: "Beneficiário",
+};
+
 export function AdminMembersManagement() {
-  const { members, invites, loading, updateMemberRole, toggleMemberActive, createInvite } = useAdminMembers();
+  const { members, invites, loading, updateMemberRole, toggleMemberActive, createInvite, revokeInvite } = useAdminMembers();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [addOpen, setAddOpen] = useState(false);
-  const [editMember, setEditMember] = useState<AdminMember | null>(null);
+  const [editMember, setEditMember] = useState<AdminMemberFlat | null>(null);
+
+  // Metrics
+  const totalMembers = members.length;
+  const activeMembers = members.filter(m => m.is_active).length;
+  const suspendedMembers = members.filter(m => !m.is_active).length;
+  const pendingInvites = invites.length;
 
   const filtered = useMemo(() => {
     return members.filter((m) => {
@@ -35,101 +49,132 @@ export function AdminMembersManagement() {
   const roleBadge = (role: string) => {
     const variants: Record<string, string> = {
       admin: "bg-primary text-primary-foreground",
-      owner: "bg-primary text-primary-foreground",
       manager: "bg-info text-white",
+      reviewer: "bg-accent text-accent-foreground",
+      beneficiary: "bg-muted text-muted-foreground",
     };
     return (
       <Badge className={variants[role] || "bg-muted text-muted-foreground"}>
-        {role === "owner" ? "Admin" : role.charAt(0).toUpperCase() + role.slice(1)}
+        {ROLE_LABELS[role] || role}
       </Badge>
     );
   };
 
   if (loading) {
     return (
-      <Card>
-        <CardHeader><Skeleton className="h-6 w-48" /></CardHeader>
-        <CardContent className="space-y-3">
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24" />)}
+        </div>
+        <Skeleton className="h-64" />
+      </div>
     );
   }
 
-  // Adapter for EditMemberDialog which expects OrgMember shape
-  const editMemberAdapter = editMember ? {
-    id: editMember.id,
-    user_id: editMember.user_id,
-    organization_id: editMember.organization_id,
-    role: editMember.role,
-    is_active: editMember.is_active,
-    permissions: editMember.permissions,
-    created_at: editMember.created_at,
-    updated_at: editMember.updated_at,
-    profiles: {
-      full_name: editMember.full_name,
-      email: editMember.email,
-      avatar_url: editMember.avatar_url,
-    },
-  } : null;
-
   return (
-    <>
+    <div className="space-y-6">
+      {/* Metric Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Users className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{totalMembers}</p>
+                <p className="text-xs text-muted-foreground">Total membros</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <ShieldCheck className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{activeMembers}</p>
+                <p className="text-xs text-muted-foreground">Ativos</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-destructive/10">
+                <XCircle className="h-5 w-5 text-destructive" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{suspendedMembers}</p>
+                <p className="text-xs text-muted-foreground">Suspensos</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-accent">
+                <Mail className="h-5 w-5 text-accent-foreground" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{pendingInvites}</p>
+                <p className="text-xs text-muted-foreground">Convites pendentes</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Members Table */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Membros Administrativos</CardTitle>
-              <CardDescription>Gerencie admins e managers da organização</CardDescription>
+              <CardTitle>Membros</CardTitle>
+              <CardDescription>Admins, managers e reviewers da organização</CardDescription>
             </div>
             <Button onClick={() => setAddOpen(true)}>
               <UserPlus className="h-4 w-4 mr-2" />
-              Adicionar Membro
+              Convidar Membro
             </Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Filters */}
           <div className="flex flex-wrap gap-3">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por nome ou e-mail..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
-              />
+              <Input placeholder="Buscar por nome ou e-mail..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
             </div>
             <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Role" />
-              </SelectTrigger>
+              <SelectTrigger className="w-[150px]"><SelectValue placeholder="Papel" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todas as roles</SelectItem>
+                <SelectItem value="all">Todos os papéis</SelectItem>
                 <SelectItem value="admin">Admin</SelectItem>
                 <SelectItem value="manager">Manager</SelectItem>
+                <SelectItem value="reviewer">Reviewer</SelectItem>
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
+              <SelectTrigger className="w-[130px]"><SelectValue placeholder="Status" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="active">Ativos</SelectItem>
-                <SelectItem value="inactive">Inativos</SelectItem>
+                <SelectItem value="inactive">Suspensos</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {/* Members Table */}
           <div className="rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Nome</TableHead>
                   <TableHead>E-mail</TableHead>
-                  <TableHead>Role</TableHead>
+                  <TableHead>Papel</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Criado em</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
@@ -145,9 +190,7 @@ export function AdminMembersManagement() {
                 )}
                 {filtered.map((m) => (
                   <TableRow key={m.id} className={!m.is_active ? "opacity-50" : ""}>
-                    <TableCell className="font-medium">
-                      {m.full_name || "—"}
-                    </TableCell>
+                    <TableCell className="font-medium">{m.full_name || "—"}</TableCell>
                     <TableCell>{m.email || "—"}</TableCell>
                     <TableCell>{roleBadge(m.role)}</TableCell>
                     <TableCell>
@@ -157,7 +200,7 @@ export function AdminMembersManagement() {
                         </Badge>
                       ) : (
                         <Badge variant="outline" className="border-destructive/50 text-destructive">
-                          <UserX className="h-3 w-3 mr-1" /> Inativo
+                          <UserX className="h-3 w-3 mr-1" /> Suspenso
                         </Badge>
                       )}
                     </TableCell>
@@ -166,14 +209,10 @@ export function AdminMembersManagement() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => setEditMember(m)}>
+                        <Button variant="ghost" size="sm" onClick={() => setEditMember(m)} title="Editar papel">
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => toggleMemberActive(m.id, !m.is_active)}
-                        >
+                        <Button variant="ghost" size="sm" onClick={() => toggleMemberActive(m.id, !m.is_active)} title={m.is_active ? "Suspender" : "Reativar"}>
                           {m.is_active ? <UserX className="h-4 w-4 text-destructive" /> : <UserCheck className="h-4 w-4 text-primary" />}
                         </Button>
                       </div>
@@ -195,8 +234,9 @@ export function AdminMembersManagement() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>E-mail</TableHead>
-                      <TableHead>Role</TableHead>
+                      <TableHead>Papel</TableHead>
                       <TableHead>Expira em</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -204,11 +244,16 @@ export function AdminMembersManagement() {
                       <TableRow key={inv.id}>
                         <TableCell className="flex items-center gap-2">
                           <Mail className="h-4 w-4 text-muted-foreground" />
-                          {inv.email}
+                          {inv.invited_email}
                         </TableCell>
                         <TableCell>{roleBadge(inv.role)}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {format(new Date(inv.expires_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="sm" onClick={() => revokeInvite(inv.id)} title="Revogar convite">
+                            <XCircle className="h-4 w-4 text-destructive" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -224,10 +269,10 @@ export function AdminMembersManagement() {
       <EditMemberDialog
         open={!!editMember}
         onOpenChange={(open) => !open && setEditMember(null)}
-        member={editMemberAdapter}
+        member={editMember}
         onUpdateRole={updateMemberRole}
         onToggleActive={toggleMemberActive}
       />
-    </>
+    </div>
   );
 }

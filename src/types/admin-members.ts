@@ -1,4 +1,4 @@
-export interface OrgMember {
+export interface AdminMemberFlat {
   id: string;
   user_id: string;
   organization_id: string;
@@ -7,23 +7,23 @@ export interface OrgMember {
   permissions: Record<string, unknown>;
   created_at: string;
   updated_at: string;
-  profiles?: {
-    full_name: string | null;
-    email: string | null;
-    avatar_url: string | null;
-  };
+  full_name: string | null;
+  avatar_url: string | null;
+  email: string | null;
 }
 
 export interface OrgInvite {
   id: string;
   organization_id: string;
-  email: string;
+  invited_email: string;
   role: string;
   token: string;
+  status: "pending" | "accepted" | "revoked" | "expired";
   expires_at: string;
-  accepted_at: string | null;
   created_by: string;
   created_at: string;
+  accepted_by: string | null;
+  accepted_at: string | null;
 }
 
 export interface InviteDetails {
