@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganizationContext } from "@/contexts/OrganizationContext";
@@ -14,8 +14,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, ImagePlus } from "lucide-react";
+import { Loader2, ImagePlus, Upload, Link, X } from "lucide-react";
 import { RichTextEditor } from "./RichTextEditor";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface CreateNewsDialogProps {
   open: boolean;
@@ -31,6 +32,54 @@ export function CreateNewsDialog({ open, onOpenChange, onCreated }: CreateNewsDi
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadedPreview, setUploadedPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Apenas arquivos de imagem são permitidos");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Imagem deve ter no máximo 5MB");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const fileName = `${user.id}/${Date.now()}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("news-images")
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from("news-images")
+        .getPublicUrl(fileName);
+
+      setCoverImageUrl(urlData.publicUrl);
+      setUploadedPreview(urlData.publicUrl);
+      toast.success("Imagem enviada com sucesso");
+    } catch (err: any) {
+      toast.error("Erro ao enviar imagem: " + (err.message || "Erro desconhecido"));
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const clearCoverImage = () => {
+    setCoverImageUrl("");
+    setUploadedPreview(null);
+  };
 
   const handleSubmit = async () => {
     if (!title.trim() || !content.trim() || !user) return;
@@ -54,6 +103,7 @@ export function CreateNewsDialog({ open, onOpenChange, onCreated }: CreateNewsDi
       setTitle("");
       setSummary("");
       setCoverImageUrl("");
+      setUploadedPreview(null);
       setContent("");
       onCreated();
     } catch (err: any) {
@@ -62,6 +112,8 @@ export function CreateNewsDialog({ open, onOpenChange, onCreated }: CreateNewsDi
       setSending(false);
     }
   };
+
+  const currentPreview = coverImageUrl || uploadedPreview;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -92,30 +144,82 @@ export function CreateNewsDialog({ open, onOpenChange, onCreated }: CreateNewsDi
             />
           </div>
 
+          {/* Cover image section */}
           <div className="space-y-2">
-            <Label htmlFor="news-cover">
+            <Label>
               <span className="flex items-center gap-1.5">
                 <ImagePlus className="h-4 w-4" />
-                URL da imagem de capa
+                Imagem de capa (opcional)
               </span>
             </Label>
-            <Input
-              id="news-cover"
-              value={coverImageUrl}
-              onChange={(e) => setCoverImageUrl(e.target.value)}
-              placeholder="https://exemplo.com/imagem.jpg (opcional)"
-            />
-            {coverImageUrl && (
-              <div className="relative rounded-lg overflow-hidden h-32 bg-muted">
+
+            {currentPreview ? (
+              <div className="relative rounded-lg overflow-hidden h-36 bg-muted group">
                 <img
-                  src={coverImageUrl}
+                  src={currentPreview}
                   alt="Preview capa"
                   className="w-full h-full object-cover"
                   onError={(e) => {
                     (e.target as HTMLImageElement).style.display = "none";
                   }}
                 />
+                <button
+                  type="button"
+                  onClick={clearCoverImage}
+                  className="absolute top-2 right-2 p-1.5 rounded-full bg-background/80 hover:bg-background text-foreground shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
+            ) : (
+              <Tabs defaultValue="upload" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 h-9">
+                  <TabsTrigger value="upload" className="text-xs gap-1.5">
+                    <Upload className="h-3.5 w-3.5" />
+                    Upload
+                  </TabsTrigger>
+                  <TabsTrigger value="url" className="text-xs gap-1.5">
+                    <Link className="h-3.5 w-3.5" />
+                    URL
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="upload" className="mt-2">
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex flex-col items-center justify-center gap-2 p-6 border-2 border-dashed border-border rounded-lg cursor-pointer hover:border-primary/50 hover:bg-muted/50 transition-colors"
+                  >
+                    {uploading ? (
+                      <>
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">Enviando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-6 w-6 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">
+                          Clique para selecionar uma imagem (máx. 5MB)
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFileUpload}
+                  />
+                </TabsContent>
+
+                <TabsContent value="url" className="mt-2">
+                  <Input
+                    value={coverImageUrl}
+                    onChange={(e) => setCoverImageUrl(e.target.value)}
+                    placeholder="https://exemplo.com/imagem.jpg"
+                  />
+                </TabsContent>
+              </Tabs>
             )}
           </div>
 
