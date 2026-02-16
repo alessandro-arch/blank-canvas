@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.monthly-report-reminder]
 verify_jwt = false
+
+[functions.admin-list-members]
+verify_jwt = false

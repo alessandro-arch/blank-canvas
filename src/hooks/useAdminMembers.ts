@@ -2,12 +2,26 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrganizationContext } from "@/contexts/OrganizationContext";
 import { useToast } from "@/hooks/use-toast";
-import type { OrgMember, OrgInvite } from "@/types/admin-members";
+import type { OrgInvite } from "@/types/admin-members";
+
+export interface AdminMember {
+  id: string;
+  user_id: string;
+  organization_id: string;
+  role: string;
+  is_active: boolean;
+  permissions: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  email: string | null;
+}
 
 export function useAdminMembers() {
   const { currentOrganization } = useOrganizationContext();
   const { toast } = useToast();
-  const [members, setMembers] = useState<OrgMember[]>([]);
+  const [members, setMembers] = useState<AdminMember[]>([]);
   const [invites, setInvites] = useState<OrgInvite[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -17,61 +31,61 @@ export function useAdminMembers() {
     if (!orgId) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("organization_members")
-        .select("*, profiles!organization_members_user_id_fkey(full_name, email, avatar_url)")
-        .eq("organization_id", orgId)
-        .in("role", ["admin", "owner", "manager"])
-        .order("created_at", { ascending: false }) as any;
+      // Use edge function to get members with emails from auth.users
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
 
-      if (error) throw error;
-      setMembers(data || []);
-    } catch (err: any) {
-      console.error("Error fetching members:", err);
-      // Fallback: fetch without join
-      try {
-        const { data, error } = await supabase
-          .from("organization_members")
-          .select("*")
-          .eq("organization_id", orgId)
-          .in("role", ["admin", "owner", "manager"])
-          .order("created_at", { ascending: false });
-        if (error) throw error;
-        
-        // Fetch profiles separately
-        const userIds = (data || []).map((m: any) => m.user_id);
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("user_id, full_name, email, avatar_url")
-          .in("user_id", userIds);
-        
-        const profileMap = new Map((profiles || []).map(p => [p.user_id, p]));
-        const membersWithProfiles = (data || []).map((m: any) => ({
-          ...m,
-          profiles: profileMap.get(m.user_id) || null,
-        }));
-        setMembers(membersWithProfiles);
-      } catch (fallbackErr) {
-        console.error("Fallback fetch also failed:", fallbackErr);
+      const response = await supabase.functions.invoke("admin-list-members", {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+        body: undefined,
+      });
+
+      // supabase.functions.invoke doesn't support query params well, so let's use fetch directly
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      
+      const fetchUrl = `${supabaseUrl}/functions/v1/admin-list-members?organization_id=${orgId}&include_inactive=true`;
+      const res = await fetch(fetchUrl, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          apikey: anonKey,
+        },
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Erro ao buscar membros");
       }
+
+      const { members: fetchedMembers } = await res.json();
+      
+      // Filter to admin/manager/owner roles only
+      const adminMembers = (fetchedMembers || []).filter(
+        (m: AdminMember) => ["admin", "owner", "manager"].includes(m.role)
+      );
+      setMembers(adminMembers);
+    } catch (err: any) {
+      console.error("Error fetching members via edge function:", err);
+      toast({ title: "Erro ao carregar membros", description: err.message, variant: "destructive" });
     }
 
-    // Fetch pending invites
+    // Fetch pending invites (still via direct query - no email data needed)
     try {
-      const { data: inviteData } = await supabase
+      const { data: inviteData } = await (supabase as any)
         .from("org_invites")
         .select("*")
         .eq("organization_id", orgId)
         .is("accepted_at", null)
         .gt("expires_at", new Date().toISOString())
-        .order("created_at", { ascending: false }) as any;
-      setInvites(inviteData || []);
+        .order("created_at", { ascending: false });
+      setInvites((inviteData || []) as OrgInvite[]);
     } catch {
       // org_invites may not be in generated types yet
     }
 
     setLoading(false);
-  }, [orgId]);
+  }, [orgId, toast]);
 
   useEffect(() => {
     fetchMembers();
@@ -107,7 +121,7 @@ export function useAdminMembers() {
 
   const createInvite = async (email: string, role: string) => {
     if (!orgId) return null;
-    const { data, error } = await supabase.rpc("create_org_invite", {
+    const { data, error } = await supabase.rpc("create_org_invite" as any, {
       p_organization_id: orgId,
       p_email: email,
       p_role: role,
@@ -118,7 +132,7 @@ export function useAdminMembers() {
     }
     toast({ title: "Convite criado com sucesso!" });
     await fetchMembers();
-    return data as { invite_id: string; token: string };
+    return data as unknown as { invite_id: string; token: string };
   };
 
   return {
