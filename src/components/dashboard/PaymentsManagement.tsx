@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   DollarSign,
@@ -13,6 +14,8 @@ import {
   Download,
   Building2,
   FileUp,
+  CreditCard,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,43 +34,24 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAuditLog } from "@/hooks/useAuditLog";
 import { toast } from "sonner";
-import { format, parseISO, startOfMonth, endOfMonth } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { PaymentsThematicCard } from "./PaymentsThematicCard";
 import { PaymentReceiptUpload } from "./PaymentReceiptUpload";
+import { ScholarPaymentRowComponent, type ScholarPaymentRow, type PaymentRecord } from "./ScholarPaymentRow";
 import { cn } from "@/lib/utils";
-
-interface PaymentWithDetails {
-  id: string;
-  user_id: string;
-  enrollment_id: string;
-  reference_month: string;
-  installment_number: number;
-  amount: number;
-  status: string;
-  paid_at: string | null;
-  report_id: string | null;
-  scholar_name: string;
-  scholar_email: string;
-  project_title: string;
-  project_code: string;
-  thematic_project_id: string;
-  thematic_project_title: string;
-}
-
-interface ThematicPaymentsGroup {
-  id: string;
-  title: string;
-  sponsor_name: string;
-  status: string;
-  payments: PaymentWithDetails[];
-}
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("pt-BR", {
@@ -79,176 +63,243 @@ function formatCurrency(value: number): string {
 export function PaymentsManagement() {
   const { user } = useAuth();
   const { logAction } = useAuditLog();
-  const currentMonth = format(new Date(), 'yyyy-MM');
-  
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const [statusFilter, setStatusFilter] = useState<string>(searchParams.get("payStatus") || "all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [sponsorFilter, setSponsorFilter] = useState<string>("all");
-  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
-  
+  const [thematicFilter, setThematicFilter] = useState<string>("all");
+  const [monthFilter, setMonthFilter] = useState<string>(searchParams.get("payMes") || "");
+
   // Payment confirmation dialog
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState<PaymentWithDetails | null>(null);
+  const [selectedPayment, setSelectedPayment] = useState<PaymentRecord | null>(null);
+  const [selectedScholar, setSelectedScholar] = useState<ScholarPaymentRow | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
 
   // Attach receipt dialog (for retroactive upload)
   const [attachDialogOpen, setAttachDialogOpen] = useState(false);
-  const [attachPayment, setAttachPayment] = useState<PaymentWithDetails | null>(null);
+  const [attachPayment, setAttachPayment] = useState<PaymentRecord | null>(null);
+  const [attachScholar, setAttachScholar] = useState<ScholarPaymentRow | null>(null);
   const [attachReceiptUrl, setAttachReceiptUrl] = useState<string | null>(null);
   const [attachSubmitting, setAttachSubmitting] = useState(false);
 
+  // Helper to update query params
+  const updateQueryParams = (updates: Record<string, string>) => {
+    const newParams = new URLSearchParams(searchParams);
+    Object.entries(updates).forEach(([k, v]) => {
+      if (v && v !== "all" && v !== "") newParams.set(k, v);
+      else newParams.delete(k);
+    });
+    if (!newParams.has("tab")) newParams.set("tab", "pagamentos");
+    setSearchParams(newParams, { replace: true });
+  };
+
+  const handleStatusFilterChange = (val: string) => {
+    setStatusFilter(val);
+    updateQueryParams({ payStatus: val, payMes: monthFilter });
+  };
+
+  const handleMonthFilterChange = (val: string) => {
+    setMonthFilter(val);
+    updateQueryParams({ payMes: val, payStatus: statusFilter });
+  };
+
   const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ['payments-management', selectedMonth],
+    queryKey: ['payments-management-v2'],
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
     queryFn: async () => {
-      // Fetch thematic projects
-      const { data: thematicProjects, error: thematicError } = await supabase
-        .from('thematic_projects')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (thematicError) throw thematicError;
-
-      // Fetch payments
-      const { data: paymentsData, error: paymentsError } = await supabase
-        .from("payments")
-        .select(`
+      // Fetch all needed data in parallel
+      const [
+        { data: thematicProjects, error: tpErr },
+        { data: paymentsData, error: payErr },
+        { data: enrollments, error: enrErr },
+        { data: bankAccounts, error: bankErr },
+      ] = await Promise.all([
+        supabase.from("thematic_projects").select("*").order("created_at", { ascending: false }),
+        supabase.from("payments").select(`
           *,
           enrollment:enrollments(
             id,
             user_id,
             project:projects(id, title, code, thematic_project_id)
           )
-        `)
-        .eq('reference_month', selectedMonth)
-        .order("reference_month", { ascending: false });
+        `).order("reference_month", { ascending: false }),
+        supabase.from("enrollments").select(`
+          id, user_id, status,
+          project:projects(id, title, code, thematic_project_id)
+        `).eq("status", "active"),
+        supabase.from("bank_accounts").select("user_id"),
+      ]);
 
-      if (paymentsError) throw paymentsError;
+      if (tpErr) throw tpErr;
+      if (payErr) throw payErr;
+      if (enrErr) throw enrErr;
 
-      if (!paymentsData || paymentsData.length === 0) {
-        return { thematicProjects: thematicProjects || [], payments: [] };
-      }
+      // Get unique user IDs from enrollments
+      const enrolledUserIds = [...new Set((enrollments || []).map(e => e.user_id))];
 
-      // Get unique user IDs
-      const userIds = [...new Set(paymentsData.map(p => p.user_id))];
+      // Fetch profiles
+      const { data: profiles } = enrolledUserIds.length > 0
+        ? await supabase
+            .from("profiles")
+            .select("user_id, full_name, email, is_active")
+            .in("user_id", enrolledUserIds)
+        : { data: [] };
 
-      // Fetch profiles for all users
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("user_id, full_name, email")
-        .in("user_id", userIds);
+      // Build bank data set
+      const bankUserIds = new Set((bankAccounts || []).map(b => b.user_id));
 
-      // Build thematic project map
-      const thematicMap = new Map(
-        (thematicProjects || []).map(tp => [tp.id, tp])
-      );
+      // Build thematic map
+      const thematicMap = new Map((thematicProjects || []).map(tp => [tp.id, tp]));
 
-      // Build enriched payments
-      const enrichedPayments: PaymentWithDetails[] = paymentsData.map(payment => {
-        const profile = profiles?.find(p => p.user_id === payment.user_id);
-        const enrollment = payment.enrollment as { 
-          id: string; 
+      // Build payments map per user
+      const paymentsByUser = new Map<string, PaymentRecord[]>();
+      (paymentsData || []).forEach(p => {
+        const enrollment = p.enrollment as {
+          id: string;
           user_id: string;
           project: { id: string; title: string; code: string; thematic_project_id: string } | null;
         } | null;
-        
-        const thematicProjectId = enrollment?.project?.thematic_project_id || '';
-        const thematicProject = thematicMap.get(thematicProjectId);
 
-        return {
-          id: payment.id,
-          user_id: payment.user_id,
-          enrollment_id: payment.enrollment_id,
-          reference_month: payment.reference_month,
-          installment_number: payment.installment_number,
-          amount: Number(payment.amount),
-          status: payment.status,
-          paid_at: payment.paid_at,
-          report_id: payment.report_id,
-          scholar_name: profile?.full_name || "Nome não disponível",
-          scholar_email: profile?.email || "",
-          project_title: enrollment?.project?.title || "Projeto não encontrado",
-          project_code: enrollment?.project?.code || "",
-          thematic_project_id: thematicProjectId,
-          thematic_project_title: thematicProject?.title || "Projeto Temático não encontrado",
+        const record: PaymentRecord = {
+          id: p.id,
+          user_id: p.user_id,
+          enrollment_id: p.enrollment_id,
+          reference_month: p.reference_month,
+          installment_number: p.installment_number,
+          amount: Number(p.amount),
+          status: p.status,
+          paid_at: p.paid_at,
+          report_id: p.report_id,
+          receipt_url: p.receipt_url,
         };
+
+        const list = paymentsByUser.get(p.user_id) || [];
+        list.push(record);
+        paymentsByUser.set(p.user_id, list);
       });
 
-      return { thematicProjects: thematicProjects || [], payments: enrichedPayments };
+      // Get available months
+      const allMonths = [...new Set((paymentsData || []).map(p => p.reference_month))].sort().reverse();
+
+      // Build scholar rows from enrollments
+      const scholarRows: ScholarPaymentRow[] = [];
+      const seenUsers = new Set<string>();
+
+      (enrollments || []).forEach(enrollment => {
+        if (seenUsers.has(enrollment.user_id)) return;
+        seenUsers.add(enrollment.user_id);
+
+        const profile = (profiles || []).find(p => p.user_id === enrollment.user_id);
+        const project = enrollment.project as { id: string; title: string; code: string; thematic_project_id: string } | null;
+        const thematicProjectId = project?.thematic_project_id || "";
+        const thematicProject = thematicMap.get(thematicProjectId);
+        const userPayments = paymentsByUser.get(enrollment.user_id) || [];
+
+        scholarRows.push({
+          user_id: enrollment.user_id,
+          full_name: profile?.full_name || "Nome não disponível",
+          email: profile?.email || "",
+          is_active: profile?.is_active ?? true,
+          has_bank_data: bankUserIds.has(enrollment.user_id),
+          project_title: project?.title || "Projeto não encontrado",
+          project_code: project?.code || "",
+          thematic_project_title: thematicProject?.title || "",
+          enrollment_id: enrollment.id,
+          current_payment: null,
+          all_payments: userPayments.sort((a, b) => b.reference_month.localeCompare(a.reference_month)),
+        });
+      });
+
+      return {
+        scholars: scholarRows,
+        thematicProjects: thematicProjects || [],
+        availableMonths: allMonths,
+      };
     },
   });
 
-  // Get unique sponsors for filter
-  const sponsors = useMemo(() => {
-    return [...new Set(data?.thematicProjects?.map(p => p.sponsor_name) || [])];
-  }, [data?.thematicProjects]);
+  // Auto-select current month
+  const effectiveMonth = useMemo(() => {
+    if (monthFilter) return monthFilter;
+    if (data?.availableMonths && data.availableMonths.length > 0) {
+      return data.availableMonths[0];
+    }
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  }, [monthFilter, data?.availableMonths]);
 
-  // Group payments by thematic project and apply filters
-  const filteredGroups = useMemo(() => {
+  // Apply filters
+  const filteredScholars = useMemo(() => {
     if (!data) return [];
-
     const searchLower = searchTerm.toLowerCase();
 
-    // Filter payments
-    let filteredPayments = data.payments.filter(payment => {
-      const matchesSearch = 
-        !searchTerm ||
-        payment.scholar_name.toLowerCase().includes(searchLower) ||
-        payment.project_code.toLowerCase().includes(searchLower);
-      
-      const matchesStatus = statusFilter === "all" || payment.status === statusFilter;
-      
-      return matchesSearch && matchesStatus;
-    });
+    return data.scholars
+      .map(s => {
+        const currentPayment = s.all_payments.find(p => p.reference_month === effectiveMonth) || null;
+        return { ...s, current_payment: currentPayment };
+      })
+      .filter(s => {
+        if (searchTerm) {
+          const matches =
+            s.full_name.toLowerCase().includes(searchLower) ||
+            s.email.toLowerCase().includes(searchLower) ||
+            s.project_code.toLowerCase().includes(searchLower);
+          if (!matches) return false;
+        }
 
-    // Group by thematic project
-    const groupedMap = new Map<string, PaymentWithDetails[]>();
-    filteredPayments.forEach(payment => {
-      const key = payment.thematic_project_id;
-      if (!groupedMap.has(key)) {
-        groupedMap.set(key, []);
-      }
-      groupedMap.get(key)!.push(payment);
-    });
+        if (statusFilter !== "all") {
+          const payStatus = s.current_payment?.status || "pending";
+          if (payStatus !== statusFilter) return false;
+        }
 
-    // Build groups with thematic project info
-    const groups: ThematicPaymentsGroup[] = [];
-    data.thematicProjects.forEach(tp => {
-      const payments = groupedMap.get(tp.id) || [];
-      
-      // Filter by sponsor
-      if (sponsorFilter !== 'all' && tp.sponsor_name !== sponsorFilter) {
-        return;
-      }
-      
-      // Only include thematic projects with payments or that match search
-      if (payments.length > 0 || tp.title.toLowerCase().includes(searchLower)) {
-        groups.push({
-          id: tp.id,
-          title: tp.title,
-          sponsor_name: tp.sponsor_name,
-          status: tp.status,
-          payments,
-        });
-      }
-    });
+        if (thematicFilter !== "all") {
+          const thematic = data.thematicProjects.find(tp => tp.id === thematicFilter);
+          if (!thematic || s.thematic_project_title !== thematic.title) return false;
+        }
 
-    return groups.filter(g => g.payments.length > 0);
-  }, [data, searchTerm, statusFilter, sponsorFilter]);
+        return true;
+      });
+  }, [data, searchTerm, statusFilter, thematicFilter, effectiveMonth]);
 
-  const handleOpenConfirm = (payment: PaymentWithDetails) => {
+  // Stats for the selected month
+  const monthStats = useMemo(() => {
+    if (!data) return { pending: 0, eligible: 0, paid: 0, cancelled: 0, total: 0, totalAmount: 0 };
+    const scholars = data.scholars.map(s => ({
+      ...s,
+      current_payment: s.all_payments.find(p => p.reference_month === effectiveMonth) || null,
+    }));
+    const total = scholars.length;
+    const pending = scholars.filter(s => !s.current_payment || s.current_payment.status === "pending").length;
+    const eligible = scholars.filter(s => s.current_payment?.status === "eligible").length;
+    const paid = scholars.filter(s => s.current_payment?.status === "paid").length;
+    const cancelled = scholars.filter(s => s.current_payment?.status === "cancelled").length;
+    const totalAmount = scholars
+      .filter(s => s.current_payment?.status === "eligible")
+      .reduce((sum, s) => sum + (s.current_payment?.amount || 0), 0);
+    return { pending, eligible, paid, cancelled, total, totalAmount };
+  }, [data, effectiveMonth]);
+
+  // Actions
+  const handleOpenConfirm = (payment: PaymentRecord, scholar: ScholarPaymentRow) => {
     setSelectedPayment(payment);
+    setSelectedScholar(scholar);
     setReceiptUrl(null);
     setConfirmDialogOpen(true);
   };
 
-  const handleOpenAttachReceipt = (payment: PaymentWithDetails) => {
+  const handleOpenAttachReceipt = (payment: PaymentRecord, scholar: ScholarPaymentRow) => {
     setAttachPayment(payment);
+    setAttachScholar(scholar);
     setAttachReceiptUrl(null);
     setAttachDialogOpen(true);
+  };
+
+  const handleSendReminder = (scholar: ScholarPaymentRow) => {
+    toast.info(`Lembrete enviado para ${scholar.full_name}`);
   };
 
   const handleReceiptUploaded = (url: string) => {
@@ -277,7 +328,7 @@ export function PaymentsManagement() {
         entityId: attachPayment.id,
         details: {
           scholar_id: attachPayment.user_id,
-          scholar_name: attachPayment.scholar_name,
+          scholar_name: attachScholar?.full_name,
           reference_month: attachPayment.reference_month,
           amount: attachPayment.amount,
           retroactive: true,
@@ -301,13 +352,11 @@ export function PaymentsManagement() {
 
     try {
       const now = new Date().toISOString();
-
-      // Update payment status with receipt URL if provided
       const updateData: { status: "paid"; paid_at: string; receipt_url?: string } = {
         status: "paid" as const,
         paid_at: now,
       };
-      
+
       if (receiptUrl) {
         updateData.receipt_url = receiptUrl;
       }
@@ -319,14 +368,13 @@ export function PaymentsManagement() {
 
       if (paymentError) throw paymentError;
 
-      // Log audit
       await logAction({
         action: "mark_payment_paid",
         entityType: "payment",
         entityId: selectedPayment.id,
         details: {
           scholar_id: selectedPayment.user_id,
-          scholar_name: selectedPayment.scholar_name,
+          scholar_name: selectedScholar?.full_name,
           reference_month: selectedPayment.reference_month,
           amount: selectedPayment.amount,
           paid_at: now,
@@ -345,34 +393,22 @@ export function PaymentsManagement() {
     }
   };
 
-  // Generate month options (current and 11 previous months)
-  const monthOptions = useMemo(() => {
-    const options = [];
-    const today = new Date();
-    for (let i = 0; i < 12; i++) {
-      const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
-      options.push({
-        value: format(date, 'yyyy-MM'),
-        label: format(date, "MMMM 'de' yyyy", { locale: ptBR })
-      });
+  // Format month label
+  const formatMonthLabel = (m: string) => {
+    try {
+      const [y, mo] = m.split("-").map(Number);
+      const d = new Date(y, mo - 1, 1);
+      const label = format(d, "MMMM/yyyy", { locale: ptBR });
+      return label.charAt(0).toUpperCase() + label.slice(1);
+    } catch {
+      return m;
     }
-    return options;
-  }, []);
+  };
 
-  // Calculate global stats
-  const globalStats = useMemo(() => {
-    const allPayments = data?.payments || [];
-    const eligible = allPayments.filter(p => p.status === 'eligible');
-    return {
-      totalEligible: eligible.length,
-      totalEligibleAmount: eligible.reduce((sum, p) => sum + p.amount, 0),
-    };
-  }, [data?.payments]);
-
+  // CSV export
   const handleExportCSV = () => {
-    const allFilteredPayments = filteredGroups.flatMap(g => g.payments);
-    if (allFilteredPayments.length === 0) {
-      toast.error("Nenhum pagamento para exportar");
+    if (filteredScholars.length === 0) {
+      toast.error("Nenhum dado para exportar");
       return;
     }
 
@@ -383,18 +419,17 @@ export function PaymentsManagement() {
       cancelled: "Cancelado",
     };
 
-    const headers = ["Bolsista", "Email", "Projeto", "Código", "Projeto Temático", "Mês Ref.", "Parcela", "Valor", "Status", "Pago em"];
-    const rows = allFilteredPayments.map(p => [
-      p.scholar_name,
-      p.scholar_email,
-      p.project_title,
-      p.project_code,
-      p.thematic_project_title,
-      p.reference_month,
-      p.installment_number,
-      p.amount.toFixed(2).replace(".", ","),
-      statusLabels[p.status] || p.status,
-      p.paid_at ? format(parseISO(p.paid_at), "dd/MM/yyyy") : "",
+    const headers = ["Bolsista", "Email", "Projeto", "Código", "Projeto Temático", "Mês Ref.", "Valor", "Status", "Pago em"];
+    const rows = filteredScholars.map(s => [
+      s.full_name,
+      s.email,
+      s.project_title,
+      s.project_code,
+      s.thematic_project_title,
+      effectiveMonth,
+      s.current_payment?.amount?.toFixed(2).replace(".", ",") || "",
+      statusLabels[s.current_payment?.status || "pending"] || "Pendente",
+      s.current_payment?.paid_at ? format(parseISO(s.current_payment.paid_at), "dd/MM/yyyy") : "",
     ]);
 
     const csvContent = [headers, ...rows]
@@ -405,7 +440,7 @@ export function PaymentsManagement() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `pagamentos_${selectedMonth}_${format(new Date(), "yyyy-MM-dd")}.csv`;
+    link.download = `pagamentos_${effectiveMonth}_${format(new Date(), "yyyy-MM-dd")}.csv`;
     link.click();
     URL.revokeObjectURL(url);
     toast.success("CSV exportado com sucesso!");
@@ -421,9 +456,9 @@ export function PaymentsManagement() {
               Gestão de Pagamentos
             </CardTitle>
             <CardDescription>
-              {globalStats.totalEligible > 0 
-                ? `${globalStats.totalEligible} pagamento(s) liberado(s) • ${formatCurrency(globalStats.totalEligibleAmount)}`
-                : "Acompanhe pagamentos por projeto temático"
+              {monthStats.eligible > 0
+                ? `${monthStats.eligible} pagamento(s) liberado(s) • ${formatCurrency(monthStats.totalAmount)}`
+                : "Acompanhe pagamentos por bolsista"
               }
             </CardDescription>
           </div>
@@ -439,20 +474,74 @@ export function PaymentsManagement() {
           </div>
         </div>
       </CardHeader>
+
       <CardContent className="space-y-6">
+        {/* KPI Stats */}
+        {!isLoading && (
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div className="p-3 rounded-lg bg-muted/50 text-center">
+              <p className="text-2xl font-bold text-foreground">{monthStats.total}</p>
+              <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                <Users className="w-3 h-3" /> Total
+              </p>
+            </div>
+            <div className="p-3 rounded-lg bg-warning/10 text-center">
+              <p className="text-2xl font-bold text-warning">{monthStats.pending}</p>
+              <p className="text-xs text-warning flex items-center justify-center gap-1">
+                <Clock className="w-3 h-3" /> Pendentes
+              </p>
+            </div>
+            <div className="p-3 rounded-lg bg-success/10 text-center">
+              <p className="text-2xl font-bold text-success">{monthStats.eligible}</p>
+              <p className="text-xs text-success flex items-center justify-center gap-1">
+                <CheckCircle className="w-3 h-3" /> Liberados
+              </p>
+            </div>
+            <div className="p-3 rounded-lg bg-primary/10 text-center">
+              <p className="text-2xl font-bold text-primary">{monthStats.paid}</p>
+              <p className="text-xs text-primary flex items-center justify-center gap-1">
+                <CreditCard className="w-3 h-3" /> Pagos
+              </p>
+            </div>
+            <div className="p-3 rounded-lg bg-destructive/10 text-center">
+              <p className="text-2xl font-bold text-destructive">{monthStats.cancelled}</p>
+              <p className="text-xs text-destructive flex items-center justify-center gap-1">
+                <Lock className="w-3 h-3" /> Cancelados
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Filters */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {/* Month filter - primary */}
+          <Select value={effectiveMonth} onValueChange={handleMonthFilterChange}>
+            <SelectTrigger className="border-primary/30 bg-primary/5">
+              <Calendar className="h-4 w-4 mr-2 text-primary" />
+              <SelectValue placeholder="Mês/Ano" />
+            </SelectTrigger>
+            <SelectContent>
+              {(data?.availableMonths || []).map(month => (
+                <SelectItem key={month} value={month}>
+                  {formatMonthLabel(month)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Search */}
           <div className="relative lg:col-span-2">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por bolsista ou código..."
+              placeholder="Buscar por nome, email ou código..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
             />
           </div>
-          
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+
+          {/* Status filter */}
+          <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
             <SelectTrigger>
               <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
               <SelectValue placeholder="Status" />
@@ -466,70 +555,66 @@ export function PaymentsManagement() {
             </SelectContent>
           </Select>
 
-          <Select value={sponsorFilter} onValueChange={setSponsorFilter}>
+          {/* Thematic project filter */}
+          <Select value={thematicFilter} onValueChange={setThematicFilter}>
             <SelectTrigger>
               <Building2 className="h-4 w-4 mr-2 text-muted-foreground" />
-              <SelectValue placeholder="Financiador" />
+              <SelectValue placeholder="Projeto Temático" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos os financiadores</SelectItem>
-              {sponsors.map(sponsor => (
-                <SelectItem key={sponsor} value={sponsor}>{sponsor}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger>
-              <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {monthOptions.map(option => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
+              <SelectItem value="all">Todos os projetos</SelectItem>
+              {(data?.thematicProjects || []).map(tp => (
+                <SelectItem key={tp.id} value={tp.id}>{tp.title}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
-        {/* Thematic Project Cards */}
-        <div className="space-y-4">
+        {/* Scholar Table */}
+        <div className="rounded-lg border overflow-hidden">
           {isLoading ? (
-            Array.from({ length: 2 }).map((_, i) => (
-              <Card key={i}>
-                <CardContent className="p-6">
-                  <div className="flex gap-4">
-                    <Skeleton className="w-12 h-12 rounded-lg" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-4 w-20" />
-                      <Skeleton className="h-6 w-full max-w-lg" />
-                      <Skeleton className="h-4 w-32" />
-                    </div>
-                    <div className="flex gap-6">
-                      <Skeleton className="w-16 h-16" />
-                      <Skeleton className="w-16 h-16" />
-                      <Skeleton className="w-16 h-16" />
-                    </div>
+            <div className="p-6 space-y-4">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex gap-4 items-center">
+                  <Skeleton className="w-8 h-8 rounded-full" />
+                  <div className="flex-1 space-y-1">
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="h-3 w-24" />
                   </div>
-                </CardContent>
-              </Card>
-            ))
-          ) : filteredGroups.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground border rounded-lg">
+                  <Skeleton className="h-6 w-20" />
+                  <Skeleton className="h-4 w-20" />
+                </div>
+              ))}
+            </div>
+          ) : filteredScholars.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
               <DollarSign className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Nenhum pagamento encontrado</p>
+              <p className="text-sm">Nenhum bolsista encontrado para os filtros selecionados</p>
             </div>
           ) : (
-            filteredGroups.map(group => (
-              <PaymentsThematicCard
-                key={group.id}
-                group={group}
-                onMarkAsPaid={handleOpenConfirm}
-                onAttachReceipt={handleOpenAttachReceipt}
-              />
-            ))
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Bolsista</TableHead>
+                  <TableHead>Projeto</TableHead>
+                  <TableHead>Valor</TableHead>
+                  <TableHead>Status do mês</TableHead>
+                  <TableHead>Pago em</TableHead>
+                  <TableHead className="w-[120px]">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredScholars.map(scholar => (
+                  <ScholarPaymentRowComponent
+                    key={scholar.user_id}
+                    scholar={scholar}
+                    onMarkAsPaid={handleOpenConfirm}
+                    onAttachReceipt={handleOpenAttachReceipt}
+                    onSendReminder={handleSendReminder}
+                  />
+                ))}
+              </TableBody>
+            </Table>
           )}
         </div>
       </CardContent>
@@ -547,22 +632,20 @@ export function PaymentsManagement() {
             </DialogDescription>
           </DialogHeader>
 
-          {selectedPayment && (
+          {selectedPayment && selectedScholar && (
             <div className="space-y-4">
               <div className="p-4 bg-muted/50 rounded-lg space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Bolsista</span>
-                  <span className="font-medium">{selectedPayment.scholar_name}</span>
+                  <span className="font-medium">{selectedScholar.full_name}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Projeto</span>
-                  <span className="font-medium">{selectedPayment.project_code}</span>
+                  <span className="font-medium">{selectedScholar.project_code}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Referência</span>
-                  <span className="font-medium">
-                    {format(parseISO(`${selectedPayment.reference_month}-01`), "MMMM/yyyy", { locale: ptBR })}
-                  </span>
+                  <span className="font-medium">{formatMonthLabel(selectedPayment.reference_month)}</span>
                 </div>
                 <div className="flex items-center justify-between pt-2 border-t border-border">
                   <span className="text-sm font-medium">Valor</span>
@@ -594,8 +677,8 @@ export function PaymentsManagement() {
           )}
 
           <DialogFooter className="gap-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setConfirmDialogOpen(false)}
               disabled={submitting}
             >
@@ -626,22 +709,20 @@ export function PaymentsManagement() {
             </DialogDescription>
           </DialogHeader>
 
-          {attachPayment && (
+          {attachPayment && attachScholar && (
             <div className="space-y-4">
               <div className="p-4 bg-muted/50 rounded-lg space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Bolsista</span>
-                  <span className="font-medium">{attachPayment.scholar_name}</span>
+                  <span className="font-medium">{attachScholar.full_name}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Projeto</span>
-                  <span className="font-medium">{attachPayment.project_code}</span>
+                  <span className="font-medium">{attachScholar.project_code}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Referência</span>
-                  <span className="font-medium">
-                    {format(parseISO(`${attachPayment.reference_month}-01`), "MMMM/yyyy", { locale: ptBR })}
-                  </span>
+                  <span className="font-medium">{formatMonthLabel(attachPayment.reference_month)}</span>
                 </div>
                 <div className="flex items-center justify-between pt-2 border-t border-border">
                   <span className="text-sm font-medium">Valor</span>
@@ -668,8 +749,8 @@ export function PaymentsManagement() {
           )}
 
           <DialogFooter className="gap-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setAttachDialogOpen(false)}
               disabled={attachSubmitting}
             >
