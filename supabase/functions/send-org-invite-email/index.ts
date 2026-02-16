@@ -100,7 +100,12 @@ Deno.serve(async (req) => {
       day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
     });
 
-    const inviteLink = `https://innovago.app/convite?token=${invite.token}`;
+    // Use APP_URL env var if set, otherwise fall back to the Referer/Origin header, then to published URL
+    const appUrl = Deno.env.get('APP_URL') 
+      || req.headers.get('referer')?.replace(/\/+$/, '').split('/').slice(0, 3).join('/')
+      || req.headers.get('origin')
+      || 'https://boundless-start-art.lovable.app';
+    const inviteLink = `${appUrl}/convite?token=${invite.token}`;
     const logoUrl = `${supabaseUrl}/storage/v1/object/public/email-assets/logo-innovago.png?v=1`;
 
     const html = `
