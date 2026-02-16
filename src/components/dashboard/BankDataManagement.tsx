@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/hooks/use-toast';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { 
   Search, 
@@ -39,6 +40,7 @@ import {
   RefreshCw,
   Filter,
   Building2,
+  UserX,
 } from 'lucide-react';
 
 import { BankDataThematicCard } from './BankDataThematicCard';
@@ -141,8 +143,47 @@ export function BankDataManagement() {
 
       if (accountsError) throw accountsError;
 
+      // Fetch ALL active enrollments to find scholars without bank data
+      const { data: allActiveEnrollments } = await supabase
+        .from('enrollments')
+        .select(`
+          user_id,
+          project:projects(thematic_project_id)
+        `)
+        .eq('status', 'active');
+
+      const allActiveUserIds = [...new Set(allActiveEnrollments?.map(e => e.user_id) || [])];
+      const accountUserIds = new Set(accounts?.map(a => a.user_id) || []);
+      const missingBankDataUserIds = allActiveUserIds.filter(uid => !accountUserIds.has(uid));
+
+      // Fetch profiles for missing users
+      let missingScholars: { user_id: string; full_name: string | null; email: string | null; thematic_project_title: string }[] = [];
+      if (missingBankDataUserIds.length > 0) {
+        const { data: missingProfiles } = await supabase
+          .from('profiles')
+          .select('user_id, full_name, email')
+          .in('user_id', missingBankDataUserIds);
+
+        const missingEnrollmentMap = new Map<string, string>();
+        allActiveEnrollments?.forEach(e => {
+          const project = e.project as { thematic_project_id: string } | null;
+          if (project?.thematic_project_id) {
+            missingEnrollmentMap.set(e.user_id, project.thematic_project_id);
+          }
+        });
+
+        const thematicMapTemp = new Map((thematicProjects || []).map(tp => [tp.id, tp.title]));
+
+        missingScholars = (missingProfiles || []).map(p => ({
+          user_id: p.user_id,
+          full_name: p.full_name,
+          email: p.email,
+          thematic_project_title: thematicMapTemp.get(missingEnrollmentMap.get(p.user_id) || '') || 'Não vinculado',
+        }));
+      }
+
       const userIds = accounts?.map(a => a.user_id) || [];
-      if (userIds.length === 0) return { thematicProjects: thematicProjects || [], accounts: [] };
+      if (userIds.length === 0) return { thematicProjects: thematicProjects || [], accounts: [], missingScholars };
 
       // Fetch profiles
       const { data: profiles, error: profilesError } = await supabase
@@ -187,7 +228,7 @@ export function BankDataManagement() {
         };
       }) || [];
 
-      return { thematicProjects: thematicProjects || [], accounts: enrichedAccounts };
+      return { thematicProjects: thematicProjects || [], accounts: enrichedAccounts, missingScholars };
     },
   });
 
@@ -479,14 +520,34 @@ export function BankDataManagement() {
             </Select>
           </div>
 
-          {/* Info alert */}
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 text-sm text-muted-foreground">
+           <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 text-sm text-muted-foreground">
             <AlertCircle className="h-4 w-4 flex-shrink-0" />
             <span>
               Dados sensíveis são mascarados por padrão. Clique no ícone de olho para revelar ou em "Detalhes" para visualizar e validar.
             </span>
           </div>
 
+          {/* Missing bank data indicator */}
+          {(data?.missingScholars?.length ?? 0) > 0 && (
+            <div className="flex items-start gap-3 p-4 rounded-lg bg-warning/10 border border-warning/30 text-sm">
+              <UserX className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-semibold text-foreground">
+                  {data!.missingScholars!.length} bolsista(s) com bolsa ativa sem dados bancários cadastrados
+                </p>
+                <ul className="mt-2 space-y-1 text-muted-foreground">
+                  {data!.missingScholars!.map(s => (
+                    <li key={s.user_id} className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-warning flex-shrink-0" />
+                      <span className="font-medium text-foreground">{s.full_name || 'Sem nome'}</span>
+                      <span className="text-xs">({s.email || '—'})</span>
+                      <span className="text-xs italic">— {s.thematic_project_title}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
           {/* Thematic Project Cards */}
           <div className="space-y-4">
             {isLoading ? (
