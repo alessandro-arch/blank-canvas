@@ -9,9 +9,9 @@ import { useToast } from "@/hooks/use-toast";
 import type { InviteDetails } from "@/types/admin-members";
 
 const roleRedirects: Record<string, string> = {
-  admin: "/admin/painel",
-  manager: "/admin/painel",
-  reviewer: "/admin/painel",
+  admin: "/admin/dashboard",
+  manager: "/admin/dashboard",
+  reviewer: "/admin/dashboard",
   beneficiary: "/bolsista/painel",
   proponente: "/bolsista/painel",
 };
@@ -70,7 +70,7 @@ const InviteAcceptPage = () => {
     setAcceptedRole(role);
     setAccepted(true);
     toast({ title: "Convite aceito com sucesso!" });
-    const redirect = roleRedirects[role] || "/admin/painel";
+    const redirect = roleRedirects[role] || "/admin/dashboard";
     setTimeout(() => navigate(redirect, { replace: true }), 2000);
   };
 
