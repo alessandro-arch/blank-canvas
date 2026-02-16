@@ -6,11 +6,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { UserPlus, Search, Pencil, UserX, UserCheck, Clock, Mail, Users, XCircle, ShieldCheck } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { UserPlus, Search, Pencil, UserX, UserCheck, Clock, Mail, Users, XCircle, ShieldCheck, RefreshCw, AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import { useAdminMembers } from "@/hooks/useAdminMembers";
 import { AddMemberDialog } from "./AddMemberDialog";
 import { EditMemberDialog } from "./EditMemberDialog";
-import type { AdminMemberFlat } from "@/types/admin-members";
+import type { AdminMemberFlat, OrgInvite } from "@/types/admin-members";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -22,18 +23,19 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 export function AdminMembersManagement() {
-  const { members, invites, loading, updateMemberRole, toggleMemberActive, createInvite, revokeInvite } = useAdminMembers();
+  const { members, invites, loading, updateMemberRole, toggleMemberActive, createInvite, revokeInvite, resendInviteEmail } = useAdminMembers();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [addOpen, setAddOpen] = useState(false);
   const [editMember, setEditMember] = useState<AdminMemberFlat | null>(null);
+  const [loadingInviteId, setLoadingInviteId] = useState<string | null>(null);
 
   // Metrics
   const totalMembers = members.length;
   const activeMembers = members.filter(m => m.is_active).length;
   const suspendedMembers = members.filter(m => !m.is_active).length;
-  const pendingInvites = invites.length;
+  const pendingInvites = invites.filter(i => i.status === 'pending').length;
 
   const filtered = useMemo(() => {
     return members.filter((m) => {
@@ -45,6 +47,10 @@ export function AdminMembersManagement() {
       return matchSearch && matchRole && matchStatus;
     });
   }, [members, search, roleFilter, statusFilter]);
+
+  const pendingInvitesList = useMemo(() => {
+    return invites.filter(i => i.status === 'pending');
+  }, [invites]);
 
   const roleBadge = (role: string) => {
     const variants: Record<string, string> = {
@@ -58,6 +64,73 @@ export function AdminMembersManagement() {
         {ROLE_LABELS[role] || role}
       </Badge>
     );
+  };
+
+  const handleResend = async (inviteId: string) => {
+    setLoadingInviteId(inviteId);
+    await resendInviteEmail(inviteId);
+    setLoadingInviteId(null);
+  };
+
+  const handleRevoke = async (inviteId: string) => {
+    setLoadingInviteId(inviteId);
+    await revokeInvite(inviteId);
+    setLoadingInviteId(null);
+  };
+
+  const isExpiringSoon = (expiresAt: string) => {
+    const diff = new Date(expiresAt).getTime() - Date.now();
+    return diff > 0 && diff < 24 * 60 * 60 * 1000;
+  };
+
+  const renderEmailStatus = (inv: OrgInvite) => {
+    const attempts = (inv as any).send_attempts || 0;
+    const hasError = !!inv.send_error;
+    const wasSent = !!inv.email_sent_at;
+
+    if (wasSent && !hasError) {
+      return (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger>
+              <span className="flex items-center gap-1 text-primary text-xs">
+                <CheckCircle2 className="h-3 w-3" />
+                Enviado
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Enviado em {format(new Date(inv.email_sent_at!), "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
+              {attempts > 1 && <p>{attempts} tentativa(s)</p>}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+
+    if (hasError) {
+      return (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger>
+              <span className="flex items-center gap-1 text-destructive text-xs">
+                <AlertTriangle className="h-3 w-3" />
+                Falha
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Erro: {inv.send_error}</p>
+              <p>{attempts} tentativa(s)</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+
+    if (attempts > 0 && !wasSent) {
+      return <span className="text-xs text-muted-foreground">{attempts} tentativa(s)</span>;
+    }
+
+    return <span className="text-xs text-muted-foreground">Nao enviado</span>;
   };
 
   if (loading) {
@@ -135,7 +208,7 @@ export function AdminMembersManagement() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Membros</CardTitle>
-              <CardDescription>Admins, managers e reviewers da organização</CardDescription>
+              <CardDescription>Admins, managers e reviewers da organizacao</CardDescription>
             </div>
             <Button onClick={() => setAddOpen(true)}>
               <UserPlus className="h-4 w-4 mr-2" />
@@ -152,7 +225,7 @@ export function AdminMembersManagement() {
             <Select value={roleFilter} onValueChange={setRoleFilter}>
               <SelectTrigger className="w-[150px]"><SelectValue placeholder="Papel" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos os papéis</SelectItem>
+                <SelectItem value="all">Todos os papeis</SelectItem>
                 <SelectItem value="admin">Admin</SelectItem>
                 <SelectItem value="manager">Manager</SelectItem>
                 <SelectItem value="reviewer">Reviewer</SelectItem>
@@ -177,7 +250,7 @@ export function AdminMembersManagement() {
                   <TableHead>Papel</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Criado em</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
+                  <TableHead className="text-right">Acoes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -223,8 +296,8 @@ export function AdminMembersManagement() {
             </Table>
           </div>
 
-          {/* Pending Invites */}
-          {invites.filter(i => i.status === 'pending').length > 0 && (
+          {/* Pending Invites with tracking */}
+          {pendingInvitesList.length > 0 && (
             <div className="mt-6">
               <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
                 <Clock className="h-4 w-4" /> Convites Pendentes
@@ -235,28 +308,48 @@ export function AdminMembersManagement() {
                     <TableRow>
                       <TableHead>E-mail</TableHead>
                       <TableHead>Papel</TableHead>
+                      <TableHead>E-mail</TableHead>
                       <TableHead>Expira em</TableHead>
-                      <TableHead className="text-right">Ações</TableHead>
+                      <TableHead className="text-right">Acoes</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {invites.filter(i => i.status === 'pending').map((inv) => (
-                      <TableRow key={inv.id}>
-                        <TableCell className="flex items-center gap-2">
-                          <Mail className="h-4 w-4 text-muted-foreground" />
-                          {inv.invited_email}
-                        </TableCell>
-                        <TableCell>{roleBadge(inv.role)}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {format(new Date(inv.expires_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="sm" onClick={() => revokeInvite(inv.id)} title="Revogar convite">
-                            <XCircle className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {pendingInvitesList.map((inv) => {
+                      const isLoading = loadingInviteId === inv.id;
+                      const expiringSoon = isExpiringSoon(inv.expires_at);
+                      const manyAttempts = ((inv as any).send_attempts || 0) >= 3;
+
+                      return (
+                        <TableRow key={inv.id} className={manyAttempts ? "bg-destructive/5" : expiringSoon ? "bg-accent/50" : ""}>
+                          <TableCell className="flex items-center gap-2">
+                            <Mail className="h-4 w-4 text-muted-foreground" />
+                            {inv.invited_email}
+                          </TableCell>
+                          <TableCell>{roleBadge(inv.role)}</TableCell>
+                          <TableCell>{renderEmailStatus(inv)}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            <span className={expiringSoon ? "text-warning font-medium" : ""}>
+                              {expiringSoon && <AlertTriangle className="h-3 w-3 inline mr-1" />}
+                              {format(new Date(inv.expires_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {isLoading ? (
+                              <Loader2 className="h-4 w-4 animate-spin inline" />
+                            ) : (
+                              <div className="flex justify-end gap-1">
+                                <Button variant="ghost" size="sm" onClick={() => handleResend(inv.id)} title="Reenviar e-mail">
+                                  <RefreshCw className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => handleRevoke(inv.id)} title="Revogar convite">
+                                  <XCircle className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
