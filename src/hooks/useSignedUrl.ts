@@ -27,7 +27,8 @@ export function useSignedUrl(): UseSignedUrlReturn {
 
       if (error) {
         console.error("Error creating signed URL:", error);
-        toast.error("Erro ao gerar link de acesso ao arquivo");
+        const isNotFound = (error as any)?.statusCode === "404" || error.message?.includes("not found");
+        toast.error(isNotFound ? "Arquivo não encontrado no storage" : "Erro ao gerar link de acesso ao arquivo");
         return null;
       }
 
@@ -66,7 +67,8 @@ export async function openReportPdf(filePath: string): Promise<void> {
 
     if (error) {
       console.error("Error creating signed URL:", error);
-      toast.error("Erro ao gerar link de acesso ao arquivo");
+      const isNotFound = (error as any)?.statusCode === "404" || error.message?.includes("not found");
+      toast.error(isNotFound ? "Arquivo PDF não encontrado no storage" : "Erro ao gerar link de acesso ao arquivo");
       newWindow?.close();
       return;
     }
@@ -105,7 +107,8 @@ export async function downloadReportPdf(filePath: string, fileName?: string): Pr
 
     if (error) {
       console.error("Error creating signed URL:", error);
-      toast.error("Erro ao gerar link de download");
+      const isNotFound = (error as any)?.statusCode === "404" || error.message?.includes("not found");
+      toast.error(isNotFound ? "Arquivo PDF não encontrado no storage" : "Erro ao gerar link de download");
       return;
     }
 
