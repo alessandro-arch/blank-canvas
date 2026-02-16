@@ -10,12 +10,13 @@ import { useToast } from "@/hooks/use-toast";
 interface AddMemberDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (email: string, role: string) => Promise<{ invite_id: string; token: string } | null>;
+  onSubmit: (email: string, role: string, expiresDays: number) => Promise<{ invite_id: string; token: string } | null>;
 }
 
 export function AddMemberDialog({ open, onOpenChange, onSubmit }: AddMemberDialogProps) {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("manager");
+  const [expiresDays, setExpiresDays] = useState("7");
   const [loading, setLoading] = useState(false);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -28,7 +29,7 @@ export function AddMemberDialog({ open, onOpenChange, onSubmit }: AddMemberDialo
   const handleSubmit = async () => {
     if (!email.trim()) return;
     setLoading(true);
-    const result = await onSubmit(email.trim().toLowerCase(), role);
+    const result = await onSubmit(email.trim().toLowerCase(), role, parseInt(expiresDays) || 7);
     if (result?.token) {
       setInviteToken(result.token);
     }
@@ -47,6 +48,7 @@ export function AddMemberDialog({ open, onOpenChange, onSubmit }: AddMemberDialo
     if (!isOpen) {
       setEmail("");
       setRole("manager");
+      setExpiresDays("7");
       setInviteToken(null);
       setCopied(false);
     }
@@ -58,7 +60,7 @@ export function AddMemberDialog({ open, onOpenChange, onSubmit }: AddMemberDialo
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {inviteToken ? "Convite Criado" : "Adicionar Membro"}
+            {inviteToken ? "Convite Criado" : "Convidar Membro"}
           </DialogTitle>
         </DialogHeader>
 
@@ -80,9 +82,9 @@ export function AddMemberDialog({ open, onOpenChange, onSubmit }: AddMemberDialo
         ) : (
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">E-mail *</Label>
+              <Label htmlFor="invite-email">E-mail *</Label>
               <Input
-                id="email"
+                id="invite-email"
                 type="email"
                 placeholder="nome@exemplo.com"
                 value={email}
@@ -90,7 +92,7 @@ export function AddMemberDialog({ open, onOpenChange, onSubmit }: AddMemberDialo
               />
             </div>
             <div className="space-y-2">
-              <Label>Role</Label>
+              <Label>Papel</Label>
               <Select value={role} onValueChange={setRole}>
                 <SelectTrigger>
                   <SelectValue />
@@ -98,13 +100,29 @@ export function AddMemberDialog({ open, onOpenChange, onSubmit }: AddMemberDialo
                 <SelectContent>
                   <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="reviewer">Reviewer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="expires">Expiração (dias)</Label>
+              <Select value={expiresDays} onValueChange={setExpiresDays}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 dia</SelectItem>
+                  <SelectItem value="3">3 dias</SelectItem>
+                  <SelectItem value="7">7 dias</SelectItem>
+                  <SelectItem value="14">14 dias</SelectItem>
+                  <SelectItem value="30">30 dias</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => handleClose(false)}>Cancelar</Button>
               <Button onClick={handleSubmit} disabled={loading || !email.trim()}>
-                {loading ? "Salvando..." : "Adicionar / Convidar"}
+                {loading ? "Criando..." : "Gerar Convite"}
               </Button>
             </DialogFooter>
           </div>
