@@ -369,6 +369,48 @@ export function PaymentsManagement() {
     };
   }, [data?.payments]);
 
+  const handleExportCSV = () => {
+    const allFilteredPayments = filteredGroups.flatMap(g => g.payments);
+    if (allFilteredPayments.length === 0) {
+      toast.error("Nenhum pagamento para exportar");
+      return;
+    }
+
+    const statusLabels: Record<string, string> = {
+      pending: "Pendente",
+      eligible: "Liberado",
+      paid: "Pago",
+      cancelled: "Cancelado",
+    };
+
+    const headers = ["Bolsista", "Email", "Projeto", "Código", "Projeto Temático", "Mês Ref.", "Parcela", "Valor", "Status", "Pago em"];
+    const rows = allFilteredPayments.map(p => [
+      p.scholar_name,
+      p.scholar_email,
+      p.project_title,
+      p.project_code,
+      p.thematic_project_title,
+      p.reference_month,
+      p.installment_number,
+      p.amount.toFixed(2).replace(".", ","),
+      statusLabels[p.status] || p.status,
+      p.paid_at ? format(parseISO(p.paid_at), "dd/MM/yyyy") : "",
+    ]);
+
+    const csvContent = [headers, ...rows]
+      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `pagamentos_${selectedMonth}_${format(new Date(), "yyyy-MM-dd")}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success("CSV exportado com sucesso!");
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -385,10 +427,16 @@ export function PaymentsManagement() {
               }
             </CardDescription>
           </div>
-          <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
-            <RefreshCw className={cn("h-4 w-4 mr-2", isFetching && "animate-spin")} />
-            Atualizar
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={isLoading}>
+              <Download className="h-4 w-4 mr-2" />
+              CSV
+            </Button>
+            <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
+              <RefreshCw className={cn("h-4 w-4 mr-2", isFetching && "animate-spin")} />
+              Atualizar
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
