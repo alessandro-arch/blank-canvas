@@ -370,13 +370,35 @@ export default function ThematicProjectDetail() {
     ? valorTotalBolsasMensal * duracaoMesesProjeto
     : 0;
 
-  // Valor Total Atribuído: soma(valor_mensal * meses_bolsa) por bolsa ativa
-  const valorTotalAtribuidoAuto = subprojects
-    ?.filter(p => p.status === 'active')
-    .reduce((sum, p) => {
-      const months = Math.max(1, differenceInMonths(new Date(p.end_date), new Date(p.start_date)) + 1);
-      return sum + (p.valor_mensal || 0) * months;
-    }, 0) ?? 0;
+  // Valor Total Atribuído: soma dos pagamentos efetivamente pagos (status = 'paid')
+  const { data: paidPaymentsTotal } = useQuery({
+    queryKey: ['thematic-paid-total', id],
+    queryFn: async () => {
+      if (!id) return 0;
+      const projectIds = subprojects?.map(p => p.id) || [];
+      if (projectIds.length === 0) return 0;
+
+      // Get enrollment IDs for these projects
+      const { data: enrollments } = await supabase
+        .from('enrollments')
+        .select('id')
+        .in('project_id', projectIds);
+
+      if (!enrollments?.length) return 0;
+
+      const enrollmentIds = enrollments.map(e => e.id);
+      const { data: payments } = await supabase
+        .from('payments')
+        .select('amount')
+        .in('enrollment_id', enrollmentIds)
+        .eq('status', 'paid');
+
+      return payments?.reduce((sum, p) => sum + Number(p.amount), 0) ?? 0;
+    },
+    enabled: !!id && !!subprojects && subprojects.length > 0,
+  });
+
+  const valorTotalAtribuidoAuto = paidPaymentsTotal ?? 0;
 
   const isLoading = loadingThematic || loadingSubprojects;
 
