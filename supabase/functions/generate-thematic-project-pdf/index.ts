@@ -21,7 +21,8 @@ serve(async (req) => {
   }
 
   const startTime = Date.now();
-
+  const requestId = req.headers.get("x-request-id") || `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 8)}`;
+  console.log(`[rid:${requestId}] generate-thematic-project-pdf: request started`);
   try {
     // ─── 1) Auth ───
     const authHeader = req.headers.get("Authorization");
@@ -284,8 +285,8 @@ serve(async (req) => {
       reportId: crypto.randomUUID(),
     });
   } catch (err: any) {
-    console.error("Thematic PDF error:", err);
-    return jsonResponse({ error: err.message || "Erro interno" }, 500);
+    console.error(`[rid:${requestId}] Thematic PDF error:`, err);
+    return jsonResponse({ error: err.message || "Erro interno", requestId }, 500);
   }
 });
 

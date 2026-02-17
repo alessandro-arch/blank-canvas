@@ -43,6 +43,7 @@ import type { SubprojectWithScholar, Project } from './types';
 import { useUserRole } from '@/hooks/useUserRole';
 import { getModalityLabel } from '@/lib/modality-labels';
 import { supabase } from '@/integrations/supabase/client';
+import { tracedInvoke, friendlyError } from '@/lib/logger';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { SubprojectMobileCard } from './SubprojectMobileCard';
 import { PdfReadyDialog } from '@/components/ui/PdfReadyDialog';
@@ -178,19 +179,18 @@ export function SubprojectsTable({
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Não autenticado');
 
-      const res = await supabase.functions.invoke('generate-scholarship-pdf', {
-        body: { bolsa_id: project.id },
-      });
-
-      if (res.error) throw res.error;
-      const { signedUrl } = res.data as { signedUrl: string };
+      const { data } = await tracedInvoke<{ signedUrl: string }>(
+        'generate-scholarship-pdf',
+        { bolsa_id: project.id },
+        'SubprojectsTable',
+      );
 
       if (isMobile) {
-        setPdfSignedUrl(signedUrl);
+        setPdfSignedUrl(data.signedUrl);
         setPdfDialogStatus("ready");
       } else {
         if (newWindow) {
-          newWindow.location.href = signedUrl;
+          newWindow.location.href = data.signedUrl;
         } else {
           toast.error('Permita pop-ups no navegador para visualizar o arquivo');
         }
@@ -201,9 +201,9 @@ export function SubprojectsTable({
       newWindow?.close();
       if (isMobile) {
         setPdfDialogStatus("error");
-        setPdfDialogError(err?.message || 'Erro ao gerar relatório PDF');
+        setPdfDialogError(friendlyError(err, 'Erro ao gerar relatório PDF'));
       } else {
-        toast.error(err?.message || 'Erro ao gerar relatório PDF', { id: toastId });
+        toast.error(friendlyError(err, 'Erro ao gerar relatório PDF'), { id: toastId });
       }
     } finally {
       setGeneratingPdfFor(null);

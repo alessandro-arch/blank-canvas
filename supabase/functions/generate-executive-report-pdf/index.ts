@@ -21,7 +21,8 @@ serve(async (req) => {
   }
 
   const startTime = Date.now();
-
+  const requestId = req.headers.get("x-request-id") || `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 8)}`;
+  console.log(`[rid:${requestId}] generate-executive-report-pdf: request started`);
   try {
     // ─── 1) Auth ───
     const authHeader = req.headers.get("Authorization");
@@ -328,8 +329,8 @@ serve(async (req) => {
       reportId: reportUuid,
     });
   } catch (err: any) {
-    console.error("Executive report error:", err);
-    return jsonResponse({ error: err.message || "Erro interno" }, 500);
+    console.error(`[rid:${requestId}] Executive report error:`, err);
+    return jsonResponse({ error: err.message || "Erro interno", requestId }, 500);
   }
 });
 
