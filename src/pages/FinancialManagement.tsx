@@ -216,7 +216,7 @@ export default function FinancialManagement() {
     const saldoDisponivel = tetoProjeto - tetoBolsas;
 
     const totalPago = filteredPayments.filter(p => p.status === 'paid').reduce((s, p) => s + Number(p.amount), 0);
-    const percentExecutado = tetoProjeto > 0 ? (totalPago / tetoProjeto) * 100 : 0;
+    const percentExecutado = tetoBolsas > 0 ? (totalPago / tetoBolsas) * 100 : 0;
 
     // Passivo programado
     // Passivo programado = teto_bolsas - valor_pago (compromisso futuro real)
@@ -530,10 +530,10 @@ export default function FinancialManagement() {
                     </KPICard>
                     <KPICard
                       icon={<Target className="h-5 w-5" />}
-                      label="% Execução Projeto"
+                      label="% Execução de Bolsas"
                       value={`${agg.percentExecutado.toFixed(1)}%`}
-                      subtitle={`${formatCurrency(agg.totalPago)} de ${formatCurrency(agg.tetoProjeto)}`}
-                      tooltip="Percentual de execução financeira do projeto. Fórmula: valor_atribuído ÷ teto_projeto. Não utiliza orçamento líquido como base."
+                      subtitle={`${formatCurrency(agg.totalPago)} pago de ${formatCurrency(agg.tetoBolsas)}`}
+                      tooltip="Percentual de execução de bolsas. Fórmula: total_pago_bolsas ÷ teto_bolsas. Não inclui encargos (ISS e taxa administrativa)."
                       iconColor={agg.percentExecutado >= 80 ? 'text-success' : agg.percentExecutado >= 50 ? 'text-warning' : 'text-primary'}
                     />
                     <KPICard
