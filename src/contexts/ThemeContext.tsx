@@ -14,6 +14,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const { settings, loading, updateSettings } = useUserSettings();
   const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
 
+  // Cleanup theme classes when unmounting (e.g., logout)
+  useEffect(() => {
+    return () => {
+      document.documentElement.classList.remove("dark", "density-compact");
+    };
+  }, []);
+
   useEffect(() => {
     const applyTheme = (mode: string) => {
       if (mode === "system") {
