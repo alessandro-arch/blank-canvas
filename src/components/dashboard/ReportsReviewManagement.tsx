@@ -258,21 +258,17 @@ export function ReportsReviewManagement() {
   // PDF viewing
   const handleViewPdf = async (fileUrl: string) => {
     setPdfLoading(true);
-    const newWindow = window.open("about:blank", "_blank");
     try {
       const { data, error } = await supabase.storage.from("reports").createSignedUrl(fileUrl, 900);
       if (error) throw error;
       if (data?.signedUrl) {
-        if (newWindow) newWindow.location.href = data.signedUrl;
-        else toast.error("Permita pop-ups no navegador para visualizar o arquivo");
-      } else {
-        newWindow?.close();
+        const opened = window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+        if (!opened) window.location.href = data.signedUrl;
       }
     } catch (error: any) {
       console.error("Error opening PDF:", error);
       const isNotFound = error?.statusCode === "404" || error?.message?.includes("not found");
       toast.error(isNotFound ? "Arquivo PDF não encontrado no storage" : "Erro ao abrir PDF");
-      newWindow?.close();
     } finally {
       setPdfLoading(false);
     }
