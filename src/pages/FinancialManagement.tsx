@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useOrganizationContext } from '@/contexts/OrganizationContext';
 import { Header } from '@/components/layout/Header';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Footer } from '@/components/layout/Footer';
@@ -59,22 +60,29 @@ const periodOptions = generatePeriodOptions();
 
 export default function FinancialManagement() {
   const isMobile = useIsMobile();
+  const { currentOrganization } = useOrganizationContext();
+  const orgId = currentOrganization?.id;
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
   const [selectedSponsor, setSelectedSponsor] = useState<string>('all');
   const [selectedPeriod, setSelectedPeriod] = useState<string>('all');
 
-  // ── Data fetching ──
+  // ── Data fetching (scoped to current organization) ──
 
   const { data: projects, isLoading: loadingProjects } = useQuery({
-    queryKey: ['financial-thematic-projects'],
+    queryKey: ['financial-thematic-projects', orgId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('thematic_projects')
         .select('id, title, sponsor_name, status, start_date, end_date, valor_total_projeto, taxa_administrativa_percentual, impostos_percentual, atribuicao_modo, valor_total_atribuido_bolsas_manual')
         .order('title');
+      if (orgId) {
+        query = query.eq('organization_id', orgId);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return data || [];
     },
+    enabled: !!orgId,
   });
 
   const { data: subprojects } = useQuery({
@@ -266,7 +274,11 @@ export default function FinancialManagement() {
                 Gestão Financeira
               </h1>
               <p className="text-sm text-muted-foreground mt-1">
-                Indicadores consolidados de orçamento, execução e força de trabalho
+                {currentOrganization?.name ? (
+                  <>{currentOrganization.name} — Indicadores consolidados de orçamento, execução e força de trabalho</>
+                ) : (
+                  <>Indicadores consolidados de orçamento, execução e força de trabalho</>
+                )}
               </p>
             </div>
 
