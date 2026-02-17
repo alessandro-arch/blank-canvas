@@ -27,10 +27,13 @@ import {
   FileCheck,
   FileX,
   DollarSign,
-  User
+  User,
+  FileText,
+  Loader2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { toast } from 'sonner';
 import { ProjectDetailsDialog } from './ProjectDetailsDialog';
 import { EditProjectDialog } from './EditProjectDialog';
 import { ArchiveProjectDialog } from './ArchiveProjectDialog';
@@ -38,6 +41,7 @@ import { AssignScholarToProjectDialog } from './AssignScholarToProjectDialog';
 import type { SubprojectWithScholar, Project } from './types';
 import { useUserRole } from '@/hooks/useUserRole';
 import { getModalityLabel } from '@/lib/modality-labels';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SubprojectsTableProps {
   subprojects: SubprojectWithScholar[];
@@ -60,6 +64,7 @@ export function SubprojectsTable({
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [generatingPdfFor, setGeneratingPdfFor] = useState<string | null>(null);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -138,6 +143,40 @@ export function SubprojectsTable({
   const handleProjectUpdated = () => {
     onRefresh();
     queryClient.invalidateQueries({ queryKey: ['projects-management'] });
+  };
+
+  const handleGeneratePdf = async (project: SubprojectWithScholar) => {
+    if (generatingPdfFor) return;
+    setGeneratingPdfFor(project.id);
+    const toastId = toast.loading('Gerando relatório PDF...');
+    
+    // Open window synchronously to avoid popup blocker
+    const newWindow = window.open('about:blank', '_blank');
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Não autenticado');
+
+      const res = await supabase.functions.invoke('generate-scholarship-pdf', {
+        body: { bolsa_id: project.id },
+      });
+
+      if (res.error) throw res.error;
+      const { signedUrl } = res.data as { signedUrl: string };
+
+      if (newWindow) {
+        newWindow.location.href = signedUrl;
+      } else {
+        toast.error('Permita pop-ups no navegador para visualizar o arquivo');
+      }
+      toast.success('Relatório gerado com sucesso', { id: toastId });
+    } catch (err: any) {
+      console.error('PDF generation error:', err);
+      newWindow?.close();
+      toast.error(err?.message || 'Erro ao gerar relatório PDF', { id: toastId });
+    } finally {
+      setGeneratingPdfFor(null);
+    }
   };
 
   // Convert SubprojectWithScholar to Project for dialogs
@@ -231,6 +270,18 @@ export function SubprojectsTable({
                       <DropdownMenuItem onClick={() => handleViewProject(project)}>
                         <Eye className="h-4 w-4 mr-2" />
                         Ver detalhes
+                      </DropdownMenuItem>
+
+                      <DropdownMenuItem 
+                        onClick={() => handleGeneratePdf(project)}
+                        disabled={generatingPdfFor === project.id}
+                      >
+                        {generatingPdfFor === project.id ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <FileText className="h-4 w-4 mr-2" />
+                        )}
+                        {generatingPdfFor === project.id ? 'Gerando...' : 'Gerar PDF'}
                       </DropdownMenuItem>
                       
                       {hasManagerAccess && (
