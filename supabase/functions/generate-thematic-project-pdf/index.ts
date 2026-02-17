@@ -479,7 +479,7 @@ async function buildConsolidatedPdf(data: ConsolidatedData): Promise<Uint8Array>
 
   for (const item of pendItems) {
     check(LH + 2);
-    const icon = item.value > 0 ? "●" : "○";
+    const icon = item.value > 0 ? "X" : "-";
     txt(icon, M, y, 8, fontBold, item.color);
     txt(item.label, M + 14, y, 9);
     txt(String(item.value), W - M - 30, y, 10, fontBold, item.color);
