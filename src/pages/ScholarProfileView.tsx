@@ -2,7 +2,7 @@ import { useParams, Link } from "react-router-dom";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
-import { ArrowLeft, User, Clock, Loader2 } from "lucide-react";
+import { ArrowLeft, User, Clock, Loader2, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,9 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getModalityLabel } from "@/lib/modality-labels";
+import { tracedInvoke, friendlyError } from "@/lib/logger";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { PdfReadyDialog } from "@/components/ui/PdfReadyDialog";
 import type { Database } from "@/integrations/supabase/types";
 
 type EnrollmentStatus = Database["public"]["Enums"]["enrollment_status"];
@@ -69,10 +72,16 @@ const bankValidationStatusConfig: Record<BankValidationStatus, { label: string; 
 
 const ScholarProfileView = () => {
   const { userId } = useParams<{ userId: string }>();
+  const isMobile = useIsMobile();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<ScholarProfile | null>(null);
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [bankAccount, setBankAccount] = useState<BankAccount | null>(null);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
+  const [pdfSignedUrl, setPdfSignedUrl] = useState<string | null>(null);
+  const [pdfDialogStatus, setPdfDialogStatus] = useState<"loading" | "ready" | "error">("ready");
+  const [pdfDialogError, setPdfDialogError] = useState<string | undefined>();
 
   useEffect(() => {
     if (!userId) return;
@@ -198,6 +207,52 @@ const ScholarProfileView = () => {
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString("pt-BR");
   };
+  const handleGenerateScholarPdf = async () => {
+    if (generatingPdf || !userId) return;
+    setGeneratingPdf(true);
+
+    if (isMobile) {
+      setPdfSignedUrl(null);
+      setPdfDialogStatus("loading");
+      setPdfDialogError(undefined);
+      setPdfDialogOpen(true);
+    }
+
+    const toastId = !isMobile ? toast.loading('Gerando relatório da bolsa...') : undefined;
+    const newWindow = !isMobile ? window.open('about:blank', '_blank') : null;
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Não autenticado');
+
+      const { data } = await tracedInvoke<{ signedUrl: string }>(
+        'generate-scholarship-pdf',
+        { user_id: userId },
+        'ScholarProfileView',
+      );
+
+      if (isMobile) {
+        setPdfSignedUrl(data.signedUrl);
+        setPdfDialogStatus("ready");
+      } else if (newWindow) {
+        newWindow.location.href = data.signedUrl;
+      } else {
+        toast.error('Permita pop-ups no navegador para visualizar o arquivo');
+      }
+      if (toastId) toast.success('Relatório gerado com sucesso', { id: toastId });
+    } catch (err: any) {
+      console.error('Scholar PDF error:', err);
+      newWindow?.close();
+      if (isMobile) {
+        setPdfDialogStatus("error");
+        setPdfDialogError(friendlyError(err, 'Erro ao gerar relatório'));
+      } else {
+        toast.error(friendlyError(err, 'Erro ao gerar relatório'), { id: toastId });
+      }
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
 
 
   return (
@@ -252,7 +307,20 @@ const ScholarProfileView = () => {
                     <p className="text-muted-foreground">{profile.email}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleGenerateScholarPdf}
+                    disabled={generatingPdf || !enrollment}
+                  >
+                    {generatingPdf ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <FileText className="h-4 w-4 mr-2" />
+                    )}
+                    {generatingPdf ? 'Gerando...' : 'Relatório da Bolsa (PDF)'}
+                  </Button>
                   {!profile.isActive ? (
                     <Badge variant="destructive">Desativado</Badge>
                   ) : enrollment ? (
@@ -429,6 +497,15 @@ const ScholarProfileView = () => {
         </main>
         <Footer />
       </div>
+      <PdfReadyDialog
+        open={pdfDialogOpen}
+        onOpenChange={setPdfDialogOpen}
+        signedUrl={pdfSignedUrl}
+        title="Relatório da Bolsa pronto"
+        status={pdfDialogStatus}
+        errorMessage={pdfDialogError}
+        onRetry={handleGenerateScholarPdf}
+      />
     </div>
   );
 };
