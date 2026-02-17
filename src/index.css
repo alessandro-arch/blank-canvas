@@ -121,9 +121,43 @@ html.theme-ready *::after {
     --sidebar-ring: 213 70% 45%;
 
     /* Dark theme contrast improvements */
-    --muted-foreground: 0 0% 78%;
+    --muted-foreground: 0 0% 80%;
     --border: 0 0% 20%;
     --input: 0 0% 20%;
+  }
+
+  /* Dark-mode contrast overrides for badges & disabled elements */
+  .theme-dark,
+  .dark {
+    .status-active {
+      --tw-text-opacity: 1;
+      color: hsl(142 76% 46%);
+      background-color: hsl(142 76% 46% / 0.15);
+    }
+
+    .status-pending {
+      --tw-text-opacity: 1;
+      color: hsl(38 92% 60%);
+      background-color: hsl(38 92% 60% / 0.15);
+    }
+
+    .status-inactive {
+      color: hsl(0 0% 70%);
+      background-color: hsl(0 0% 20%);
+    }
+
+    .status-suspended {
+      color: hsl(0 72% 65%);
+      background-color: hsl(0 72% 65% / 0.15);
+    }
+
+    /* Disabled buttons: ensure readable text */
+    button:disabled,
+    button[disabled],
+    [role="button"]:disabled {
+      color: hsl(0 0% 45%);
+      opacity: 1;
+    }
   }
 }
 
