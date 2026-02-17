@@ -3,13 +3,17 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { calcularRiscoFinanceiro } from '@/lib/financial-risk';
+import { tracedInvoke, friendlyError } from '@/lib/logger';
 import type { RiskResult } from '@/lib/financial-risk';
 import { useOrganizationContext } from '@/contexts/OrganizationContext';
+import { PdfReadyDialog } from '@/components/ui/PdfReadyDialog';
 import { Header } from '@/components/layout/Header';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Footer } from '@/components/layout/Footer';
 import { AdminBanner } from '@/components/admin/AdminBanner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
@@ -38,6 +42,8 @@ import {
   ShieldAlert,
   Clock,
   Activity,
+  FileText,
+  Loader2,
 } from 'lucide-react';
 import { differenceInMonths, format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -68,6 +74,11 @@ export default function FinancialManagement() {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
   const [selectedSponsor, setSelectedSponsor] = useState<string>('all');
   const [selectedPeriod, setSelectedPeriod] = useState<string>('all');
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
+  const [pdfSignedUrl, setPdfSignedUrl] = useState<string | null>(null);
+  const [pdfDialogStatus, setPdfDialogStatus] = useState<"loading" | "ready" | "error">("ready");
+  const [pdfDialogError, setPdfDialogError] = useState<string | undefined>();
 
   // ── Data fetching (scoped to current organization) ──
 
@@ -278,6 +289,58 @@ export default function FinancialManagement() {
 
   const isLoading = loadingProjects;
 
+  const handleExportExecutivePdf = async () => {
+    // Need a specific project to generate the executive PDF
+    const targetProjectId = selectedProjectId !== 'all' ? selectedProjectId : filteredProjects?.[0]?.id;
+    if (generatingPdf || !targetProjectId) {
+      toast.error('Selecione um projeto temático para gerar o relatório executivo.');
+      return;
+    }
+    setGeneratingPdf(true);
+
+    if (isMobile) {
+      setPdfSignedUrl(null);
+      setPdfDialogStatus("loading");
+      setPdfDialogError(undefined);
+      setPdfDialogOpen(true);
+    }
+
+    const toastId = !isMobile ? toast.loading('Gerando relatório executivo...') : undefined;
+    const newWindow = !isMobile ? window.open('about:blank', '_blank') : null;
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Não autenticado');
+
+      const { data } = await tracedInvoke<{ signedUrl: string }>(
+        'generate-executive-report-pdf',
+        { projeto_id: targetProjectId },
+        'FinancialManagement',
+      );
+
+      if (isMobile) {
+        setPdfSignedUrl(data.signedUrl);
+        setPdfDialogStatus("ready");
+      } else if (newWindow) {
+        newWindow.location.href = data.signedUrl;
+      } else {
+        toast.error('Permita pop-ups no navegador para visualizar o arquivo');
+      }
+      if (toastId) toast.success('Relatório executivo gerado com sucesso', { id: toastId });
+    } catch (err: any) {
+      console.error('Executive PDF error:', err);
+      newWindow?.close();
+      if (isMobile) {
+        setPdfDialogStatus("error");
+        setPdfDialogError(friendlyError(err, 'Erro ao gerar relatório executivo'));
+      } else {
+        toast.error(friendlyError(err, 'Erro ao gerar relatório executivo'), { id: toastId });
+      }
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
@@ -289,18 +352,32 @@ export default function FinancialManagement() {
         <main className="flex-1 p-4 md:p-6 overflow-auto">
           <div className="max-w-7xl mx-auto space-y-6">
             {/* Header */}
-            <div>
-              <h1 className="text-xl md:text-2xl font-bold text-foreground flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 md:h-6 md:w-6 text-primary" />
-                Gestão Financeira
-              </h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                {currentOrganization?.name ? (
-                  <>{currentOrganization.name} — Indicadores consolidados de orçamento, execução e força de trabalho</>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div>
+                <h1 className="text-xl md:text-2xl font-bold text-foreground flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 md:h-6 md:w-6 text-primary" />
+                  Gestão Financeira
+                </h1>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {currentOrganization?.name ? (
+                    <>{currentOrganization.name} — Indicadores consolidados de orçamento, execução e força de trabalho</>
+                  ) : (
+                    <>Indicadores consolidados de orçamento, execução e força de trabalho</>
+                  )}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                onClick={handleExportExecutivePdf}
+                disabled={generatingPdf || !filteredProjects?.length}
+              >
+                {generatingPdf ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
-                  <>Indicadores consolidados de orçamento, execução e força de trabalho</>
+                  <FileText className="h-4 w-4 mr-2" />
                 )}
-              </p>
+                {generatingPdf ? 'Gerando...' : 'Exportar PDF Executivo'}
+              </Button>
             </div>
 
             {/* ── Filtros Globais ── */}
@@ -662,6 +739,16 @@ export default function FinancialManagement() {
       </div>
 
       <Footer />
+
+      <PdfReadyDialog
+        open={pdfDialogOpen}
+        onOpenChange={setPdfDialogOpen}
+        signedUrl={pdfSignedUrl}
+        title="Relatório Executivo pronto"
+        status={pdfDialogStatus}
+        errorMessage={pdfDialogError}
+        onRetry={handleExportExecutivePdf}
+      />
     </div>
   );
 }
