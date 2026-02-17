@@ -42,6 +42,8 @@ import type { SubprojectWithScholar, Project } from './types';
 import { useUserRole } from '@/hooks/useUserRole';
 import { getModalityLabel } from '@/lib/modality-labels';
 import { supabase } from '@/integrations/supabase/client';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { SubprojectMobileCard } from './SubprojectMobileCard';
 
 interface SubprojectsTableProps {
   subprojects: SubprojectWithScholar[];
@@ -58,6 +60,7 @@ export function SubprojectsTable({
 }: SubprojectsTableProps) {
   const queryClient = useQueryClient();
   const { hasManagerAccess, isAdmin } = useUserRole();
+  const isMobile = useIsMobile();
   
   const [selectedProject, setSelectedProject] = useState<SubprojectWithScholar | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
@@ -207,118 +210,134 @@ export function SubprojectsTable({
 
   return (
     <>
-      <div className="rounded-lg border overflow-auto max-h-[500px]">
-        <Table className="min-w-[1100px]">
-          <TableHeader className="sticky top-0 bg-card z-10">
-            <TableRow>
-              <TableHead className="w-[100px]">Código</TableHead>
-              <TableHead>Subprojeto</TableHead>
-              <TableHead>Bolsista</TableHead>
-              <TableHead>Modalidade</TableHead>
-              <TableHead className="text-right">Valor</TableHead>
-              <TableHead>Vigência</TableHead>
-              <TableHead>Relatório</TableHead>
-              <TableHead>Pagamento</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-[60px]">Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {subprojects.map((project) => (
-              <TableRow key={project.id}>
-                <TableCell className="font-mono text-xs">{project.code}</TableCell>
-                <TableCell className="font-medium max-w-[180px] truncate" title={project.title}>
-                  {project.title}
-                </TableCell>
-                <TableCell>
-                  {project.scholar_name ? (
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{project.scholar_name}</p>
-                        {project.scholar_email && (
-                          <p className="truncate text-xs text-muted-foreground">{project.scholar_email}</p>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <Badge variant="outline" className="border-warning text-warning">
-                      Aguardando atribuição
-                    </Badge>
-                  )}
-                </TableCell>
-                <TableCell className="text-sm">
-                  {project.modalidade_bolsa ? getModalityLabel(project.modalidade_bolsa) : '—'}
-                </TableCell>
-                <TableCell className="text-right font-mono text-sm">
-                  {formatCurrency(project.valor_mensal)}
-                </TableCell>
-                <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                  {format(new Date(project.start_date), 'dd/MM/yy', { locale: ptBR })} - {format(new Date(project.end_date), 'dd/MM/yy', { locale: ptBR })}
-                </TableCell>
-                <TableCell>{getReportStatusBadge(project.report_status)}</TableCell>
-                <TableCell>{getPaymentStatusBadge(project.payment_status)}</TableCell>
-                <TableCell>{getStatusBadge(project.status)}</TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleViewProject(project)}>
-                        <Eye className="h-4 w-4 mr-2" />
-                        Ver detalhes
-                      </DropdownMenuItem>
-
-                      <DropdownMenuItem 
-                        onClick={() => handleGeneratePdf(project)}
-                        disabled={generatingPdfFor === project.id}
-                      >
-                        {generatingPdfFor === project.id ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <FileText className="h-4 w-4 mr-2" />
-                        )}
-                        {generatingPdfFor === project.id ? 'Gerando...' : 'Gerar PDF'}
-                      </DropdownMenuItem>
-                      
-                      {hasManagerAccess && (
-                        <>
-                          <DropdownMenuItem onClick={() => handleEditProject(project)}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Editar subprojeto
-                          </DropdownMenuItem>
-                          
-                          {!project.scholar_name && (
-                            <DropdownMenuItem onClick={() => handleAssignScholar(project)}>
-                              <UserPlus className="h-4 w-4 mr-2" />
-                              Atribuir bolsista
-                            </DropdownMenuItem>
-                          )}
-                          
-                          <DropdownMenuSeparator />
-                          
-                          {project.status === 'active' && isAdmin && (
-                            <DropdownMenuItem 
-                              onClick={() => handleArchiveProject(project)}
-                              className="text-destructive"
-                            >
-                              <Archive className="h-4 w-4 mr-2" />
-                              Arquivar
-                            </DropdownMenuItem>
-                          )}
-                        </>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
+      {/* Mobile: card list */}
+      {isMobile ? (
+        <div className="space-y-3">
+          {subprojects.map((project) => (
+            <SubprojectMobileCard
+              key={project.id}
+              project={project}
+              onView={handleViewProject}
+              onEdit={handleEditProject}
+              onArchive={handleArchiveProject}
+              onAssign={handleAssignScholar}
+              onGeneratePdf={handleGeneratePdf}
+              generatingPdfFor={generatingPdfFor}
+              hasManagerAccess={hasManagerAccess}
+              isAdmin={isAdmin}
+            />
+          ))}
+        </div>
+      ) : (
+        /* Desktop: full table */
+        <div className="rounded-lg border overflow-auto max-h-[500px]">
+          <Table className="min-w-[1100px]">
+            <TableHeader className="sticky top-0 bg-card z-10">
+              <TableRow>
+                <TableHead className="w-[100px]">Código</TableHead>
+                <TableHead>Subprojeto</TableHead>
+                <TableHead>Bolsista</TableHead>
+                <TableHead>Modalidade</TableHead>
+                <TableHead className="text-right">Valor</TableHead>
+                <TableHead>Vigência</TableHead>
+                <TableHead>Relatório</TableHead>
+                <TableHead>Pagamento</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="w-[60px]">Ações</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+            </TableHeader>
+            <TableBody>
+              {subprojects.map((project) => (
+                <TableRow key={project.id}>
+                  <TableCell className="font-mono text-xs">{project.code}</TableCell>
+                  <TableCell className="font-medium max-w-[180px] truncate" title={project.title}>
+                    {project.title}
+                  </TableCell>
+                  <TableCell>
+                    {project.scholar_name ? (
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{project.scholar_name}</p>
+                          {project.scholar_email && (
+                            <p className="truncate text-xs text-muted-foreground">{project.scholar_email}</p>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <Badge variant="outline" className="border-warning text-warning">
+                        Aguardando atribuição
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {project.modalidade_bolsa ? getModalityLabel(project.modalidade_bolsa) : '—'}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm">
+                    {formatCurrency(project.valor_mensal)}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                    {format(new Date(project.start_date), 'dd/MM/yy', { locale: ptBR })} - {format(new Date(project.end_date), 'dd/MM/yy', { locale: ptBR })}
+                  </TableCell>
+                  <TableCell>{getReportStatusBadge(project.report_status)}</TableCell>
+                  <TableCell>{getPaymentStatusBadge(project.payment_status)}</TableCell>
+                  <TableCell>{getStatusBadge(project.status)}</TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleViewProject(project)}>
+                          <Eye className="h-4 w-4 mr-2" />
+                          Ver detalhes
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => handleGeneratePdf(project)}
+                          disabled={generatingPdfFor === project.id}
+                        >
+                          {generatingPdfFor === project.id ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <FileText className="h-4 w-4 mr-2" />
+                          )}
+                          {generatingPdfFor === project.id ? 'Gerando...' : 'Gerar PDF'}
+                        </DropdownMenuItem>
+                        {hasManagerAccess && (
+                          <>
+                            <DropdownMenuItem onClick={() => handleEditProject(project)}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Editar subprojeto
+                            </DropdownMenuItem>
+                            {!project.scholar_name && (
+                              <DropdownMenuItem onClick={() => handleAssignScholar(project)}>
+                                <UserPlus className="h-4 w-4 mr-2" />
+                                Atribuir bolsista
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator />
+                            {project.status === 'active' && isAdmin && (
+                              <DropdownMenuItem 
+                                onClick={() => handleArchiveProject(project)}
+                                className="text-destructive"
+                              >
+                                <Archive className="h-4 w-4 mr-2" />
+                                Arquivar
+                              </DropdownMenuItem>
+                            )}
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       {/* Dialogs */}
       {selectedProject && (

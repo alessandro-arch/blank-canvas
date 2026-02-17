@@ -51,8 +51,10 @@ import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { PaymentReceiptUpload } from "./PaymentReceiptUpload";
 import { ScholarPaymentRowComponent, type ScholarPaymentRow, type PaymentRecord } from "./ScholarPaymentRow";
+import { PaymentMobileCard } from "./PaymentMobileCard";
 import { cn } from "@/lib/utils";
 import { PeriodFilter, type PeriodRange } from "./PeriodFilter";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("pt-BR", {
@@ -64,6 +66,7 @@ function formatCurrency(value: number): string {
 export function PaymentsManagement() {
   const { user } = useAuth();
   const { logAction } = useAuditLog();
+  const isMobile = useIsMobile();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [statusFilter, setStatusFilter] = useState<string>(searchParams.get("payStatus") || "all");
@@ -581,8 +584,8 @@ export function PaymentsManagement() {
           </div>
         </div>
 
-        {/* Scholar Table */}
-        <div className="rounded-lg border overflow-hidden">
+        {/* Scholar Table / Mobile Cards */}
+        <div className={cn(!isMobile && "rounded-lg border overflow-hidden")}>
           {isLoading ? (
             <div className="p-6 space-y-4">
               {Array.from({ length: 5 }).map((_, i) => (
@@ -601,6 +604,18 @@ export function PaymentsManagement() {
             <div className="text-center py-12 text-muted-foreground">
               <DollarSign className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p className="text-sm">Nenhum bolsista encontrado para os filtros selecionados</p>
+            </div>
+          ) : isMobile ? (
+            <div className="space-y-3">
+              {filteredScholars.map(scholar => (
+                <PaymentMobileCard
+                  key={scholar.user_id}
+                  scholar={scholar}
+                  onMarkAsPaid={handleOpenConfirm}
+                  onAttachReceipt={handleOpenAttachReceipt}
+                  onSendReminder={handleSendReminder}
+                />
+              ))}
             </div>
           ) : (
             <Table>
