@@ -3,6 +3,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { tracedInvoke, friendlyError } from '@/lib/logger';
 import { Header } from '@/components/layout/Header';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Footer } from '@/components/layout/Footer';
@@ -339,19 +340,18 @@ export default function ThematicProjectDetail() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Não autenticado');
 
-      const res = await supabase.functions.invoke('generate-thematic-project-pdf', {
-        body: { thematic_project_id: id },
-      });
-
-      if (res.error) throw res.error;
-      const { signedUrl } = res.data as { signedUrl: string };
+      const { data } = await tracedInvoke<{ signedUrl: string }>(
+        'generate-thematic-project-pdf',
+        { thematic_project_id: id },
+        'ThematicProjectDetail',
+      );
 
       if (isMobile) {
-        setPdfSignedUrl(signedUrl);
+        setPdfSignedUrl(data.signedUrl);
         setPdfDialogStatus("ready");
         setPdfDialogTitle("Relatório consolidado pronto");
       } else if (newWindow) {
-        newWindow.location.href = signedUrl;
+        newWindow.location.href = data.signedUrl;
       } else {
         toast.error('Permita pop-ups no navegador para visualizar o arquivo');
       }
@@ -361,9 +361,9 @@ export default function ThematicProjectDetail() {
       newWindow?.close();
       if (isMobile) {
         setPdfDialogStatus("error");
-        setPdfDialogError(err?.message || 'Erro ao gerar relatório PDF');
+        setPdfDialogError(friendlyError(err, 'Erro ao gerar relatório PDF'));
       } else {
-        toast.error(err?.message || 'Erro ao gerar relatório PDF', { id: toastId });
+        toast.error(friendlyError(err, 'Erro ao gerar relatório PDF'), { id: toastId });
       }
     } finally {
       setGeneratingPdf(false);
@@ -390,19 +390,18 @@ export default function ThematicProjectDetail() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Não autenticado');
 
-      const res = await supabase.functions.invoke('generate-executive-report-pdf', {
-        body: { projeto_id: id },
-      });
-
-      if (res.error) throw res.error;
-      const { signedUrl } = res.data as { signedUrl: string };
+      const { data } = await tracedInvoke<{ signedUrl: string }>(
+        'generate-executive-report-pdf',
+        { projeto_id: id },
+        'ThematicProjectDetail',
+      );
 
       if (isMobile) {
-        setPdfSignedUrl(signedUrl);
+        setPdfSignedUrl(data.signedUrl);
         setPdfDialogStatus("ready");
         setPdfDialogTitle("Relatório executivo pronto");
       } else if (newWindow) {
-        newWindow.location.href = signedUrl;
+        newWindow.location.href = data.signedUrl;
       } else {
         toast.error('Permita pop-ups no navegador para visualizar o arquivo');
       }
@@ -412,9 +411,9 @@ export default function ThematicProjectDetail() {
       newWindow?.close();
       if (isMobile) {
         setPdfDialogStatus("error");
-        setPdfDialogError(err?.message || 'Erro ao gerar relatório executivo');
+        setPdfDialogError(friendlyError(err, 'Erro ao gerar relatório executivo'));
       } else {
-        toast.error(err?.message || 'Erro ao gerar relatório executivo', { id: toastId });
+        toast.error(friendlyError(err, 'Erro ao gerar relatório executivo'), { id: toastId });
       }
     } finally {
       setGeneratingExecPdf(false);
