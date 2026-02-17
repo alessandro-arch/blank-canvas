@@ -182,13 +182,17 @@ export default function FinancialManagement() {
       } catch { return s; }
     }, 0);
 
-    const comprometido = totalEstimadoBolsas + custoTotalEncargos;
-    const percentComprometido = orcamentoTotal > 0 ? (comprometido / orcamentoTotal) * 100 : 0;
+    // Orçamento líquido disponível para bolsas (desconta encargos fixos)
+    const orcamentoLiquido = orcamentoTotal - custoTotalEncargos;
+    
+    // Comprometido = apenas bolsas estimadas (encargos já deduzidos do orçamento)
+    const comprometido = totalEstimadoBolsas;
+    const percentComprometido = orcamentoLiquido > 0 ? (comprometido / orcamentoLiquido) * 100 : 0;
 
     // Execução
     const totalPago = filteredPayments.filter(p => p.status === 'paid').reduce((s, p) => s + Number(p.amount), 0);
-    const percentExecutado = orcamentoTotal > 0 ? (totalPago / orcamentoTotal) * 100 : 0;
-    const saldoDisponivel = orcamentoTotal - comprometido;
+    const percentExecutado = orcamentoLiquido > 0 ? (totalPago / orcamentoLiquido) * 100 : 0;
+    const saldoDisponivel = orcamentoLiquido - comprometido;
 
     // Passivo programado
     const passivoProgramado = filteredPayments.filter(p => p.status === 'pending' || p.status === 'eligible').reduce((s, p) => s + Number(p.amount), 0);
@@ -222,6 +226,7 @@ export default function FinancialManagement() {
 
     return {
       orcamentoTotal,
+      orcamentoLiquido,
       totalMensalBolsas,
       totalTaxaAdmin,
       totalImpostos,
@@ -356,13 +361,14 @@ export default function FinancialManagement() {
                       icon={<Wallet className="h-5 w-5" />}
                       label="Orçamento Total"
                       value={formatCurrency(agg.orcamentoTotal)}
+                      subtitle={`Encargos: ${formatCurrency(agg.custoTotalEncargos)}`}
                       iconColor="text-primary"
                     />
                     <KPICard
                       icon={<TrendingUp className="h-5 w-5" />}
-                      label="Comprometido"
+                      label="Comprometido (Bolsas)"
                       value={formatCurrency(agg.comprometido)}
-                      subtitle={`${agg.percentComprometido.toFixed(1)}% do orçamento`}
+                      subtitle={`${agg.percentComprometido.toFixed(1)}% do orç. líquido`}
                       iconColor="text-primary"
                     >
                       <Progress value={Math.min(agg.percentComprometido, 100)} className="mt-2 h-1.5" />
@@ -371,7 +377,7 @@ export default function FinancialManagement() {
                       icon={<DollarSign className="h-5 w-5" />}
                       label="Executado"
                       value={formatCurrency(agg.totalPago)}
-                      subtitle={`${agg.percentExecutado.toFixed(1)}% executado`}
+                      subtitle={`${agg.percentExecutado.toFixed(1)}% do orç. líquido`}
                       iconColor="text-success"
                     >
                       <Progress value={Math.min(agg.percentExecutado, 100)} className="mt-2 h-1.5" />
@@ -380,6 +386,7 @@ export default function FinancialManagement() {
                       icon={<PiggyBank className="h-5 w-5" />}
                       label="Saldo Disponível"
                       value={formatCurrency(agg.saldoDisponivel)}
+                      subtitle={`Orç. líquido: ${formatCurrency(agg.orcamentoLiquido)}`}
                       iconColor={agg.saldoDisponivel >= 0 ? 'text-success' : 'text-destructive'}
                       valueColor={agg.saldoDisponivel >= 0 ? 'text-success' : 'text-destructive'}
                     />
@@ -418,7 +425,7 @@ export default function FinancialManagement() {
                         <Progress value={Math.min(agg.percentExecutado, 100)} className="mt-3 h-2" />
                         <div className="flex justify-between mt-2 text-xs text-muted-foreground">
                           <span>Pago: {formatCurrency(agg.totalPago)}</span>
-                          <span>Total: {formatCurrency(agg.orcamentoTotal)}</span>
+                          <span>Líquido: {formatCurrency(agg.orcamentoLiquido)}</span>
                         </div>
                       </CardContent>
                     </Card>
@@ -552,8 +559,9 @@ export default function FinancialManagement() {
                                 try { dur = Math.max(1, differenceInMonths(new Date(p.end_date), new Date(p.start_date)) + 1); } catch {}
                               }
                               const estBolsas = dur ? mensal * dur : 0;
-                              const comprometido = estBolsas + encargos;
-                              const saldo = (p.valor_total_projeto || 0) - comprometido;
+                              const orcLiquido = (p.valor_total_projeto || 0) - encargos;
+                              const comprometido = estBolsas;
+                              const saldo = orcLiquido - comprometido;
 
                               const pago = filteredPayments
                                 .filter(pay => {
