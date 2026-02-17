@@ -158,11 +158,15 @@ serve(async (req) => {
     const totalMensal = activeSubs.reduce((sum: number, s: any) => sum + Number(s.valor_mensal), 0);
 
     // Valor Total Estimado: mensal * duração do projeto temático
+    // Cálculo por diferença de meses do calendário (mesmo método do front-end)
+    const calcMonthsDiff = (startStr: string, endStr: string): number => {
+      const s = new Date(startStr);
+      const e = new Date(endStr);
+      return (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth()) + 1;
+    };
     let duracaoMeses = 0;
     if (tp.start_date && tp.end_date) {
-      const start = new Date(tp.start_date);
-      const end = new Date(tp.end_date);
-      duracaoMeses = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30.44)) + 1);
+      duracaoMeses = Math.max(1, calcMonthsDiff(tp.start_date, tp.end_date));
     }
     const valorTotalEstimadoBolsas = totalMensal * duracaoMeses;
 
@@ -171,9 +175,7 @@ serve(async (req) => {
     for (const enr of activeEnrollments) {
       const sub = subs.find((s: any) => s.id === enr.project_id);
       if (!sub) continue;
-      const start = new Date(enr.start_date);
-      const end = new Date(enr.end_date);
-      const months = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30.44)) + 1);
+      const months = Math.max(1, calcMonthsDiff(enr.start_date, enr.end_date));
       valorTotalAtribuido += months * Number(enr.grant_value);
     }
 
