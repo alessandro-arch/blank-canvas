@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import { SupportCenterProvider } from "@/contexts/SupportCenterContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import { SupportCenterFAB } from "@/components/support-center/SupportCenterFAB";
 import { SupportCenterDrawer } from "@/components/support-center/SupportCenterDrawer";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
@@ -48,6 +49,7 @@ import AdminMessages from "./pages/AdminMessages";
 import AdminMembers from "./pages/AdminMembers";
 import AllUsers from "./pages/AllUsers";
 import InviteAccept from "./pages/InviteAccept";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -62,6 +64,7 @@ const App = () => (
     <TooltipProvider>
       <AuthProvider>
         <OrganizationProvider>
+          <ThemeProvider>
           <SupportCenterProvider>
           <Toaster />
           <Sonner />
@@ -117,6 +120,11 @@ const App = () => (
               <Route path="/bolsista/mensagens" element={
                 <ScholarProtectedRoute>
                   <ScholarMessages />
+                </ScholarProtectedRoute>
+              } />
+              <Route path="/bolsista/configuracoes" element={
+                <ScholarProtectedRoute>
+                  <Settings />
                 </ScholarProtectedRoute>
               } />
               
@@ -228,6 +236,7 @@ const App = () => (
             <SupportCenterDrawer />
           </BrowserRouter>
           </SupportCenterProvider>
+          </ThemeProvider>
         </OrganizationProvider>
       </AuthProvider>
     </TooltipProvider>

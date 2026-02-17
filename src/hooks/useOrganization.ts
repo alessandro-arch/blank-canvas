@@ -7,6 +7,10 @@ export interface Organization {
   name: string;
   slug: string;
   logo_url: string | null;
+  primary_color: string | null;
+  secondary_color: string | null;
+  watermark_text: string | null;
+  report_footer_text: string | null;
   settings: unknown;
   is_active: boolean;
   created_at: string;
