@@ -161,7 +161,7 @@ const App = () => (
                 </AdminProtectedRoute>
               } />
               <Route path="/admin/mensagens" element={
-                <AdminProtectedRoute allowedRoles={["admin"]}>
+                <AdminProtectedRoute>
                   <AdminMessages />
                 </AdminProtectedRoute>
               } />
@@ -196,7 +196,7 @@ const App = () => (
                 </AdminProtectedRoute>
               } />
               <Route path="/admin/documentos" element={
-                <AdminProtectedRoute allowedRoles={["admin"]}>
+                <AdminProtectedRoute>
                   <Documents />
                 </AdminProtectedRoute>
               } />
