@@ -230,7 +230,7 @@ export default function FinancialManagement() {
     });
     const bolsistasAtivos = new Set(activeEnrollments.map(e => e.user_id)).size;
     const bolsasPrevistas = activeEnrollments.reduce((s, e) => s + (e.total_installments || 0), 0);
-    const totalActiveSubs = (subprojects || []).filter(s => filteredThematicIds.has(s.thematic_project_id)).length;
+    const totalActiveSubs = (subprojects || []).filter(s => filteredThematicIds.has(s.thematic_project_id) && s.status === 'active').length;
     const taxaAtivacao = totalActiveSubs > 0 ? (bolsistasAtivos / totalActiveSubs) * 100 : 0;
     const custoMedioBolsista = bolsistasAtivos > 0 ? totalPago / bolsistasAtivos : 0;
 
@@ -279,7 +279,6 @@ export default function FinancialManagement() {
       passivoProgramado,
       bolsistasAtivos,
       bolsasPrevistas,
-      totalActiveSubs,
       taxaAtivacao,
       custoMedioBolsista,
       pagamentosPendentes,
@@ -555,8 +554,7 @@ export default function FinancialManagement() {
                     <KPICard
                       icon={<GraduationCap className="h-5 w-5" />}
                       label="Bolsistas Ativos"
-                      value={`${agg.bolsistasAtivos}/${agg.totalActiveSubs}`}
-                      subtitle={`${agg.bolsistasAtivos} ativos de ${agg.totalActiveSubs} previstos`}
+                      value={String(agg.bolsistasAtivos)}
                       iconColor="text-primary"
                     />
                     <KPICard
