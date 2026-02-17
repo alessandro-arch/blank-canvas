@@ -38,3 +38,6 @@ verify_jwt = false
 
 [functions.generate-scholarship-pdf]
 verify_jwt = false
+
+[functions.generate-thematic-project-pdf]
+verify_jwt = false
