@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { createLogger } from "@/lib/logger";
 import type { Database } from "@/integrations/supabase/types";
+
+const logger = createLogger("useScholarPayments");
 
 type Enrollment = Database["public"]["Tables"]["enrollments"]["Row"];
 type Payment = Database["public"]["Tables"]["payments"]["Row"];
@@ -68,6 +71,8 @@ export function useScholarPayments(): UseScholarPaymentsReturn {
       return;
     }
 
+    const ctx = logger.createContext("fetchData", user.id);
+
     setLoading(true);
     setError(null);
 
@@ -86,7 +91,7 @@ export function useScholarPayments(): UseScholarPaymentsReturn {
         .maybeSingle();
 
       if (enrollmentError) {
-        console.error("Error fetching enrollment:", enrollmentError);
+        logger.error("Error fetching enrollment", ctx, enrollmentError);
         setError("Erro ao carregar dados do vínculo");
         setLoading(false);
         return;
@@ -119,7 +124,7 @@ export function useScholarPayments(): UseScholarPaymentsReturn {
         .order("installment_number", { ascending: true });
 
       if (paymentsError) {
-        console.error("Error fetching payments:", paymentsError);
+        logger.error("Error fetching payments", ctx, paymentsError);
       }
 
       // 3. Fetch reports for this user (ordered by created_at desc to get latest first)
@@ -211,7 +216,7 @@ export function useScholarPayments(): UseScholarPaymentsReturn {
         },
       });
     } catch (err) {
-      console.error("Error fetching scholar payments:", err);
+      logger.error("Unexpected error fetching scholar payments", ctx, err);
       setError("Erro ao carregar dados de pagamentos");
     } finally {
       setLoading(false);

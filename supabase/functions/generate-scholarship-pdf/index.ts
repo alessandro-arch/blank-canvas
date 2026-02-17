@@ -22,6 +22,8 @@ serve(async (req) => {
   }
 
   const startTime = Date.now();
+  const requestId = req.headers.get("x-request-id") || `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 8)}`;
+  console.log(`[rid:${requestId}] generate-scholarship-pdf: request started`);
 
   try {
     // ─── 1) Auth ───
