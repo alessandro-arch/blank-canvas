@@ -666,7 +666,7 @@ async function buildExecutivePdf(data: ExecutiveData): Promise<Uint8Array> {
 
   for (const item of pendItems) {
     check(LH + 4);
-    const icon = item.value > 0 ? "●" : "○";
+    const icon = item.value > 0 ? "-" : "o";
     txt(icon, M + 2, y, 8, fontBold, item.color);
     txt(item.label, M + 16, y, 9, font);
     txt(String(item.value), W - M - 30, y, 10, fontBold, item.color);
