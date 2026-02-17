@@ -233,8 +233,8 @@ function InstallmentActions({ installment, onRefresh }: InstallmentActionsProps)
         {/* More Actions Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="p-1.5 rounded hover:bg-muted transition-colors">
-              <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
+            <button className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded hover:bg-muted transition-colors">
+              <MoreHorizontal className="w-5 h-5 text-muted-foreground" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">

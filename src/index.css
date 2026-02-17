@@ -251,28 +251,41 @@ html.theme-ready *::after {
 
 /* ===== Mobile touch-target & spacing hardening ===== */
 @media (max-width: 767px) {
-  /* Ensure all interactive elements meet 44px touch targets */
-  button,
-  [role="button"],
-  a,
-  select,
-  input[type="checkbox"],
-  input[type="radio"],
-  .dropdown-menu-item {
+  /*
+   * Touch targets: Apply 44px minimum to action-oriented interactive elements.
+   * Exclude inline badges, spans[role=button] used as tags, etc.
+   */
+
+  /* Standalone buttons (not inside badges or inline chips) */
+  button:not([class*="badge"]):not([class*="status-"]):not(.inline-action),
+  [role="button"]:not([class*="badge"]):not([class*="status-"]) {
     min-height: 44px;
-    min-width: 44px;
   }
 
-  /* Inputs need comfortable height */
-  input,
+  /* Icon-only action buttons (MoreHorizontal, etc.) */
+  button[class*="size-icon"],
+  .icon-action {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Dropdown menu items — comfortable touch target */
+  [role="menuitem"] {
+    min-height: 44px;
+    padding-top: 0.625rem;
+    padding-bottom: 0.625rem;
+  }
+
+  /* Form inputs — comfortable height + prevent iOS zoom */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]),
   textarea,
   select,
   [role="combobox"] {
     min-height: 44px;
-    font-size: 16px; /* Prevents iOS zoom on focus */
+    font-size: 16px;
   }
 
-  /* Tighter card padding on mobile */
+  /* Card padding adjustments */
   .card-institutional {
     padding: 1rem;
   }
@@ -281,10 +294,15 @@ html.theme-ready *::after {
     padding: 0.875rem;
   }
 
-  /* Mobile table cells */
+  /* Table cells */
   .table-institutional td,
   .table-institutional th {
     padding: 0.75rem 0.5rem;
     font-size: 0.8125rem;
+  }
+
+  /* Sidebar nav items — extra spacing between items */
+  .nav-item + .nav-item {
+    margin-top: 2px;
   }
 }
