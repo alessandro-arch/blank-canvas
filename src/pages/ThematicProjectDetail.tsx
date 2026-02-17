@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -56,6 +57,7 @@ import { differenceInMonths } from 'date-fns';
 import type { Database } from '@/integrations/supabase/types';
 import { FinancialInfoSection } from '@/components/projects/FinancialInfoSection';
 import { ProjectDocumentsSection } from '@/components/projects/ProjectDocumentsSection';
+import { MobileFiltersDrawer } from '@/components/dashboard/MobileFiltersDrawer';
 
 type ProjectStatus = Database['public']['Enums']['project_status'];
 
@@ -106,7 +108,7 @@ export default function ThematicProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  
+  const isMobile = useIsMobile();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [selectedProject, setSelectedProject] = useState<SubprojectWithScholar | null>(null);
@@ -575,30 +577,66 @@ export default function ThematicProjectDetail() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Filters */}
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Buscar por código, título ou orientador..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
+                {isMobile ? (
+                  <div className="flex flex-col gap-3">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Buscar por código, título ou orientador..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                    <MobileFiltersDrawer
+                      activeCount={statusFilter !== "all" ? 1 : 0}
+                      onApply={() => {}}
+                      onClear={() => setStatusFilter("all")}
+                    >
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Status</label>
+                        <Select
+                          value={statusFilter}
+                          onValueChange={(value) => setStatusFilter(value as StatusFilter)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Todos os status</SelectItem>
+                            <SelectItem value="active">Ativos</SelectItem>
+                            <SelectItem value="archived">Arquivados</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </MobileFiltersDrawer>
                   </div>
-                  <Select
-                    value={statusFilter}
-                    onValueChange={(value) => setStatusFilter(value as StatusFilter)}
-                  >
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os status</SelectItem>
-                      <SelectItem value="active">Ativos</SelectItem>
-                      <SelectItem value="archived">Arquivados</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                ) : (
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Buscar por código, título ou orientador..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                    <Select
+                      value={statusFilter}
+                      onValueChange={(value) => setStatusFilter(value as StatusFilter)}
+                    >
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os status</SelectItem>
+                        <SelectItem value="active">Ativos</SelectItem>
+                        <SelectItem value="archived">Arquivados</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 {/* Stats */}
                 <div className="flex gap-4 text-sm text-muted-foreground">
