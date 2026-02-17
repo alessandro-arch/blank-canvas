@@ -52,7 +52,10 @@ import { DeleteProjectDialog } from '@/components/projects/DeleteProjectDialog';
 import { AssignScholarToProjectDialog } from '@/components/projects/AssignScholarToProjectDialog';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { differenceInMonths } from 'date-fns';
 import type { Database } from '@/integrations/supabase/types';
+import { FinancialInfoSection } from '@/components/projects/FinancialInfoSection';
+import { ProjectDocumentsSection } from '@/components/projects/ProjectDocumentsSection';
 
 type ProjectStatus = Database['public']['Enums']['project_status'];
 
@@ -64,6 +67,15 @@ interface ThematicProject {
   start_date: string | null;
   end_date: string | null;
   observations: string | null;
+  valor_total_projeto: number;
+  taxa_administrativa_percentual: number;
+  impostos_percentual: number;
+  contrato_projeto_url: string | null;
+  contrato_projeto_nome: string | null;
+  contrato_projeto_uploaded_at: string | null;
+  plano_trabalho_url: string | null;
+  plano_trabalho_nome: string | null;
+  plano_trabalho_uploaded_at: string | null;
 }
 
 interface SubprojectWithScholar {
@@ -117,7 +129,7 @@ export default function ThematicProjectDetail() {
         .maybeSingle();
 
       if (error) throw error;
-      return data as ThematicProject | null;
+      return data as unknown as ThematicProject | null;
     },
     enabled: !!id
   });
@@ -338,6 +350,18 @@ export default function ThematicProjectDetail() {
     updated_at: selectedProject.updated_at,
   } : null;
 
+  // Calculate financial values from subprojects
+  const valorTotalBolsas = subprojects
+    ?.filter(p => p.status === 'active')
+    .reduce((sum, p) => sum + (p.valor_mensal || 0), 0) ?? 0;
+
+  const valorTotalEstimadoBolsas = subprojects
+    ?.filter(p => p.status === 'active')
+    .reduce((sum, p) => {
+      const months = Math.max(1, differenceInMonths(new Date(p.end_date), new Date(p.start_date)) + 1);
+      return sum + (p.valor_mensal || 0) * months;
+    }, 0) ?? 0;
+
   const isLoading = loadingThematic || loadingSubprojects;
 
   if (!id) {
@@ -422,6 +446,31 @@ export default function ThematicProjectDetail() {
                   Projeto Temático não encontrado.
                 </CardContent>
               </Card>
+            )}
+
+            {/* Financial Info & Documents */}
+            {thematicProject && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <FinancialInfoSection
+                  projectId={thematicProject.id}
+                  valorTotalProjeto={thematicProject.valor_total_projeto || 0}
+                  taxaAdministrativaPercentual={thematicProject.taxa_administrativa_percentual || 0}
+                  impostosPercentual={thematicProject.impostos_percentual || 0}
+                  valorTotalBolsas={valorTotalBolsas}
+                  valorTotalEstimadoBolsas={valorTotalEstimadoBolsas}
+                  onUpdate={() => queryClient.invalidateQueries({ queryKey: ['thematic-project', id] })}
+                />
+                <ProjectDocumentsSection
+                  projectId={thematicProject.id}
+                  contratoUrl={thematicProject.contrato_projeto_url}
+                  contratoNome={thematicProject.contrato_projeto_nome}
+                  contratoUploadedAt={thematicProject.contrato_projeto_uploaded_at}
+                  planoUrl={thematicProject.plano_trabalho_url}
+                  planoNome={thematicProject.plano_trabalho_nome}
+                  planoUploadedAt={thematicProject.plano_trabalho_uploaded_at}
+                  onUpdate={() => queryClient.invalidateQueries({ queryKey: ['thematic-project', id] })}
+                />
+              </div>
             )}
 
             {/* Subprojects Card */}

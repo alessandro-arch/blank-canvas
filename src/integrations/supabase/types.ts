@@ -1066,40 +1066,67 @@ export type Database = {
       }
       thematic_projects: {
         Row: {
+          contrato_projeto_nome: string | null
+          contrato_projeto_uploaded_at: string | null
+          contrato_projeto_url: string | null
           created_at: string
           end_date: string | null
           id: string
+          impostos_percentual: number | null
           observations: string | null
           organization_id: string | null
+          plano_trabalho_nome: string | null
+          plano_trabalho_uploaded_at: string | null
+          plano_trabalho_url: string | null
           sponsor_name: string
           start_date: string | null
           status: string
+          taxa_administrativa_percentual: number | null
           title: string
           updated_at: string
+          valor_total_projeto: number | null
         }
         Insert: {
+          contrato_projeto_nome?: string | null
+          contrato_projeto_uploaded_at?: string | null
+          contrato_projeto_url?: string | null
           created_at?: string
           end_date?: string | null
           id?: string
+          impostos_percentual?: number | null
           observations?: string | null
           organization_id?: string | null
+          plano_trabalho_nome?: string | null
+          plano_trabalho_uploaded_at?: string | null
+          plano_trabalho_url?: string | null
           sponsor_name: string
           start_date?: string | null
           status?: string
+          taxa_administrativa_percentual?: number | null
           title: string
           updated_at?: string
+          valor_total_projeto?: number | null
         }
         Update: {
+          contrato_projeto_nome?: string | null
+          contrato_projeto_uploaded_at?: string | null
+          contrato_projeto_url?: string | null
           created_at?: string
           end_date?: string | null
           id?: string
+          impostos_percentual?: number | null
           observations?: string | null
           organization_id?: string | null
+          plano_trabalho_nome?: string | null
+          plano_trabalho_uploaded_at?: string | null
+          plano_trabalho_url?: string | null
           sponsor_name?: string
           start_date?: string | null
           status?: string
+          taxa_administrativa_percentual?: number | null
           title?: string
           updated_at?: string
+          valor_total_projeto?: number | null
         }
         Relationships: [
           {
