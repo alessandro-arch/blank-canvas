@@ -27,7 +27,6 @@ export function GrantTermTab({ searchQuery = "" }: GrantTermTabProps) {
 
   const handleView = async () => {
     if (!grantTerm) return;
-    const newWindow = window.open("about:blank", "_blank");
     setViewLoading(true);
     try {
       const { data, error } = await supabase.storage
@@ -35,18 +34,15 @@ export function GrantTermTab({ searchQuery = "" }: GrantTermTabProps) {
         .createSignedUrl(grantTerm.fileUrl, 900);
       if (error) throw error;
       if (data?.signedUrl) {
-        if (newWindow) {
-          newWindow.location.href = data.signedUrl;
-        } else {
-          toast.error("Permita pop-ups no navegador para visualizar o arquivo");
+        const opened = window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+        if (!opened) {
+          window.location.href = data.signedUrl;
         }
       } else {
-        newWindow?.close();
         toast.error("Link de acesso não disponível");
       }
     } catch (err) {
       console.error("Error opening grant term:", err);
-      newWindow?.close();
       toast.error("Erro ao abrir o termo de outorga");
     } finally {
       setViewLoading(false);

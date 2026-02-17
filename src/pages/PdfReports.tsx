@@ -261,13 +261,12 @@ export default function PdfReports() {
       else { setPdfDialogStatus("error"); }
       return;
     }
-    const newWindow = window.open("about:blank", "_blank");
     const url = await getSignedUrl(filePath);
-    if (url && newWindow) { newWindow.location.href = url; }
-    else {
-      newWindow?.close();
-      if (!url) toast.error("Erro ao gerar link de acesso");
-      else toast.error("Permita pop-ups no navegador para visualizar o arquivo");
+    if (url) {
+      const opened = window.open(url, "_blank", "noopener,noreferrer");
+      if (!opened) window.location.href = url;
+    } else {
+      toast.error("Erro ao gerar link de acesso");
     }
   };
 

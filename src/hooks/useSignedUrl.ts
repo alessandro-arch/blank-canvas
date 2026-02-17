@@ -49,16 +49,15 @@ export function useSignedUrl(): UseSignedUrlReturn {
 }
 
 /**
- * Utility function to open a PDF in a new tab using signed URL
+ * Utility function to open a PDF in a new tab using signed URL.
+ * On mobile, avoids the pre-opened blank window pattern (blocked by Safari/Chrome)
+ * and falls back to navigating in the same tab.
  */
 export async function openReportPdf(filePath: string): Promise<void> {
   if (!filePath) {
     toast.error("Arquivo não encontrado");
     return;
   }
-
-  // Open window synchronously to avoid popup blocker
-  const newWindow = window.open("about:blank", "_blank");
 
   try {
     const { data, error } = await supabase.storage
@@ -69,25 +68,21 @@ export async function openReportPdf(filePath: string): Promise<void> {
       console.error("Error creating signed URL:", error);
       const isNotFound = (error as any)?.statusCode === "404" || error.message?.includes("not found");
       toast.error(isNotFound ? "Arquivo PDF não encontrado no storage" : "Erro ao gerar link de acesso ao arquivo");
-      newWindow?.close();
       return;
     }
 
     if (data?.signedUrl) {
-      if (newWindow) {
-        newWindow.location.href = data.signedUrl;
-      } else {
-        // Don't navigate in same tab - inform user about popup blocker
-        toast.error("Permita pop-ups no navegador para visualizar o arquivo");
+      // Try opening in new tab; if blocked (mobile), fall back to same-tab navigation
+      const opened = window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+      if (!opened) {
+        window.location.href = data.signedUrl;
       }
     } else {
       toast.error("Link de acesso não disponível");
-      newWindow?.close();
     }
   } catch (err) {
     console.error("Error opening PDF:", err);
     toast.error("Erro ao abrir o arquivo");
-    newWindow?.close();
   }
 }
 
