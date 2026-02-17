@@ -195,3 +195,23 @@
     box-shadow: var(--shadow-md);
   }
 }
+
+/* Density: compact mode */
+.density-compact {
+  font-size: 13px;
+}
+
+.density-compact .nav-item {
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+
+.density-compact .card {
+  padding: 0.75rem;
+}
+
+.density-compact table td,
+.density-compact table th {
+  padding-top: 0.35rem;
+  padding-bottom: 0.35rem;
+}

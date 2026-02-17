@@ -47,6 +47,7 @@ const scholarNavigation: NavItem[] = [
   { name: "Mensagens", icon: Mail, href: "/bolsista/mensagens" },
   { name: "Documentos", icon: FileText, href: "/bolsista/documentos" },
   { name: "Manual", icon: HelpCircle, href: "/bolsista/manual" },
+  { name: "Configurações", icon: Settings, href: "/bolsista/configuracoes" },
 ];
 
 const adminNavigation: NavItem[] = [
@@ -62,6 +63,7 @@ const adminNavigation: NavItem[] = [
   { name: "Importar Dados", icon: Upload, href: "/admin/importar", managerOnly: true },
   { name: "Organizações", icon: Building2, href: "/admin/organizacoes", adminOnly: true },
   { name: "Trilha de Auditoria", icon: ShieldAlert, href: "/admin/trilha-auditoria", adminOnly: true },
+  { name: "Configurações", icon: Settings, href: "/admin/configuracoes", managerOnly: true },
 ];
 
 export function Sidebar() {

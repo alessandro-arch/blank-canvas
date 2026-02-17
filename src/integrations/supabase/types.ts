@@ -698,6 +698,8 @@ export type Database = {
       organizations: {
         Row: {
           created_at: string
+          default_admin_fee: number | null
+          default_currency: string | null
           email_notifications_enabled: boolean
           id: string
           is_active: boolean
@@ -714,6 +716,8 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          default_admin_fee?: number | null
+          default_currency?: string | null
           email_notifications_enabled?: boolean
           id?: string
           is_active?: boolean
@@ -730,6 +734,8 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          default_admin_fee?: number | null
+          default_currency?: string | null
           email_notifications_enabled?: boolean
           id?: string
           is_active?: boolean
@@ -1176,6 +1182,36 @@ export type Database = {
         Update: {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_settings: {
+        Row: {
+          created_at: string
+          density: string
+          id: string
+          sidebar_behavior: string
+          theme_mode: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          density?: string
+          id?: string
+          sidebar_behavior?: string
+          theme_mode?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          density?: string
+          id?: string
+          sidebar_behavior?: string
+          theme_mode?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
