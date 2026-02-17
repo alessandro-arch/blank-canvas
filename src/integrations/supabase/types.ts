@@ -704,10 +704,12 @@ export type Database = {
           logo_url: string | null
           name: string
           primary_color: string | null
+          report_footer_text: string | null
           secondary_color: string | null
           settings: Json | null
           slug: string
           updated_at: string
+          watermark_text: string | null
           watermark_url: string | null
         }
         Insert: {
@@ -718,10 +720,12 @@ export type Database = {
           logo_url?: string | null
           name: string
           primary_color?: string | null
+          report_footer_text?: string | null
           secondary_color?: string | null
           settings?: Json | null
           slug: string
           updated_at?: string
+          watermark_text?: string | null
           watermark_url?: string | null
         }
         Update: {
@@ -732,10 +736,12 @@ export type Database = {
           logo_url?: string | null
           name?: string
           primary_color?: string | null
+          report_footer_text?: string | null
           secondary_color?: string | null
           settings?: Json | null
           slug?: string
           updated_at?: string
+          watermark_text?: string | null
           watermark_url?: string | null
         }
         Relationships: []

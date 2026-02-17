@@ -73,11 +73,11 @@ serve(async (req) => {
     }
 
     // ─── 4) Fetch organization branding ───
-    let orgBranding = { name: "Instituição", primary_color: "#1e3a5f", secondary_color: "#f0f4f8", logo_url: null as string | null, watermark_url: null as string | null };
+    let orgBranding = { name: "Instituição", primary_color: "#1e3a5f", secondary_color: "#f0f4f8", logo_url: null as string | null, watermark_text: null as string | null, report_footer_text: null as string | null };
     if (tp.organization_id) {
       const { data: org } = await db
         .from("organizations")
-        .select("name, logo_url, primary_color, secondary_color, watermark_url")
+        .select("name, logo_url, primary_color, secondary_color, watermark_text, report_footer_text")
         .eq("id", tp.organization_id)
         .maybeSingle();
       if (org) {
@@ -86,7 +86,8 @@ serve(async (req) => {
           primary_color: org.primary_color || "#1e3a5f",
           secondary_color: org.secondary_color || "#f0f4f8",
           logo_url: org.logo_url,
-          watermark_url: org.watermark_url,
+          watermark_text: org.watermark_text || null,
+          report_footer_text: org.report_footer_text || null,
         };
       }
     }
@@ -226,6 +227,8 @@ serve(async (req) => {
     const pdfBytes = await buildExecutivePdf({
       orgName: orgBranding.name,
       primaryColor: orgBranding.primary_color,
+      watermarkText: orgBranding.watermark_text,
+      reportFooterText: orgBranding.report_footer_text,
       projectTitle: tp.title,
       sponsor: tp.sponsor_name,
       status: tp.status,
@@ -333,6 +336,8 @@ serve(async (req) => {
 interface ExecutiveData {
   orgName: string;
   primaryColor: string;
+  watermarkText: string | null;
+  reportFooterText: string | null;
   projectTitle: string;
   sponsor: string;
   status: string;
@@ -410,11 +415,26 @@ async function buildExecutivePdf(data: ExecutiveData): Promise<Uint8Array> {
 
   const check = (needed: number) => {
     if (y - needed < M + 30) {
-      // Footer on current page
       drawPageFooter();
+      if (data.watermarkText) drawWatermark();
       page = pdfDoc.addPage([W, H]);
       y = H - M;
     }
+  };
+
+  const drawWatermark = () => {
+    const wText = data.watermarkText || "";
+    if (!wText) return;
+    // Draw diagonal watermark text across page
+    page.drawText(wText, {
+      x: W / 2 - wText.length * 6,
+      y: H / 2,
+      size: 48,
+      font,
+      color: rgb(0.9, 0.9, 0.9),
+      opacity: 0.15,
+      rotate: { type: "degrees" as const, angle: -45 },
+    });
   };
 
   const drawPageFooter = () => {
@@ -522,6 +542,7 @@ async function buildExecutivePdf(data: ExecutiveData): Promise<Uint8Array> {
   // ═══════════════════════════════════════════════════════════════════════════
   // PAGE 2+: VISÃO FINANCEIRA
   // ═══════════════════════════════════════════════════════════════════════════
+  if (data.watermarkText) drawWatermark();
   drawPageFooter();
   page = pdfDoc.addPage([W, H]);
   y = H - M;
@@ -699,15 +720,20 @@ async function buildExecutivePdf(data: ExecutiveData): Promise<Uint8Array> {
   }
 
   // ═══ FINAL FOOTER ═══
-  check(50);
+  check(60);
   page.drawLine({ start: { x: M, y }, end: { x: W - M, y }, thickness: 2, color: primaryRgb });
   y -= 14;
+  if (data.reportFooterText) {
+    txt(data.reportFooterText, M, y, 7, font, grayText);
+    y -= 10;
+  }
   txt("Documento gerado automaticamente pelo sistema InnovaGO. Uso interno e institucional.", M, y, 7, font, grayText);
   y -= 10;
   txt("Os indicadores são recalculados no momento da geração e refletem a situação atual do projeto.", M, y, 7, font, grayText);
   y -= 10;
   txt(`ID: ${data.reportId} | Gerado em: ${fmtDatetime(data.generatedAt)} | Por: ${data.generatedBy}`, M, y, 6, font, grayText);
 
+  if (data.watermarkText) drawWatermark();
   drawPageFooter();
 
   return await pdfDoc.save();
