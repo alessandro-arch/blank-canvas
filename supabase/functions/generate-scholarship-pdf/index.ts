@@ -83,6 +83,23 @@ serve(async (req) => {
     const thematic = project.thematic_projects as any;
     const orgId = thematic?.organization_id || null;
 
+    // Fetch organization branding
+    let orgBranding = { name: "Instituição", primary_color: "#1e3a5f", watermark_text: null as string | null, report_footer_text: null as string | null };
+    if (orgId) {
+      const { data: org } = await supabaseAdmin
+        .from("organizations")
+        .select("name, primary_color, watermark_text, report_footer_text")
+        .eq("id", orgId)
+        .maybeSingle();
+      if (org) {
+        orgBranding = {
+          name: org.name,
+          primary_color: org.primary_color || "#1e3a5f",
+          watermark_text: org.watermark_text || null,
+          report_footer_text: org.report_footer_text || null,
+        };
+      }
+    }
     // Enrollment
     const { data: enrollments } = await supabaseAdmin
       .from("enrollments")
@@ -281,7 +298,7 @@ serve(async (req) => {
     // ─── 6) Convert HTML to PDF with pdf-lib ───
     // Since Deno edge functions can't run a browser engine,
     // we build a structured PDF from the same data using pdf-lib.
-    const pdfBytes = await buildPdfFromData(templateData);
+    const pdfBytes = await buildPdfFromData(templateData, orgBranding);
 
     // ─── 7) Upload to storage ───
     const filePath = `tenant/${orgId || "global"}/bolsas/${bolsaId}/relatorio.pdf`;
@@ -358,10 +375,26 @@ serve(async (req) => {
 
 // ─── PDF Builder using pdf-lib ───────────────────────────────────────────────
 
-async function buildPdfFromData(data: RelatorioBolsaData): Promise<Uint8Array> {
+interface OrgBranding {
+  name: string;
+  primary_color: string;
+  watermark_text: string | null;
+  report_footer_text: string | null;
+}
+
+function hexToRgbScholar(hex: string) {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.substring(0, 2), 16) / 255;
+  const g = parseInt(h.substring(2, 4), 16) / 255;
+  const b = parseInt(h.substring(4, 6), 16) / 255;
+  return rgb(r, g, b);
+}
+
+async function buildPdfFromData(data: RelatorioBolsaData, branding: OrgBranding): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const primaryRgb = hexToRgbScholar(branding.primary_color);
 
   const W = 595.28;
   const H = 841.89;
@@ -405,12 +438,12 @@ async function buildPdfFromData(data: RelatorioBolsaData): Promise<Uint8Array> {
   const sectionTitle = (title: string, num: string) => {
     check(40);
     y -= 6;
-    // Draw number box
-    page.drawRectangle({ x: M, y: y - 4, width: 16, height: 16, color: rgb(0.1, 0.1, 0.12), borderColor: rgb(0.1,0.1,0.12) });
+    // Draw number box with primary color
+    page.drawRectangle({ x: M, y: y - 4, width: 16, height: 16, color: primaryRgb, borderColor: primaryRgb });
     txt(num, M + 5, y, 8, fontBold, rgb(1, 1, 1));
-    txt(title, M + 22, y, 10.5, fontBold);
+    txt(title, M + 22, y, 10.5, fontBold, primaryRgb);
     y -= 8;
-    line(y);
+    page.drawLine({ start: { x: M, y }, end: { x: W - M, y }, thickness: 1, color: primaryRgb });
     y -= LH;
   };
 
@@ -430,17 +463,18 @@ async function buildPdfFromData(data: RelatorioBolsaData): Promise<Uint8Array> {
   };
 
   // ═══ HEADER ═══
-  page.drawRectangle({ x: M, y: y - 4, width: 30, height: 30, color: rgb(0.1, 0.1, 0.12), borderColor: rgb(0.1,0.1,0.12) });
+  page.drawRectangle({ x: M, y: y - 4, width: 30, height: 30, color: primaryRgb, borderColor: primaryRgb });
   txt('BG', M + 7, y + 4, 12, fontBold, rgb(1, 1, 1));
-  txt('BolsaGO', M + 36, y + 8, 18, fontBold);
+  txt('BolsaGO', M + 36, y + 8, 18, fontBold, primaryRgb);
   txt('Relatorio de Bolsa', M + 36, y - 6, 9, font, rgb(0.5, 0.5, 0.55));
 
-  // Right side: date
+  // Right side: org name + date
+  txt(branding.name, W - M - 180, y + 8, 8, fontBold, rgb(0.5, 0.5, 0.55));
   const genDate = fmtDate(data.generatedAt);
-  txt(`Gerado em: ${genDate}`, W - M - 120, y + 2, 8, font, rgb(0.5, 0.5, 0.55));
+  txt(`Gerado em: ${genDate}`, W - M - 120, y - 4, 8, font, rgb(0.5, 0.5, 0.55));
 
   y -= 20;
-  page.drawLine({ start: { x: M, y }, end: { x: W - M, y }, thickness: 2.5, color: rgb(0.1, 0.1, 0.12) });
+  page.drawLine({ start: { x: M, y }, end: { x: W - M, y }, thickness: 2.5, color: primaryRgb });
   y -= 20;
 
   // ═══ SEÇÃO 1 ═══
@@ -654,14 +688,34 @@ async function buildPdfFromData(data: RelatorioBolsaData): Promise<Uint8Array> {
   }
 
   // ═══ FOOTER ═══
-  check(40);
-  page.drawLine({ start: { x: M, y }, end: { x: W - M, y }, thickness: 2, color: rgb(0.1, 0.1, 0.12) });
+  check(50);
+  page.drawLine({ start: { x: M, y }, end: { x: W - M, y }, thickness: 2, color: primaryRgb });
   y -= 14;
+  if (branding.report_footer_text) {
+    txt(branding.report_footer_text, M, y, 7, font, rgb(0.5, 0.5, 0.55));
+    y -= 10;
+  }
   txt('Documento gerado automaticamente pelo sistema BolsaGO. Uso interno e institucional.', M, y, 7, font, rgb(0.5, 0.5, 0.55));
   y -= 10;
   txt('Os dados refletem a situacao no momento da geracao. Para informacoes atualizadas, consulte o sistema.', M, y, 7, font, rgb(0.5, 0.5, 0.55));
   y -= 12;
   txt(`ID: ${data.reportId}`, M, y, 7, font, rgb(0.4, 0.4, 0.45));
+
+  // Draw watermark on all pages
+  if (branding.watermark_text) {
+    const pages = pdfDoc.getPages();
+    for (const pg of pages) {
+      pg.drawText(branding.watermark_text, {
+        x: W / 2 - branding.watermark_text.length * 6,
+        y: H / 2,
+        size: 48,
+        font,
+        color: rgb(0.9, 0.9, 0.9),
+        opacity: 0.15,
+        rotate: { type: "degrees" as const, angle: -45 },
+      });
+    }
+  }
 
   return await pdfDoc.save();
 }

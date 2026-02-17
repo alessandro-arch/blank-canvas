@@ -37,6 +37,10 @@ export function EditOrganizationDialog({
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [isActive, setIsActive] = useState(true);
+  const [primaryColor, setPrimaryColor] = useState("#1e3a5f");
+  const [secondaryColor, setSecondaryColor] = useState("#f0f4f8");
+  const [watermarkText, setWatermarkText] = useState("");
+  const [reportFooterText, setReportFooterText] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
@@ -44,6 +48,10 @@ export function EditOrganizationDialog({
       setName(organization.name);
       setSlug(organization.slug);
       setIsActive(organization.is_active);
+      setPrimaryColor((organization as any).primary_color || "#1e3a5f");
+      setSecondaryColor((organization as any).secondary_color || "#f0f4f8");
+      setWatermarkText((organization as any).watermark_text || "");
+      setReportFooterText((organization as any).report_footer_text || "");
     }
   }, [organization]);
 
@@ -71,6 +79,10 @@ export function EditOrganizationDialog({
         name: name.trim(),
         slug: slug.trim().toLowerCase(),
         is_active: isActive,
+        primary_color: primaryColor.trim() || "#1e3a5f",
+        secondary_color: secondaryColor.trim() || "#f0f4f8",
+        watermark_text: watermarkText.trim() || null,
+        report_footer_text: reportFooterText.trim() || null,
       };
 
       const { error } = await supabase
@@ -172,6 +184,80 @@ export function EditOrganizationDialog({
                 <Switch
                   checked={isActive}
                   onCheckedChange={setIsActive}
+                  disabled={isLoading}
+                />
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold">Identidade Visual (PDFs)</Label>
+                <p className="text-xs text-muted-foreground">
+                  Estas configurações são aplicadas nos relatórios PDF gerados.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-primary-color">Cor Primária</Label>
+                  <div className="flex gap-2">
+                    <input
+                      type="color"
+                      value={primaryColor}
+                      onChange={(e) => setPrimaryColor(e.target.value)}
+                      className="h-9 w-12 cursor-pointer rounded border border-input"
+                      disabled={isLoading}
+                    />
+                    <Input
+                      id="edit-primary-color"
+                      value={primaryColor}
+                      onChange={(e) => setPrimaryColor(e.target.value)}
+                      placeholder="#1e3a5f"
+                      disabled={isLoading}
+                      className="flex-1"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-secondary-color">Cor Secundária</Label>
+                  <div className="flex gap-2">
+                    <input
+                      type="color"
+                      value={secondaryColor}
+                      onChange={(e) => setSecondaryColor(e.target.value)}
+                      className="h-9 w-12 cursor-pointer rounded border border-input"
+                      disabled={isLoading}
+                    />
+                    <Input
+                      id="edit-secondary-color"
+                      value={secondaryColor}
+                      onChange={(e) => setSecondaryColor(e.target.value)}
+                      placeholder="#f0f4f8"
+                      disabled={isLoading}
+                      className="flex-1"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-watermark">Marca d'Água (texto opcional)</Label>
+                <Input
+                  id="edit-watermark"
+                  value={watermarkText}
+                  onChange={(e) => setWatermarkText(e.target.value)}
+                  placeholder="Ex: CONFIDENCIAL, RASCUNHO"
+                  disabled={isLoading}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-footer">Rodapé Personalizado (opcional)</Label>
+                <Input
+                  id="edit-footer"
+                  value={reportFooterText}
+                  onChange={(e) => setReportFooterText(e.target.value)}
+                  placeholder="Ex: © 2026 Instituto XYZ - Todos os direitos reservados"
                   disabled={isLoading}
                 />
               </div>
