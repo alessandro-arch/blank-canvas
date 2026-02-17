@@ -51,11 +51,11 @@ export function PdfReadyDialog({
         </DialogHeader>
 
         <DialogFooter className="flex-col sm:flex-row gap-2 pt-2">
-          <Button variant="outline" className="flex-1" onClick={handleDownload}>
+          <Button variant="outline" className="flex-1 min-h-[44px]" onClick={handleDownload}>
             <Download className="h-4 w-4 mr-2" />
             Baixar
           </Button>
-          <Button className="flex-1" onClick={handleOpen}>
+          <Button className="flex-1 min-h-[44px]" onClick={handleOpen}>
             <ExternalLink className="h-4 w-4 mr-2" />
             Abrir
           </Button>

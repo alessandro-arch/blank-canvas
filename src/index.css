@@ -119,6 +119,11 @@ html.theme-ready *::after {
     --sidebar-accent-foreground: 0 0% 96%;
     --sidebar-border: 0 0% 16%;
     --sidebar-ring: 213 70% 45%;
+
+    /* Dark theme contrast improvements */
+    --muted-foreground: 0 0% 78%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
   }
 }
 
@@ -130,6 +135,16 @@ html.theme-ready *::after {
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Inter', sans-serif;
+  }
+
+  /* ===== Accessibility: visible focus ring ===== */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring;
+  }
+
+  /* Remove default focus ring when not using keyboard */
+  :focus:not(:focus-visible) {
+    outline: none;
   }
 }
 
@@ -232,4 +247,44 @@ html.theme-ready *::after {
 .density-compact table th {
   padding-top: 0.35rem;
   padding-bottom: 0.35rem;
+}
+
+/* ===== Mobile touch-target & spacing hardening ===== */
+@media (max-width: 767px) {
+  /* Ensure all interactive elements meet 44px touch targets */
+  button,
+  [role="button"],
+  a,
+  select,
+  input[type="checkbox"],
+  input[type="radio"],
+  .dropdown-menu-item {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Inputs need comfortable height */
+  input,
+  textarea,
+  select,
+  [role="combobox"] {
+    min-height: 44px;
+    font-size: 16px; /* Prevents iOS zoom on focus */
+  }
+
+  /* Tighter card padding on mobile */
+  .card-institutional {
+    padding: 1rem;
+  }
+
+  .card-stat {
+    padding: 0.875rem;
+  }
+
+  /* Mobile table cells */
+  .table-institutional td,
+  .table-institutional th {
+    padding: 0.75rem 0.5rem;
+    font-size: 0.8125rem;
+  }
 }

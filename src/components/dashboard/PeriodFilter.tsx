@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { Calendar, CalendarRange } from "lucide-react";
+import { saveFilter, loadFilter } from "@/lib/filter-persistence";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -30,6 +31,8 @@ interface PeriodFilterProps {
   availableMonths: string[];
   value: PeriodRange | null;
   onChange: (range: PeriodRange) => void;
+  /** Unique page key for filter persistence */
+  persistKey?: string;
 }
 
 function getMonthStr(date: Date): string {
@@ -60,13 +63,17 @@ function getCurrentQuarter(): number {
   return Math.ceil((new Date().getMonth() + 1) / 3);
 }
 
-export function PeriodFilter({ availableMonths, value, onChange }: PeriodFilterProps) {
+export function PeriodFilter({ availableMonths, value, onChange, persistKey }: PeriodFilterProps) {
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = getMonthStr(now);
 
-  const [periodType, setPeriodType] = useState<PeriodType>("month");
-  const [selectedMonth, setSelectedMonth] = useState<string>(value?.startMonth || currentMonth);
+  // Restore from localStorage if persistKey is provided
+  const restoredType = persistKey ? loadFilter(persistKey, "periodType") as PeriodType | null : null;
+  const restoredMonth = persistKey ? loadFilter(persistKey, "selectedMonth") : null;
+
+  const [periodType, setPeriodType] = useState<PeriodType>(restoredType || "month");
+  const [selectedMonth, setSelectedMonth] = useState<string>(restoredMonth || value?.startMonth || currentMonth);
   const [selectedQuarter, setSelectedQuarter] = useState<string>(`${currentYear}-Q${getCurrentQuarter()}`);
   const [selectedYear, setSelectedYear] = useState<string>(String(currentYear));
   const [customStart, setCustomStart] = useState<Date | undefined>(undefined);
@@ -129,6 +136,7 @@ export function PeriodFilter({ availableMonths, value, onChange }: PeriodFilterP
 
   const handlePeriodTypeChange = (type: PeriodType) => {
     setPeriodType(type);
+    if (persistKey) saveFilter(persistKey, "periodType", type);
     if (type !== "custom") {
       emitChange(type);
     }
@@ -136,6 +144,7 @@ export function PeriodFilter({ availableMonths, value, onChange }: PeriodFilterP
 
   const handleMonthChange = (m: string) => {
     setSelectedMonth(m);
+    if (persistKey) saveFilter(persistKey, "selectedMonth", m);
     emitChange("month", { month: m });
   };
 

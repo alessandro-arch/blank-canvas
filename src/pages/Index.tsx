@@ -14,12 +14,14 @@ import { BankDataPendingBanner } from "@/components/scholar/BankDataPendingBanne
 import { BankDataValidationBanner } from "@/components/scholar/BankDataValidationBanner";
 import { useScholarPayments } from "@/hooks/useScholarPayments";
 import { useBankDataStatus } from "@/hooks/useBankDataStatus";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Index = () => {
   const navigate = useNavigate();
-  const { data, loading: paymentsLoading, error } = useScholarPayments();
+  const { data, loading: paymentsLoading, error, refresh } = useScholarPayments();
   const { status: bankStatus, loading: bankLoading, notesGestor } = useBankDataStatus();
 
   const loading = paymentsLoading || bankLoading;
@@ -42,27 +44,42 @@ const Index = () => {
       <div className="flex-1 flex flex-col">
         <Header />
         
-        <main className="flex-1 p-6 overflow-auto">
+        <main className="flex-1 p-4 md:p-6 overflow-auto">
           {/* Scholar Greeting */}
           <div className="animate-fade-in">
             <ScholarGreeting hasActiveEnrollment={hasActiveEnrollment} loading={loading} />
           </div>
 
-          {/* Error State */}
+          {/* Error State with Retry */}
           {error && (
             <div className="animate-fade-in mb-6">
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  {error}. Por favor, tente recarregar a página.
+                <AlertDescription className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <span className="flex-1">{error}. Por favor, tente novamente.</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 border-destructive/30 text-destructive hover:bg-destructive/10 w-fit"
+                    onClick={() => refresh()}
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Tentar novamente
+                  </Button>
                 </AlertDescription>
               </Alert>
             </div>
           )}
 
           {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {[1, 2, 3, 4].map(i => (
+                  <Skeleton key={i} className="h-24 rounded-lg" />
+                ))}
+              </div>
+              <Skeleton className="h-40 rounded-lg" />
+              <Skeleton className="h-32 rounded-lg" />
             </div>
           ) : !hasActiveEnrollment ? (
             <>
