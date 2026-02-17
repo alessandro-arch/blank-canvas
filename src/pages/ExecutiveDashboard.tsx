@@ -19,7 +19,7 @@ import {
   Wallet, ArrowUpDown, Percent, PiggyBank,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Area, AreaChart } from "recharts";
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -169,15 +169,34 @@ const ExecutiveDashboard = () => {
         }
       }
 
-      // 4. Calculate attributed: sum of all paid payments
+      // 4. Calculate attributed: sum of all paid payments + monthly breakdown
       const { data: paidPayments } = await supabase
         .from("payments")
-        .select("amount")
+        .select("amount, paid_at, reference_month")
         .eq("status", "paid");
 
       const valorAtribuido = paidPayments?.reduce((sum, p) => sum + Number(p.amount), 0) ?? 0;
 
-      return { valorEstimado, valorAtribuido };
+      // 5. Build monthly evolution data (cumulative paid vs estimated)
+      // Group paid amounts by reference_month
+      const monthlyPaid: Record<string, number> = {};
+      for (const p of paidPayments || []) {
+        const month = p.reference_month;
+        monthlyPaid[month] = (monthlyPaid[month] || 0) + Number(p.amount);
+      }
+
+      // Get sorted months
+      const allMonths = Object.keys(monthlyPaid).sort();
+      let cumPaid = 0;
+      const evolutionData = allMonths.map((month) => {
+        cumPaid += monthlyPaid[month];
+        const pct = valorEstimado > 0 ? (cumPaid / valorEstimado) * 100 : 0;
+        const [y, m] = month.split("-");
+        const label = format(new Date(Number(y), Number(m) - 1, 1), "MMM/yy", { locale: ptBR });
+        return { month, label, cumulativePaid: cumPaid, percentual: Math.round(pct * 10) / 10 };
+      });
+
+      return { valorEstimado, valorAtribuido, evolutionData };
     },
   });
 
@@ -347,6 +366,62 @@ const ExecutiveDashboard = () => {
                       </div>
                     );
                   })()}
+                </CardContent>
+              </Card>
+
+              {/* Evolução Mensal do % Executado */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <TrendingUp className="h-4 w-4 text-primary" />
+                    Evolução Mensal — % Executado de Bolsas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {bolsasLoading ? (
+                    <Skeleton className="h-52 w-full" />
+                  ) : bolsasData?.evolutionData && bolsasData.evolutionData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <AreaChart data={bolsasData.evolutionData}>
+                        <defs>
+                          <linearGradient id="gradExec" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                            <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                        <XAxis dataKey="label" tick={{ fontSize: 12 }} className="text-muted-foreground" />
+                        <YAxis
+                          tick={{ fontSize: 11 }}
+                          tickFormatter={(v) => `${v}%`}
+                          domain={[0, (max: number) => Math.max(100, Math.ceil(max / 10) * 10)]}
+                          className="text-muted-foreground"
+                        />
+                        <Tooltip
+                          formatter={(value: number, name: string) => {
+                            if (name === "percentual") return [`${value}%`, "% Executado"];
+                            return [formatCurrency(value), "Acumulado Pago"];
+                          }}
+                          labelFormatter={(label) => `Mês: ${label}`}
+                          contentStyle={{ borderRadius: 8, fontSize: 13 }}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="percentual"
+                          stroke="hsl(var(--primary))"
+                          fill="url(#gradExec)"
+                          strokeWidth={2}
+                          dot={{ r: 3, fill: "hsl(var(--primary))" }}
+                          activeDot={{ r: 5 }}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-52 flex flex-col items-center justify-center border border-dashed border-border rounded-lg bg-muted/30">
+                      <TrendingUp className="h-8 w-8 text-muted-foreground/50 mb-2" />
+                      <p className="text-sm text-muted-foreground">Nenhum pagamento registrado ainda</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
