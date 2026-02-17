@@ -72,49 +72,75 @@ export async function tracedInvoke<T = Record<string, unknown>>(
   const ctx = { requestId, component: component || functionName, action: functionName };
 
   // Ensure session is valid before calling
-  const { data: { session } } = await supabase.auth.getSession();
+  let { data: { session } } = await supabase.auth.getSession();
   if (!session) {
     log.warn("Session missing, attempting refresh", ctx);
-    const { error: refreshErr } = await supabase.auth.refreshSession();
-    if (refreshErr) {
+    const { data: refreshData, error: refreshErr } = await supabase.auth.refreshSession();
+    if (refreshErr || !refreshData.session) {
       log.error("Session refresh failed", ctx, refreshErr);
       const err = new Error("Sessão expirada. Faça login novamente.");
       (err as any).requestId = requestId;
       throw err;
     }
+    session = refreshData.session;
   }
 
-  const invoke = async () => {
-    const res = await supabase.functions.invoke(functionName, {
-      body,
-      headers: { "x-request-id": requestId },
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const url = `${supabaseUrl}/functions/v1/${functionName}`;
+
+  const doFetch = async (accessToken: string) => {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${accessToken}`,
+        "apikey": supabaseKey,
+        "x-request-id": requestId,
+      },
+      body: JSON.stringify(body),
     });
-    return res;
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      let parsed: any;
+      try { parsed = JSON.parse(text); } catch { parsed = null; }
+      const msg = parsed?.error || `Erro ${res.status}: ${text.substring(0, 200)}`;
+      const err = new Error(msg);
+      (err as any).status = res.status;
+      throw err;
+    }
+    return res.json();
   };
 
   log.info(`Invoking ${functionName}`, ctx);
 
-  let res = await invoke();
-
-  // Retry once on transient "Failed to send" errors (network/CORS/session)
-  if (res.error && isTransientError(res.error)) {
-    log.warn(`Transient error on ${functionName}, retrying after session refresh`, ctx);
-    await supabase.auth.refreshSession();
-    // Small delay to let the refreshed token propagate
-    await new Promise((r) => setTimeout(r, 500));
-    res = await invoke();
+  try {
+    const data = await doFetch(session.access_token);
+    log.info(`${functionName} succeeded`, ctx);
+    return { data: data as T, requestId };
+  } catch (firstErr: any) {
+    if (isTransientError(firstErr) || firstErr.status === 401) {
+      log.warn(`Transient/auth error on ${functionName}, retrying after session refresh`, ctx);
+      const { data: refreshData } = await supabase.auth.refreshSession();
+      if (refreshData.session) {
+        await new Promise((r) => setTimeout(r, 500));
+        try {
+          const data = await doFetch(refreshData.session.access_token);
+          log.info(`${functionName} succeeded on retry`, ctx);
+          return { data: data as T, requestId };
+        } catch (retryErr: any) {
+          log.error(`${functionName} failed on retry`, ctx, retryErr);
+          retryErr.requestId = requestId;
+          retryErr.isTransient = isTransientError(retryErr);
+          throw retryErr;
+        }
+      }
+    }
+    log.error(`${functionName} failed`, ctx, firstErr);
+    firstErr.requestId = requestId;
+    firstErr.isTransient = isTransientError(firstErr);
+    throw firstErr;
   }
-
-  if (res.error) {
-    log.error(`${functionName} failed`, ctx, res.error);
-    const err = new Error(res.error.message || `Erro ao chamar ${functionName}`);
-    (err as any).requestId = requestId;
-    (err as any).isTransient = isTransientError(res.error);
-    throw err;
-  }
-
-  log.info(`${functionName} succeeded`, ctx);
-  return { data: res.data as T, requestId };
 }
 
 /** Check if an error is transient (network/CORS/session) and worth retrying */
