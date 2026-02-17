@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Header } from '@/components/layout/Header';
@@ -108,10 +108,11 @@ type StatusFilter = 'all' | 'active' | 'archived';
 export default function ThematicProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [searchTerm, setSearchTerm] = useState(isMobile ? (searchParams.get("q") || "") : "");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>((isMobile ? searchParams.get("status") as StatusFilter : null) || "all");
   const [selectedProject, setSelectedProject] = useState<SubprojectWithScholar | null>(null);
   const [projectHasDependencies, setProjectHasDependencies] = useState(false);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
@@ -126,6 +127,36 @@ export default function ThematicProjectDetail() {
   const [pdfSignedUrl, setPdfSignedUrl] = useState<string | null>(null);
   const [pdfDialogTitle, setPdfDialogTitle] = useState("Relatório pronto");
 
+  // Mobile filter persistence helpers
+  const updateMobileParams = (updates: Record<string, string>) => {
+    if (!isMobile) return;
+    const newParams = new URLSearchParams(searchParams);
+    Object.entries(updates).forEach(([k, v]) => {
+      if (v && v !== "all" && v !== "") newParams.set(k, v);
+      else newParams.delete(k);
+    });
+    setSearchParams(newParams, { replace: true });
+  };
+
+  const handleSearchChange = (val: string) => {
+    setSearchTerm(val);
+    updateMobileParams({ q: val });
+  };
+
+  const handleStatusChange = (val: StatusFilter) => {
+    setStatusFilter(val);
+    updateMobileParams({ status: val });
+  };
+
+  const handleClearFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("all");
+    if (isMobile) {
+      const newParams = new URLSearchParams(searchParams);
+      ["q", "status"].forEach(k => newParams.delete(k));
+      setSearchParams(newParams, { replace: true });
+    }
+  };
   // Fetch thematic project
   const { data: thematicProject, isLoading: loadingThematic } = useQuery({
     queryKey: ['thematic-project', id],
@@ -597,20 +628,20 @@ export default function ThematicProjectDetail() {
                         type="search"
                         placeholder="Buscar por código, título ou orientador..."
                         value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onChange={(e) => handleSearchChange(e.target.value)}
                         className="pl-10 min-h-[44px]"
                       />
                     </div>
                     <MobileFiltersDrawer
                       activeCount={statusFilter !== "all" ? 1 : 0}
                       onApply={() => {}}
-                      onClear={() => setStatusFilter("all")}
+                      onClear={handleClearFilters}
                     >
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-foreground">Status</label>
                         <Select
                           value={statusFilter}
-                          onValueChange={(value) => setStatusFilter(value as StatusFilter)}
+                          onValueChange={(value) => handleStatusChange(value as StatusFilter)}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Status" />
