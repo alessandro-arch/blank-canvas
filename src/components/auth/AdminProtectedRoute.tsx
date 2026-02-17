@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import { Loader2 } from "lucide-react";
 
 interface AdminProtectedRouteProps {
@@ -50,5 +51,5 @@ export function AdminProtectedRoute({
     return <Navigate to="/acesso-negado" replace />;
   }
 
-  return <>{children}</>;
+  return <ThemeProvider>{children}</ThemeProvider>;
 }
