@@ -37,12 +37,11 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabaseUser.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
+    if (userError || !user) {
       return jsonResponse({ error: "Token inválido" }, 401);
     }
-    const userId = claimsData.claims.sub as string;
+    const userId = user.id;
 
     const db = createClient(supabaseUrl, supabaseServiceKey);
 
