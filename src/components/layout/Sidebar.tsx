@@ -47,7 +47,6 @@ const scholarNavigation: NavItem[] = [
   { name: "Mensagens", icon: Mail, href: "/bolsista/mensagens" },
   { name: "Documentos", icon: FileText, href: "/bolsista/documentos" },
   { name: "Manual", icon: HelpCircle, href: "/bolsista/manual" },
-  { name: "Configurações", icon: Settings, href: "/bolsista/configuracoes" },
 ];
 
 const adminNavigation: NavItem[] = [
@@ -74,9 +73,12 @@ export function Sidebar() {
 
   const baseNavigation = hasManagerAccess ? adminNavigation : scholarNavigation;
 
-  const secondaryNavigation: NavItem[] = [
-    ...(hasManagerAccess ? [] : [{ name: "Ajuda", icon: HelpCircle, href: "/bolsista/manual" } as NavItem]),
-  ];
+  const secondaryNavigation: NavItem[] = hasManagerAccess
+    ? []
+    : [
+        { name: "Configurações", icon: Settings, href: "/bolsista/configuracoes" },
+        { name: "Ajuda", icon: HelpCircle, href: "/bolsista/manual" },
+      ];
   
   const filteredNavigation = baseNavigation.filter(item => {
     if (item.managerOnly && !hasManagerAccess) return false;
