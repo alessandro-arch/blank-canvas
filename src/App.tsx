@@ -40,6 +40,7 @@ import OperacaoBolsas from "./pages/OperacaoBolsas";
 import AdminIccaDashboard from "./pages/AdminIccaDashboard";
 import ThematicProjectsList from "./pages/ThematicProjectsList";
 import ThematicProjectDetail from "./pages/ThematicProjectDetail";
+import FinancialManagement from "./pages/FinancialManagement";
 import InviteCodes from "./pages/InviteCodes";
 import Organizations from "./pages/Organizations";
 import ScholarProfileView from "./pages/ScholarProfileView";
@@ -171,6 +172,11 @@ const App = () => (
               <Route path="/admin/projetos-tematicos/:id" element={
                 <AdminProtectedRoute>
                   <ThematicProjectDetail />
+                </AdminProtectedRoute>
+              } />
+              <Route path="/admin/gestao-financeira" element={
+                <AdminProtectedRoute>
+                  <FinancialManagement />
                 </AdminProtectedRoute>
               } />
               <Route path="/admin/membros" element={

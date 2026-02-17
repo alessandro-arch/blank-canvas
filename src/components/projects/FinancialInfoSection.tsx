@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import {
   Select,
   SelectContent,
@@ -19,9 +18,6 @@ import { toast } from 'sonner';
 
 interface FinancialInfoSectionProps {
   projectId: string;
-  valorTotalProjeto: number;
-  taxaAdministrativaPercentual: number;
-  impostosPercentual: number;
   valorTotalBolsasMensal: number;
   valorTotalEstimadoBolsas: number;
   duracaoMesesProjeto: number | null;
@@ -34,9 +30,6 @@ interface FinancialInfoSectionProps {
 
 export function FinancialInfoSection({
   projectId,
-  valorTotalProjeto,
-  taxaAdministrativaPercentual,
-  impostosPercentual,
   valorTotalBolsasMensal,
   valorTotalEstimadoBolsas,
   duracaoMesesProjeto,
@@ -49,9 +42,6 @@ export function FinancialInfoSection({
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
-    valor_total_projeto: valorTotalProjeto,
-    taxa_administrativa_percentual: taxaAdministrativaPercentual,
-    impostos_percentual: impostosPercentual,
     atribuicao_modo: atribuicaoModo,
     valor_total_atribuido_bolsas_manual: valorTotalAtribuidoManual,
     atribuicao_justificativa: atribuicaoJustificativa,
@@ -60,10 +50,6 @@ export function FinancialInfoSection({
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
-  const valorTaxaAdministrativa = (formData.valor_total_projeto * formData.taxa_administrativa_percentual) / 100;
-  const valorImpostos = (formData.valor_total_projeto * formData.impostos_percentual) / 100;
-
-  // Determine effective attributed value
   const valorAtribuido = atribuicaoModo === 'manual' ? valorTotalAtribuidoManual : valorTotalAtribuidoAuto;
   const diferenca = valorTotalEstimadoBolsas - valorAtribuido;
   const percentualAtribuido = valorTotalEstimadoBolsas > 0 ? (valorAtribuido / valorTotalEstimadoBolsas) * 100 : 0;
@@ -79,9 +65,6 @@ export function FinancialInfoSection({
       const { error } = await supabase
         .from('thematic_projects')
         .update({
-          valor_total_projeto: formData.valor_total_projeto,
-          taxa_administrativa_percentual: formData.taxa_administrativa_percentual,
-          impostos_percentual: formData.impostos_percentual,
           atribuicao_modo: formData.atribuicao_modo,
           valor_total_atribuido_bolsas_manual: formData.atribuicao_modo === 'manual' ? formData.valor_total_atribuido_bolsas_manual : null,
           atribuicao_justificativa: formData.atribuicao_modo === 'manual' ? formData.atribuicao_justificativa : null,
@@ -90,7 +73,6 @@ export function FinancialInfoSection({
 
       if (error) throw error;
 
-      // Audit log for manual override
       if (formData.atribuicao_modo === 'manual') {
         await supabase.rpc('insert_audit_log', {
           p_action: 'atribuicao_manual_bolsas',
@@ -120,9 +102,6 @@ export function FinancialInfoSection({
 
   const handleCancel = () => {
     setFormData({
-      valor_total_projeto: valorTotalProjeto,
-      taxa_administrativa_percentual: taxaAdministrativaPercentual,
-      impostos_percentual: impostosPercentual,
       atribuicao_modo: atribuicaoModo,
       valor_total_atribuido_bolsas_manual: valorTotalAtribuidoManual,
       atribuicao_justificativa: atribuicaoJustificativa,
@@ -135,7 +114,7 @@ export function FinancialInfoSection({
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2 text-base">
           <DollarSign className="h-5 w-5 text-primary" />
-          Informações Financeiras
+          Resumo Financeiro de Bolsas
         </CardTitle>
         {!editing ? (
           <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
@@ -156,73 +135,13 @@ export function FinancialInfoSection({
         )}
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Campos editáveis do projeto */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Valor Total do Projeto</Label>
-            {editing ? (
-              <Input
-                type="number"
-                step="0.01"
-                value={formData.valor_total_projeto}
-                onChange={(e) => setFormData(prev => ({ ...prev, valor_total_projeto: parseFloat(e.target.value) || 0 }))}
-              />
-            ) : (
-              <p className="text-lg font-semibold">{formatCurrency(valorTotalProjeto)}</p>
-            )}
-          </div>
-
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Taxa Administrativa (%)</Label>
-            {editing ? (
-              <Input
-                type="number"
-                step="0.01"
-                value={formData.taxa_administrativa_percentual}
-                onChange={(e) => setFormData(prev => ({ ...prev, taxa_administrativa_percentual: parseFloat(e.target.value) || 0 }))}
-              />
-            ) : (
-              <p className="text-lg font-semibold">{taxaAdministrativaPercentual}%</p>
-            )}
-          </div>
-
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Valor Taxa Administrativa</Label>
-            <p className="text-lg font-semibold text-muted-foreground">
-              {formatCurrency(editing ? valorTaxaAdministrativa : (valorTotalProjeto * taxaAdministrativaPercentual) / 100)}
-            </p>
-          </div>
-
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Impostos (%)</Label>
-            {editing ? (
-              <Input
-                type="number"
-                step="0.01"
-                value={formData.impostos_percentual}
-                onChange={(e) => setFormData(prev => ({ ...prev, impostos_percentual: parseFloat(e.target.value) || 0 }))}
-              />
-            ) : (
-              <p className="text-lg font-semibold">{impostosPercentual}%</p>
-            )}
-          </div>
-
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Valor Impostos</Label>
-            <p className="text-lg font-semibold text-muted-foreground">
-              {formatCurrency(editing ? valorImpostos : (valorTotalProjeto * impostosPercentual) / 100)}
-            </p>
-          </div>
-
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Total Mensal em Bolsas</Label>
-            <p className="text-lg font-semibold text-primary">{formatCurrency(valorTotalBolsasMensal)}</p>
-          </div>
+        {/* KPI: Total Mensal */}
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Total Mensal em Bolsas</Label>
+          <p className="text-lg font-semibold text-primary">{formatCurrency(valorTotalBolsasMensal)}</p>
         </div>
 
-        <Separator />
-
-        {/* Bloco de Bolsas Estimado vs Atribuído */}
+        {/* Bolsas — Estimado vs Atribuído */}
         <div>
           <h4 className="text-sm font-medium mb-4 flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-primary" />
@@ -247,9 +166,7 @@ export function FinancialInfoSection({
             {/* Atribuído */}
             <div className="border rounded-lg p-4 space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-xs text-muted-foreground">
-                  Total Pago em Bolsas
-                </Label>
+                <Label className="text-xs text-muted-foreground">Total Pago em Bolsas</Label>
                 {editing && (
                   <Select
                     value={formData.atribuicao_modo}

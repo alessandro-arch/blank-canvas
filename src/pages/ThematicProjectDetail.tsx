@@ -617,9 +617,6 @@ export default function ThematicProjectDetail() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <FinancialInfoSection
                   projectId={thematicProject.id}
-                  valorTotalProjeto={thematicProject.valor_total_projeto || 0}
-                  taxaAdministrativaPercentual={thematicProject.taxa_administrativa_percentual || 0}
-                  impostosPercentual={thematicProject.impostos_percentual || 0}
                   valorTotalBolsasMensal={valorTotalBolsasMensal}
                   valorTotalEstimadoBolsas={valorTotalEstimadoBolsas}
                   duracaoMesesProjeto={duracaoMesesProjeto}
