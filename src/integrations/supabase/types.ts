@@ -1231,6 +1231,10 @@ export type Database = {
         }
         Returns: Json
       }
+      enrollment_in_user_org: {
+        Args: { p_enrollment_id: string }
+        Returns: boolean
+      }
       ensure_profile_exists: { Args: never; Returns: Json }
       get_invite_details: { Args: { p_token: string }; Returns: Json }
       get_user_organizations: { Args: never; Returns: string[] }
@@ -1255,12 +1259,24 @@ export type Database = {
       }
       is_org_admin: { Args: { p_org_id: string }; Returns: boolean }
       is_org_admin_or_manager: { Args: { p_org_id: string }; Returns: boolean }
+      project_belongs_to_user_org: {
+        Args: { p_project_id: string }
+        Returns: boolean
+      }
       upsert_sensitive_profile: {
         Args: { p_cpf?: string; p_phone?: string }
         Returns: Json
       }
       user_can_access_profile_by_org: {
         Args: { p_user_id: string }
+        Returns: boolean
+      }
+      user_enrolled_in_thematic_project: {
+        Args: { p_thematic_project_id: string }
+        Returns: boolean
+      }
+      user_has_enrollment_in_project: {
+        Args: { p_project_id: string }
         Returns: boolean
       }
       user_has_org_access: { Args: { p_org_id: string }; Returns: boolean }
