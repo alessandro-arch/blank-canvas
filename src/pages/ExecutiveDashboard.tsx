@@ -11,13 +11,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { format, subDays, differenceInDays } from "date-fns";
+import { format, subDays, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   FileText, DollarSign, XCircle, Users, Calendar,
   AlertTriangle, ArrowRight, TrendingUp, BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -94,6 +95,37 @@ const ExecutiveDashboard = () => {
 
       const totalPaid = paidPayments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
 
+      // Fetch payment data for chart (last 6 months)
+      const chartMonths: { month: string; label: string; paid: number; pending: number }[] = [];
+      const [year, mon] = selectedMonth.split("-").map(Number);
+      const selectedDate = new Date(year, mon - 1, 1);
+      
+      for (let i = 5; i >= 0; i--) {
+        const d = subMonths(selectedDate, i);
+        const monthKey = format(d, "yyyy-MM");
+        const label = format(d, "MMM/yy", { locale: ptBR });
+        chartMonths.push({ month: monthKey, label, paid: 0, pending: 0 });
+      }
+
+      const monthKeys = chartMonths.map(m => m.month);
+      const { data: chartPayments } = await supabase
+        .from("payments")
+        .select("reference_month, amount, status")
+        .in("reference_month", monthKeys);
+
+      if (chartPayments) {
+        for (const p of chartPayments) {
+          const entry = chartMonths.find(m => m.month === p.reference_month);
+          if (entry) {
+            if (p.status === "paid") {
+              entry.paid += Number(p.amount);
+            } else {
+              entry.pending += Number(p.amount);
+            }
+          }
+        }
+      }
+
       return {
         pendingReports: pendingReports ?? 0,
         rejectedReports: rejectedReports ?? 0,
@@ -102,6 +134,7 @@ const ExecutiveDashboard = () => {
         lateReports: lateReports?.length ?? 0,
         latePayments: latePayments?.length ?? 0,
         totalPaid,
+        chartData: chartMonths,
       };
     },
   });
@@ -239,15 +272,39 @@ const ExecutiveDashboard = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="h-48 flex flex-col items-center justify-center border border-dashed border-border rounded-lg bg-muted/30">
-                      <TrendingUp className="h-8 w-8 text-muted-foreground/50 mb-2" />
-                      <p className="text-sm text-muted-foreground">Gráfico em desenvolvimento</p>
-                      {!isLoading && data && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Total pago no período: <span className="font-semibold">{formatCurrency(data.totalPaid)}</span>
+                    {isLoading ? (
+                      <Skeleton className="h-48 w-full" />
+                    ) : data?.chartData && data.chartData.some(d => d.paid > 0 || d.pending > 0) ? (
+                      <div className="space-y-2">
+                        <ResponsiveContainer width="100%" height={200}>
+                          <BarChart data={data.chartData} barGap={2}>
+                            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                            <XAxis dataKey="label" tick={{ fontSize: 12 }} className="text-muted-foreground" />
+                            <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} className="text-muted-foreground" />
+                            <Tooltip
+                              formatter={(value: number) => formatCurrency(value)}
+                              labelFormatter={(label) => `Mês: ${label}`}
+                              contentStyle={{ borderRadius: 8, fontSize: 13 }}
+                            />
+                            <Bar dataKey="paid" name="Pago" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="pending" name="Pendente" fill="hsl(var(--warning))" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                        <p className="text-xs text-muted-foreground text-center">
+                          Total pago no período selecionado: <span className="font-semibold">{formatCurrency(data.totalPaid)}</span>
                         </p>
-                      )}
-                    </div>
+                      </div>
+                    ) : (
+                      <div className="h-48 flex flex-col items-center justify-center border border-dashed border-border rounded-lg bg-muted/30">
+                        <TrendingUp className="h-8 w-8 text-muted-foreground/50 mb-2" />
+                        <p className="text-sm text-muted-foreground">Nenhum pagamento registrado</p>
+                        {!isLoading && data && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Total pago no período: <span className="font-semibold">{formatCurrency(data.totalPaid)}</span>
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
