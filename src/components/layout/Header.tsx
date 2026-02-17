@@ -88,7 +88,7 @@ export function Header() {
         {/* User Menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-muted transition-colors">
+            <button className="flex items-center gap-2 min-h-[44px] p-1.5 rounded-lg hover:bg-muted transition-colors">
               <Avatar className="w-8 h-8">
                 {avatarUrl && <AvatarImage src={avatarUrl} alt="Foto de perfil" />}
                 <AvatarFallback className="bg-primary/10 text-primary text-sm">

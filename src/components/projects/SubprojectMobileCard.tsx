@@ -88,8 +88,8 @@ export function SubprojectMobileCard({
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
-              <MoreHorizontal className="h-4 w-4" />
+            <Button variant="ghost" size="icon" className="min-w-[44px] min-h-[44px] flex-shrink-0">
+              <MoreHorizontal className="h-5 w-5" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
@@ -172,8 +172,8 @@ export function SubprojectMobileCard({
       </div>
 
       {/* Quick action */}
-      <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => onView(project)}>
-        <Eye className="w-3.5 h-3.5 mr-1" />
+      <Button variant="outline" size="sm" className="w-full min-h-[44px] text-sm" onClick={() => onView(project)}>
+        <Eye className="w-4 h-4 mr-1.5" />
         Ver detalhes
       </Button>
     </div>

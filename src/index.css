@@ -189,6 +189,12 @@ html.theme-ready *::after {
     @apply flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-muted-foreground transition-colors;
   }
 
+  @media (max-width: 767px) {
+    .nav-item {
+      @apply min-h-[44px] py-3 text-base;
+    }
+  }
+
   .nav-item:hover {
     @apply bg-muted text-foreground;
   }
