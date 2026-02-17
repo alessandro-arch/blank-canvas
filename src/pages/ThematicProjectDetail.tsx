@@ -439,6 +439,8 @@ export default function ThematicProjectDetail() {
                 title={thematicProject.title}
                 financiador={thematicProject.sponsor_name}
                 status={thematicProject.status as 'active' | 'inactive' | 'archived'}
+                startDate={thematicProject.start_date}
+                endDate={thematicProject.end_date}
               />
             ) : (
               <Card className="border-dashed">
