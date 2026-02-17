@@ -128,7 +128,7 @@ export function ProjectDocumentsSection({
               Enviado em {format(new Date(uploadedAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
             </div>
           )}
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2">
             <Button variant="outline" size="sm" onClick={() => handleView(url)}>
               <Eye className="h-4 w-4 mr-1" />
               Visualizar
