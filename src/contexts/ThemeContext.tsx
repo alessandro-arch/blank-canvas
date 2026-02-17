@@ -24,9 +24,9 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
+export function ThemeProvider({ children, forceTheme }: { children: React.ReactNode; forceTheme?: "light" | "dark" }) {
   const { settings, loading, updateSettings } = useUserSettings();
-  const [theme, setThemeState] = useState<"light" | "dark">("light");
+  const [theme, setThemeState] = useState<"light" | "dark">(forceTheme || "light");
 
   // Cleanup on unmount (logout)
   useEffect(() => {
@@ -38,9 +38,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   // Apply theme when settings load or change
   useEffect(() => {
-    const resolved: "light" | "dark" = settings.theme_mode === "dark" ? "dark" : "light";
-    setThemeState(resolved);
-    applyThemeClass(resolved);
+    if (forceTheme) {
+      setThemeState(forceTheme);
+      applyThemeClass(forceTheme);
+    } else {
+      const resolved: "light" | "dark" = settings.theme_mode === "dark" ? "dark" : "light";
+      setThemeState(resolved);
+      applyThemeClass(resolved);
+    }
 
     // Enable smooth transitions AFTER first paint
     if (!loading) {
@@ -48,7 +53,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         document.documentElement.classList.add("theme-ready");
       });
     }
-  }, [settings.theme_mode, loading]);
+  }, [settings.theme_mode, loading, forceTheme]);
 
   // Apply density
   useEffect(() => {
