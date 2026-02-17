@@ -452,6 +452,7 @@ export default function ThematicProjectDetail() {
               </Card>
             ) : thematicProject ? (
               <MasterProjectCard
+                projectId={thematicProject.id}
                 title={thematicProject.title}
                 financiador={thematicProject.sponsor_name}
                 status={thematicProject.status as 'active' | 'inactive' | 'archived'}
