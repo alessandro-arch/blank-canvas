@@ -1,4 +1,5 @@
 import { FileText, Book, FileCheck, Eye, Download, AlertTriangle, Loader2, Trash2 } from "lucide-react";
+import { ErrorState, EmptyState, LoadingSkeleton } from "@/components/ui/MobileStateDisplays";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useInstitutionalDocuments, useDeleteInstitutionalDocument, InstitutionalDocument, DocumentType } from "@/hooks/useInstitutionalDocuments";
@@ -145,7 +146,7 @@ interface DocumentsGridProps {
 }
 
 export function DocumentsGrid({ searchQuery = "", typeFilter = "todos", sortOrder = "recentes" }: DocumentsGridProps) {
-  const { data: documents, isLoading } = useInstitutionalDocuments();
+  const { data: documents, isLoading, error: queryError, refetch } = useInstitutionalDocuments();
   const { isAdmin, isManager } = useUserRole();
   const canEdit = isAdmin || isManager;
 
@@ -172,29 +173,32 @@ export function DocumentsGrid({ searchQuery = "", typeFilter = "todos", sortOrde
     }
   });
 
-  if (isLoading) {
+  if (queryError) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-      </div>
+      <ErrorState
+        message="Não foi possível carregar os documentos."
+        onRetry={() => refetch()}
+      />
     );
+  }
+
+  if (isLoading) {
+    return <LoadingSkeleton rows={4} variant="card" />;
   }
 
   return (
     <div className="space-y-6">
       {/* Documents Grid or Empty State */}
       {!filteredDocuments || filteredDocuments.length === 0 ? (
-        <div className="card-institutional flex flex-col items-center justify-center py-12">
-          <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
-            <FileText className="w-6 h-6 text-muted-foreground" />
-          </div>
-          <p className="font-medium text-foreground mb-1">Nenhum documento disponível</p>
-          <p className="text-sm text-muted-foreground text-center max-w-md">
-            {searchQuery || typeFilter !== "todos" 
+        <EmptyState
+          icon={<FileText className="w-7 h-7 text-muted-foreground" />}
+          title="Nenhum documento disponível"
+          description={
+            searchQuery || typeFilter !== "todos"
               ? "Nenhum documento encontrado com os filtros aplicados."
-              : "Os documentos serão exibidos aqui após serem carregados pelo administrador do sistema."}
-          </p>
-        </div>
+              : "Os documentos serão exibidos aqui após serem carregados pelo administrador."
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredDocuments.map((document) => (

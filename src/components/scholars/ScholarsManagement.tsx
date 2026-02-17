@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { ErrorState, EmptyState, LoadingSkeleton } from '@/components/ui/MobileStateDisplays';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -44,7 +45,7 @@ export function ScholarsManagement() {
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('all');
 
   // Fetch all data
-  const { data, isLoading, isFetching, refetch } = useQuery({
+  const { data, isLoading, isFetching, error: queryError, refetch } = useQuery({
     queryKey: ['scholars-management', currentOrganization?.id],
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
@@ -555,16 +556,18 @@ export function ScholarsManagement() {
                 </CardContent>
               </Card>
             ))
+          ) : queryError ? (
+            <ErrorState
+              message="Não foi possível carregar os bolsistas."
+              onRetry={() => refetch()}
+            />
           ) : filteredData.thematicProjects.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground border rounded-lg">
-              <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Nenhum bolsista encontrado</p>
-              {hasActiveFilters && (
-                <Button variant="link" onClick={clearFilters} className="mt-2">
-                  Limpar filtros
-                </Button>
-              )}
-            </div>
+            <EmptyState
+              icon={<Users className="w-7 h-7 text-muted-foreground" />}
+              title="Nenhum bolsista encontrado"
+              description="Nenhum bolsista corresponde aos filtros selecionados."
+              onClearFilters={hasActiveFilters ? clearFilters : undefined}
+            />
           ) : (
             filteredData.thematicProjects.map(tp => (
               <ThematicScholarCard

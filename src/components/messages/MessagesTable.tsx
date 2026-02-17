@@ -1,4 +1,5 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ErrorState, EmptyState, LoadingSkeleton } from "@/components/ui/MobileStateDisplays";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,6 +16,7 @@ import type { EnrichedMessage } from "@/pages/AdminMessages";
 interface MessagesTableProps {
   messages: EnrichedMessage[];
   loading: boolean;
+  error?: Error | null;
   groupByCampaign: boolean;
   onToggleGroup: (v: boolean) => void;
   onView: (msg: EnrichedMessage) => void;
@@ -23,6 +25,7 @@ interface MessagesTableProps {
   page: number;
   totalPages: number;
   onPageChange: (p: number) => void;
+  onRetry?: () => void;
 }
 
 function getStatusBadge(msg: EnrichedMessage) {
@@ -124,28 +127,27 @@ function MessageRow({ msg, onView, onResend, onDelete }: { msg: EnrichedMessage;
   );
 }
 
-export function MessagesTable({ messages, loading, groupByCampaign, onToggleGroup, onView, onResend, onDelete, page, totalPages, onPageChange }: MessagesTableProps) {
-  if (loading) {
+export function MessagesTable({ messages, loading, error, groupByCampaign, onToggleGroup, onView, onResend, onDelete, page, totalPages, onPageChange, onRetry }: MessagesTableProps) {
+  if (error) {
     return (
-      <Card>
-        <CardContent className="p-4 space-y-3">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full" />
-          ))}
-        </CardContent>
-      </Card>
+      <ErrorState
+        message="Não foi possível carregar as mensagens."
+        onRetry={onRetry}
+      />
     );
+  }
+
+  if (loading) {
+    return <LoadingSkeleton rows={5} variant="row" />;
   }
 
   if (messages.length === 0) {
     return (
-      <Card>
-        <CardContent className="p-12 text-center">
-          <Mail className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium text-foreground mb-2">Nenhuma mensagem encontrada</h3>
-          <p className="text-muted-foreground">Nenhuma mensagem encontrada para os filtros selecionados.</p>
-        </CardContent>
-      </Card>
+      <EmptyState
+        icon={<Mail className="w-7 h-7 text-muted-foreground" />}
+        title="Nenhuma mensagem encontrada"
+        description="Nenhuma mensagem encontrada para os filtros selecionados."
+      />
     );
   }
 
