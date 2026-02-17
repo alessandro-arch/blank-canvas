@@ -321,8 +321,8 @@ async function buildConsolidatedPdf(data: ConsolidatedData): Promise<Uint8Array>
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-  const W = 595.28;
-  const H = 841.89;
+  const W = 841.89;  // A4 landscape
+  const H = 595.28;
   const M = 40;
   const LH = 14;
   const COL = W - 2 * M;
@@ -332,7 +332,7 @@ async function buildConsolidatedPdf(data: ConsolidatedData): Promise<Uint8Array>
 
   const txt = (text: string, x: number, yy: number, size = 9, f = font, color = rgb(0.1, 0.1, 0.12)) => {
     const maxChars = Math.floor((W - x - M) / (size * 0.48));
-    const t = text.length > maxChars ? text.substring(0, maxChars - 2) + "…" : text;
+    const t = text.length > maxChars ? text.substring(0, maxChars - 2) + "..." : text;
     page.drawText(t, { x, y: yy, size, font: f, color });
   };
 
@@ -414,27 +414,29 @@ async function buildConsolidatedPdf(data: ConsolidatedData): Promise<Uint8Array>
 
   // Table header
   check(LH * 2);
-  const cols = [M, M + 55, M + 180, M + 275, M + 355, M + 420, M + 475];
-  txt("CÓDIGO", cols[0], y, 6.5, fontBold, rgb(0.5, 0.5, 0.55));
-  txt("BOLSISTA", cols[1], y, 6.5, fontBold, rgb(0.5, 0.5, 0.55));
-  txt("ORIENTADOR", cols[2], y, 6.5, fontBold, rgb(0.5, 0.5, 0.55));
-  txt("MODALID.", cols[3], y, 6.5, fontBold, rgb(0.5, 0.5, 0.55));
-  txt("VALOR", cols[4], y, 6.5, fontBold, rgb(0.5, 0.5, 0.55));
-  txt("PERÍODO", cols[5], y, 6.5, fontBold, rgb(0.5, 0.5, 0.55));
-  txt("STATUS", cols[6], y, 6.5, fontBold, rgb(0.5, 0.5, 0.55));
+  const cols = [M, M + 75, M + 220, M + 365, M + 480, M + 570, M + 660, M + 720];
+  txt("CODIGO", cols[0], y, 7, fontBold, rgb(0.5, 0.5, 0.55));
+  txt("BOLSISTA", cols[1], y, 7, fontBold, rgb(0.5, 0.5, 0.55));
+  txt("ORIENTADOR", cols[2], y, 7, fontBold, rgb(0.5, 0.5, 0.55));
+  txt("MODALIDADE", cols[3], y, 7, fontBold, rgb(0.5, 0.5, 0.55));
+  txt("VALOR", cols[4], y, 7, fontBold, rgb(0.5, 0.5, 0.55));
+  txt("INICIO", cols[5], y, 7, fontBold, rgb(0.5, 0.5, 0.55));
+  txt("FIM", cols[6], y, 7, fontBold, rgb(0.5, 0.5, 0.55));
+  txt("STATUS", cols[7], y, 7, fontBold, rgb(0.5, 0.5, 0.55));
   y -= 4;
   line(y);
   y -= LH - 2;
 
   for (const row of data.subRows) {
     check(LH + 2);
-    txt(row.code, cols[0], y, 7.5);
-    txt(row.scholar, cols[1], y, 7.5);
-    txt(row.orientador, cols[2], y, 7.5);
-    txt(row.modalidade, cols[3], y, 7.5);
-    txt(fmtCur(row.valor), cols[4], y, 7.5);
-    txt(`${fmtDate(row.inicio).substring(0, 5)}-${fmtDate(row.fim).substring(0, 5)}`, cols[5], y, 7);
-    txt(sLabel(row.status), cols[6], y, 7.5);
+    txt(row.code, cols[0], y, 8);
+    txt(row.scholar, cols[1], y, 8);
+    txt(row.orientador, cols[2], y, 8);
+    txt(row.modalidade, cols[3], y, 8);
+    txt(fmtCur(row.valor), cols[4], y, 8);
+    txt(fmtDate(row.inicio), cols[5], y, 8);
+    txt(fmtDate(row.fim), cols[6], y, 8);
+    txt(sLabel(row.status), cols[7], y, 8);
     y -= LH;
   }
 
