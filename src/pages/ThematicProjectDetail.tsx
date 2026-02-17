@@ -58,6 +58,7 @@ import type { Database } from '@/integrations/supabase/types';
 import { FinancialInfoSection } from '@/components/projects/FinancialInfoSection';
 import { ProjectDocumentsSection } from '@/components/projects/ProjectDocumentsSection';
 import { MobileFiltersDrawer } from '@/components/dashboard/MobileFiltersDrawer';
+import { PdfReadyDialog } from '@/components/ui/PdfReadyDialog';
 
 type ProjectStatus = Database['public']['Enums']['project_status'];
 
@@ -121,6 +122,9 @@ export default function ThematicProjectDetail() {
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [generatingExecPdf, setGeneratingExecPdf] = useState(false);
+  const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
+  const [pdfSignedUrl, setPdfSignedUrl] = useState<string | null>(null);
+  const [pdfDialogTitle, setPdfDialogTitle] = useState("Relatório pronto");
 
   // Fetch thematic project
   const { data: thematicProject, isLoading: loadingThematic } = useQuery({
@@ -285,7 +289,7 @@ export default function ThematicProjectDetail() {
     if (generatingPdf || !id) return;
     setGeneratingPdf(true);
     const toastId = toast.loading('Gerando relatório consolidado...');
-    const newWindow = window.open('about:blank', '_blank');
+    const newWindow = !isMobile ? window.open('about:blank', '_blank') : null;
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -298,7 +302,11 @@ export default function ThematicProjectDetail() {
       if (res.error) throw res.error;
       const { signedUrl } = res.data as { signedUrl: string };
 
-      if (newWindow) {
+      if (isMobile) {
+        setPdfSignedUrl(signedUrl);
+        setPdfDialogTitle("Relatório consolidado pronto");
+        setPdfDialogOpen(true);
+      } else if (newWindow) {
         newWindow.location.href = signedUrl;
       } else {
         toast.error('Permita pop-ups no navegador para visualizar o arquivo');
@@ -317,7 +325,7 @@ export default function ThematicProjectDetail() {
     if (generatingExecPdf || !id) return;
     setGeneratingExecPdf(true);
     const toastId = toast.loading('Gerando relatório executivo...');
-    const newWindow = window.open('about:blank', '_blank');
+    const newWindow = !isMobile ? window.open('about:blank', '_blank') : null;
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -330,7 +338,11 @@ export default function ThematicProjectDetail() {
       if (res.error) throw res.error;
       const { signedUrl } = res.data as { signedUrl: string };
 
-      if (newWindow) {
+      if (isMobile) {
+        setPdfSignedUrl(signedUrl);
+        setPdfDialogTitle("Relatório executivo pronto");
+        setPdfDialogOpen(true);
+      } else if (newWindow) {
         newWindow.location.href = signedUrl;
       } else {
         toast.error('Permita pop-ups no navegador para visualizar o arquivo');
@@ -835,6 +847,13 @@ export default function ThematicProjectDetail() {
           />
         </>
       )}
+
+      <PdfReadyDialog
+        open={pdfDialogOpen}
+        onOpenChange={setPdfDialogOpen}
+        signedUrl={pdfSignedUrl}
+        title={pdfDialogTitle}
+      />
     </div>
   );
 }
