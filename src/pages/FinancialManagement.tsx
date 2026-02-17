@@ -279,6 +279,7 @@ export default function FinancialManagement() {
       passivoProgramado,
       bolsistasAtivos,
       bolsasPrevistas,
+      totalActiveSubs,
       taxaAtivacao,
       custoMedioBolsista,
       pagamentosPendentes,
@@ -554,7 +555,8 @@ export default function FinancialManagement() {
                     <KPICard
                       icon={<GraduationCap className="h-5 w-5" />}
                       label="Bolsistas Ativos"
-                      value={String(agg.bolsistasAtivos)}
+                      value={`${agg.bolsistasAtivos}/${agg.totalActiveSubs}`}
+                      subtitle={`${agg.bolsistasAtivos} ativos de ${agg.totalActiveSubs} previstos`}
                       iconColor="text-primary"
                     />
                     <KPICard
