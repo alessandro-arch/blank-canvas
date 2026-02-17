@@ -73,36 +73,27 @@ serve(async (req) => {
       return jsonResponse({ error: "Projeto temático não encontrado" }, 404);
     }
 
-    // ─── 4) Fetch organization branding ───
+    // ─── 4+5+11) Parallel: org branding, subprojects, audit logs ───
+    const orgId = tp.organization_id || "00000000-0000-0000-0000-000000000000";
+
+    const [orgResult, subsResult, auditResult] = await Promise.all([
+      tp.organization_id
+        ? db.from("organizations").select("name, logo_url, primary_color, secondary_color, watermark_text, report_footer_text").eq("id", tp.organization_id).maybeSingle()
+        : Promise.resolve({ data: null }),
+      db.from("projects").select("*").eq("thematic_project_id", projectId).order("code", { ascending: true }),
+      db.from("audit_logs").select("action, entity_type, details, created_at, user_email").or(`entity_id.eq.${projectId},organization_id.eq.${orgId}`).order("created_at", { ascending: false }).limit(20),
+    ]);
+
     let orgBranding = { name: "Instituição", primary_color: "#1e3a5f", secondary_color: "#f0f4f8", logo_url: null as string | null, watermark_text: null as string | null, report_footer_text: null as string | null };
-    if (tp.organization_id) {
-      const { data: org } = await db
-        .from("organizations")
-        .select("name, logo_url, primary_color, secondary_color, watermark_text, report_footer_text")
-        .eq("id", tp.organization_id)
-        .maybeSingle();
-      if (org) {
-        orgBranding = {
-          name: org.name,
-          primary_color: org.primary_color || "#1e3a5f",
-          secondary_color: org.secondary_color || "#f0f4f8",
-          logo_url: org.logo_url,
-          watermark_text: org.watermark_text || null,
-          report_footer_text: org.report_footer_text || null,
-        };
-      }
+    if (orgResult.data) {
+      const org = orgResult.data;
+      orgBranding = { name: org.name, primary_color: org.primary_color || "#1e3a5f", secondary_color: org.secondary_color || "#f0f4f8", logo_url: org.logo_url, watermark_text: org.watermark_text || null, report_footer_text: org.report_footer_text || null };
     }
 
-    // ─── 5) Fetch subprojects ───
-    const { data: subprojects } = await db
-      .from("projects")
-      .select("*")
-      .eq("thematic_project_id", projectId)
-      .order("code", { ascending: true });
-
-    const subs = subprojects || [];
+    const subs = subsResult.data || [];
     const subIds = subs.map((s: any) => s.id);
     const activeSubs = subs.filter((s: any) => s.status === "active");
+    const auditLogs = auditResult.data || [];
 
     // ─── 6) Fetch enrollments ───
     let enrollments: any[] = [];
@@ -112,48 +103,25 @@ serve(async (req) => {
     }
 
     const activeEnrollments = enrollments.filter((e: any) => e.status === "active");
-
-    // ─── 7) Fetch scholar profiles ───
     const scholarUserIds = [...new Set(enrollments.map((e: any) => e.user_id))];
-    let profilesMap: Record<string, any> = {};
-    if (scholarUserIds.length > 0) {
-      const { data: profiles } = await db.from("profiles").select("user_id, full_name, email").in("user_id", scholarUserIds);
-      for (const p of profiles || []) profilesMap[p.user_id] = p;
-    }
-
-    // ─── 8) Fetch payments ───
     const enrollmentIds = enrollments.map((e: any) => e.id);
-    let allPayments: any[] = [];
-    if (enrollmentIds.length > 0) {
-      const { data: pays } = await db.from("payments").select("*").in("enrollment_id", enrollmentIds);
-      allPayments = pays || [];
-    }
 
-    // ─── 9) Fetch reports ───
-    let allReports: any[] = [];
-    if (scholarUserIds.length > 0) {
-      const { data: reps } = await db.from("reports").select("*").in("user_id", scholarUserIds);
-      allReports = reps || [];
-    }
+    // ─── 7+8+9+10) Parallel: profiles, payments, reports, grant terms ───
+    const [profilesResult, paymentsResult, reportsResult, termsResult] = await Promise.all([
+      scholarUserIds.length > 0 ? db.from("profiles").select("user_id, full_name, email").in("user_id", scholarUserIds) : Promise.resolve({ data: [] }),
+      enrollmentIds.length > 0 ? db.from("payments").select("*").in("enrollment_id", enrollmentIds) : Promise.resolve({ data: [] }),
+      scholarUserIds.length > 0 ? db.from("reports").select("*").in("user_id", scholarUserIds) : Promise.resolve({ data: [] }),
+      scholarUserIds.length > 0 ? db.from("grant_terms").select("user_id").in("user_id", scholarUserIds) : Promise.resolve({ data: [] }),
+    ]);
 
-    // ─── 10) Fetch grant terms ───
+    let profilesMap: Record<string, any> = {};
+    for (const p of profilesResult.data || []) profilesMap[p.user_id] = p;
+
+    const allPayments = paymentsResult.data || [];
+    const allReports = reportsResult.data || [];
+
     let grantTermsMap: Record<string, boolean> = {};
-    if (scholarUserIds.length > 0) {
-      const { data: terms } = await db.from("grant_terms").select("user_id").in("user_id", scholarUserIds);
-      for (const t of terms || []) grantTermsMap[t.user_id] = true;
-    }
-
-    // ─── 11) Fetch audit logs ───
-    let auditLogs: any[] = [];
-    {
-      const { data: logs } = await db
-        .from("audit_logs")
-        .select("action, entity_type, details, created_at, user_email")
-        .or(`entity_id.eq.${projectId},organization_id.eq.${tp.organization_id || "00000000-0000-0000-0000-000000000000"}`)
-        .order("created_at", { ascending: false })
-        .limit(20);
-      auditLogs = logs || [];
-    }
+    for (const t of termsResult.data || []) grantTermsMap[t.user_id] = true;
 
     // ─── 12) Calculate financial indicators ───
     const totalMensal = activeSubs.reduce((sum: number, s: any) => sum + Number(s.valor_mensal), 0);
