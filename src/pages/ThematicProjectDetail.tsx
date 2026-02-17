@@ -473,8 +473,8 @@ export default function ThematicProjectDetail() {
                 </div>
 
                 {/* Table */}
-                <ScrollArea className="h-[500px] rounded-lg border">
-                  <Table>
+                <div className="rounded-lg border overflow-auto max-h-[500px]">
+                  <Table className="min-w-[1200px]">
                     <TableHeader className="sticky top-0 bg-card z-10">
                       <TableRow>
                         <TableHead className="w-[120px]">Código</TableHead>
@@ -594,7 +594,7 @@ export default function ThematicProjectDetail() {
                       )}
                     </TableBody>
                   </Table>
-                </ScrollArea>
+                </div>
               </CardContent>
             </Card>
           </div>
