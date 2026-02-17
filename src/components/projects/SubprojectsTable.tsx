@@ -76,6 +76,9 @@ export function SubprojectsTable({
   const [generatingPdfFor, setGeneratingPdfFor] = useState<string | null>(null);
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
   const [pdfSignedUrl, setPdfSignedUrl] = useState<string | null>(null);
+  const [pdfDialogStatus, setPdfDialogStatus] = useState<"loading" | "ready" | "error">("ready");
+  const [pdfDialogError, setPdfDialogError] = useState<string | undefined>();
+  const [pdfRetryProject, setPdfRetryProject] = useState<SubprojectWithScholar | null>(null);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -159,9 +162,16 @@ export function SubprojectsTable({
   const handleGeneratePdf = async (project: SubprojectWithScholar) => {
     if (generatingPdfFor) return;
     setGeneratingPdfFor(project.id);
-    const toastId = toast.loading('Gerando relatório PDF...');
-    
-    // Only open window synchronously on desktop
+
+    if (isMobile) {
+      setPdfSignedUrl(null);
+      setPdfDialogStatus("loading");
+      setPdfDialogError(undefined);
+      setPdfDialogOpen(true);
+      setPdfRetryProject(project);
+    }
+
+    const toastId = !isMobile ? toast.loading('Gerando relatório PDF...') : undefined;
     const newWindow = !isMobile ? window.open('about:blank', '_blank') : null;
 
     try {
@@ -177,20 +187,24 @@ export function SubprojectsTable({
 
       if (isMobile) {
         setPdfSignedUrl(signedUrl);
-        setPdfDialogOpen(true);
-        toast.success('Relatório gerado com sucesso', { id: toastId });
+        setPdfDialogStatus("ready");
       } else {
         if (newWindow) {
           newWindow.location.href = signedUrl;
         } else {
           toast.error('Permita pop-ups no navegador para visualizar o arquivo');
         }
-        toast.success('Relatório gerado com sucesso', { id: toastId });
+        if (toastId) toast.success('Relatório gerado com sucesso', { id: toastId });
       }
     } catch (err: any) {
       console.error('PDF generation error:', err);
       newWindow?.close();
-      toast.error(err?.message || 'Erro ao gerar relatório PDF', { id: toastId });
+      if (isMobile) {
+        setPdfDialogStatus("error");
+        setPdfDialogError(err?.message || 'Erro ao gerar relatório PDF');
+      } else {
+        toast.error(err?.message || 'Erro ao gerar relatório PDF', { id: toastId });
+      }
     } finally {
       setGeneratingPdfFor(null);
     }
@@ -418,6 +432,9 @@ export function SubprojectsTable({
         open={pdfDialogOpen}
         onOpenChange={setPdfDialogOpen}
         signedUrl={pdfSignedUrl}
+        status={pdfDialogStatus}
+        errorMessage={pdfDialogError}
+        onRetry={pdfRetryProject ? () => handleGeneratePdf(pdfRetryProject) : undefined}
       />
     </>
   );

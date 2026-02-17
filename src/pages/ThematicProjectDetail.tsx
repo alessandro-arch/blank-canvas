@@ -126,6 +126,9 @@ export default function ThematicProjectDetail() {
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
   const [pdfSignedUrl, setPdfSignedUrl] = useState<string | null>(null);
   const [pdfDialogTitle, setPdfDialogTitle] = useState("Relatório pronto");
+  const [pdfDialogStatus, setPdfDialogStatus] = useState<"loading" | "ready" | "error">("ready");
+  const [pdfDialogError, setPdfDialogError] = useState<string | undefined>();
+  const [pdfRetryFn, setPdfRetryFn] = useState<(() => void) | null>(null);
 
   // Mobile filter persistence helpers
   const updateMobileParams = (updates: Record<string, string>) => {
@@ -319,7 +322,17 @@ export default function ThematicProjectDetail() {
   const handleGenerateProjectPdf = async () => {
     if (generatingPdf || !id) return;
     setGeneratingPdf(true);
-    const toastId = toast.loading('Gerando relatório consolidado...');
+
+    if (isMobile) {
+      setPdfSignedUrl(null);
+      setPdfDialogStatus("loading");
+      setPdfDialogTitle("Relatório consolidado");
+      setPdfDialogError(undefined);
+      setPdfDialogOpen(true);
+      setPdfRetryFn(() => handleGenerateProjectPdf);
+    }
+
+    const toastId = !isMobile ? toast.loading('Gerando relatório consolidado...') : undefined;
     const newWindow = !isMobile ? window.open('about:blank', '_blank') : null;
 
     try {
@@ -335,18 +348,23 @@ export default function ThematicProjectDetail() {
 
       if (isMobile) {
         setPdfSignedUrl(signedUrl);
+        setPdfDialogStatus("ready");
         setPdfDialogTitle("Relatório consolidado pronto");
-        setPdfDialogOpen(true);
       } else if (newWindow) {
         newWindow.location.href = signedUrl;
       } else {
         toast.error('Permita pop-ups no navegador para visualizar o arquivo');
       }
-      toast.success('Relatório consolidado gerado com sucesso', { id: toastId });
+      if (toastId) toast.success('Relatório consolidado gerado com sucesso', { id: toastId });
     } catch (err: any) {
       console.error('Thematic PDF error:', err);
       newWindow?.close();
-      toast.error(err?.message || 'Erro ao gerar relatório PDF', { id: toastId });
+      if (isMobile) {
+        setPdfDialogStatus("error");
+        setPdfDialogError(err?.message || 'Erro ao gerar relatório PDF');
+      } else {
+        toast.error(err?.message || 'Erro ao gerar relatório PDF', { id: toastId });
+      }
     } finally {
       setGeneratingPdf(false);
     }
@@ -355,7 +373,17 @@ export default function ThematicProjectDetail() {
   const handleGenerateExecutivePdf = async () => {
     if (generatingExecPdf || !id) return;
     setGeneratingExecPdf(true);
-    const toastId = toast.loading('Gerando relatório executivo...');
+
+    if (isMobile) {
+      setPdfSignedUrl(null);
+      setPdfDialogStatus("loading");
+      setPdfDialogTitle("Relatório executivo");
+      setPdfDialogError(undefined);
+      setPdfDialogOpen(true);
+      setPdfRetryFn(() => handleGenerateExecutivePdf);
+    }
+
+    const toastId = !isMobile ? toast.loading('Gerando relatório executivo...') : undefined;
     const newWindow = !isMobile ? window.open('about:blank', '_blank') : null;
 
     try {
@@ -371,18 +399,23 @@ export default function ThematicProjectDetail() {
 
       if (isMobile) {
         setPdfSignedUrl(signedUrl);
+        setPdfDialogStatus("ready");
         setPdfDialogTitle("Relatório executivo pronto");
-        setPdfDialogOpen(true);
       } else if (newWindow) {
         newWindow.location.href = signedUrl;
       } else {
         toast.error('Permita pop-ups no navegador para visualizar o arquivo');
       }
-      toast.success('Relatório executivo gerado com sucesso', { id: toastId });
+      if (toastId) toast.success('Relatório executivo gerado com sucesso', { id: toastId });
     } catch (err: any) {
       console.error('Executive PDF error:', err);
       newWindow?.close();
-      toast.error(err?.message || 'Erro ao gerar relatório executivo', { id: toastId });
+      if (isMobile) {
+        setPdfDialogStatus("error");
+        setPdfDialogError(err?.message || 'Erro ao gerar relatório executivo');
+      } else {
+        toast.error(err?.message || 'Erro ao gerar relatório executivo', { id: toastId });
+      }
     } finally {
       setGeneratingExecPdf(false);
     }
@@ -885,6 +918,9 @@ export default function ThematicProjectDetail() {
         onOpenChange={setPdfDialogOpen}
         signedUrl={pdfSignedUrl}
         title={pdfDialogTitle}
+        status={pdfDialogStatus}
+        errorMessage={pdfDialogError}
+        onRetry={pdfRetryFn || undefined}
       />
     </div>
   );
