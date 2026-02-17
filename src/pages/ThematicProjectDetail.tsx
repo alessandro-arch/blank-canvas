@@ -3,7 +3,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { tracedInvoke, friendlyError } from '@/lib/logger';
+import { tracedInvoke, tracedInvokeWithPolling, friendlyError } from '@/lib/logger';
 import { Header } from '@/components/layout/Header';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Footer } from '@/components/layout/Footer';
@@ -390,7 +390,7 @@ export default function ThematicProjectDetail() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Não autenticado');
 
-      const { data } = await tracedInvoke<{ signedUrl: string }>(
+      const { data } = await tracedInvokeWithPolling<{ signedUrl: string }>(
         'generate-executive-report-pdf',
         { projeto_id: id },
         'ThematicProjectDetail',

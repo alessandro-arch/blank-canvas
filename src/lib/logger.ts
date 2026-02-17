@@ -131,6 +131,64 @@ function isTransientError(error: any): boolean {
 }
 
 /**
+ * Invoke a Supabase edge function that uses background processing.
+ * Returns immediately with a jobId, then polls for completion.
+ * The edge function must support { job_id } to return status/signedUrl.
+ */
+export async function tracedInvokeWithPolling<T = Record<string, unknown>>(
+  functionName: string,
+  body: Record<string, unknown>,
+  component?: string,
+  options?: { pollIntervalMs?: number; maxPollMs?: number; onProgress?: (status: string) => void },
+): Promise<{ data: T; requestId: string }> {
+  const { pollIntervalMs = 3000, maxPollMs = 120000, onProgress } = options || {};
+
+  // Initial call - should return { jobId, status: "processing" }
+  const { data: initialData, requestId } = await tracedInvoke<{ jobId: string; status: string }>(
+    functionName, body, component,
+  );
+
+  const jobId = initialData.jobId;
+  if (!jobId) {
+    // Function returned synchronously (no background processing)
+    return { data: initialData as unknown as T, requestId };
+  }
+
+  onProgress?.("processing");
+
+  // Poll for completion
+  const log = createLogger(component || functionName);
+  const ctx = { requestId, component: component || functionName, action: `${functionName}:poll` };
+  const startPoll = Date.now();
+
+  while (Date.now() - startPoll < maxPollMs) {
+    await new Promise((r) => setTimeout(r, pollIntervalMs));
+
+    const { data: statusData } = await tracedInvoke<{ status: string; signedUrl?: string; error?: string }>(
+      functionName, { job_id: jobId }, component,
+    );
+
+    if (statusData.status === "success") {
+      log.info(`${functionName} job ${jobId} completed`, ctx);
+      onProgress?.("success");
+      return { data: statusData as unknown as T, requestId };
+    }
+
+    if (statusData.status === "error") {
+      const err = new Error(statusData.error || "Erro na geração do relatório");
+      (err as any).requestId = requestId;
+      throw err;
+    }
+
+    onProgress?.("processing");
+  }
+
+  const err = new Error("Tempo limite excedido. O relatório está demorando mais que o esperado.");
+  (err as any).requestId = requestId;
+  throw err;
+}
+
+/**
  * Extract a user-friendly error message from any error.
  * Appends request_id if available for support reference.
  */

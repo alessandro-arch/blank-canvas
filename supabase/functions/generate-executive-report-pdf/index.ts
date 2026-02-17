@@ -53,19 +53,30 @@ serve(async (req) => {
       return jsonResponse({ error: "Acesso restrito a gestores e administradores" }, 403);
     }
 
-    // ─── 2) Parse input ───
+    // ─── Parse input ───
     const body = await req.json();
-    const projectId = body.projeto_id;
-    const periodo = body.periodo; // optional: { inicio, fim }
 
+    // ─── STATUS CHECK MODE: poll for job completion ───
+    if (body.job_id) {
+      const { data: log } = await db.from("pdf_logs").select("*").eq("id", body.job_id).maybeSingle();
+      if (!log) return jsonResponse({ error: "Job não encontrado" }, 404);
+      if (log.status === "processing") return jsonResponse({ status: "processing", jobId: body.job_id });
+      if (log.status === "error") return jsonResponse({ status: "error", error: log.error_message, jobId: body.job_id });
+      // Success - generate signed URL
+      const { data: signedData } = await db.storage.from("relatorios").createSignedUrl(log.file_path, 900);
+      return jsonResponse({ status: "success", signedUrl: signedData?.signedUrl, jobId: body.job_id });
+    }
+
+    // ─── GENERATION MODE: create job and process in background ───
+    const projectId = body.projeto_id;
     if (!projectId) {
       return jsonResponse({ error: "projeto_id é obrigatório" }, 400);
     }
 
-    // ─── 3) Fetch thematic project ───
+    // Quick check that the project exists
     const { data: tp, error: tpErr } = await db
       .from("thematic_projects")
-      .select("*")
+      .select("id, organization_id")
       .eq("id", projectId)
       .maybeSingle();
 
@@ -73,296 +84,275 @@ serve(async (req) => {
       return jsonResponse({ error: "Projeto temático não encontrado" }, 404);
     }
 
-    // ─── 4+5+11) Parallel: org branding, subprojects, audit logs ───
-    const orgId = tp.organization_id || "00000000-0000-0000-0000-000000000000";
-
-    const [orgResult, subsResult, auditResult] = await Promise.all([
-      tp.organization_id
-        ? db.from("organizations").select("name, logo_url, primary_color, secondary_color, watermark_text, report_footer_text").eq("id", tp.organization_id).maybeSingle()
-        : Promise.resolve({ data: null }),
-      db.from("projects").select("*").eq("thematic_project_id", projectId).order("code", { ascending: true }),
-      db.from("audit_logs").select("action, entity_type, details, created_at, user_email").or(`entity_id.eq.${projectId},organization_id.eq.${orgId}`).order("created_at", { ascending: false }).limit(20),
-    ]);
-
-    let orgBranding = { name: "Instituição", primary_color: "#1e3a5f", secondary_color: "#f0f4f8", logo_url: null as string | null, watermark_text: null as string | null, report_footer_text: null as string | null };
-    if (orgResult.data) {
-      const org = orgResult.data;
-      orgBranding = { name: org.name, primary_color: org.primary_color || "#1e3a5f", secondary_color: org.secondary_color || "#f0f4f8", logo_url: org.logo_url, watermark_text: org.watermark_text || null, report_footer_text: org.report_footer_text || null };
-    }
-
-    const subs = subsResult.data || [];
-    const subIds = subs.map((s: any) => s.id);
-    const activeSubs = subs.filter((s: any) => s.status === "active");
-    const auditLogs = auditResult.data || [];
-
-    // ─── 6) Fetch enrollments ───
-    let enrollments: any[] = [];
-    if (subIds.length > 0) {
-      const { data } = await db.from("enrollments").select("*").in("project_id", subIds);
-      enrollments = data || [];
-    }
-
-    const activeEnrollments = enrollments.filter((e: any) => e.status === "active");
-    const scholarUserIds = [...new Set(enrollments.map((e: any) => e.user_id))];
-    const enrollmentIds = enrollments.map((e: any) => e.id);
-
-    // ─── 7+8+9+10) Parallel: profiles, payments, reports, grant terms ───
-    const [profilesResult, paymentsResult, reportsResult, termsResult] = await Promise.all([
-      scholarUserIds.length > 0 ? db.from("profiles").select("user_id, full_name, email").in("user_id", scholarUserIds) : Promise.resolve({ data: [] }),
-      enrollmentIds.length > 0 ? db.from("payments").select("*").in("enrollment_id", enrollmentIds) : Promise.resolve({ data: [] }),
-      scholarUserIds.length > 0 ? db.from("reports").select("*").in("user_id", scholarUserIds) : Promise.resolve({ data: [] }),
-      scholarUserIds.length > 0 ? db.from("grant_terms").select("user_id").in("user_id", scholarUserIds) : Promise.resolve({ data: [] }),
-    ]);
-
-    let profilesMap: Record<string, any> = {};
-    for (const p of profilesResult.data || []) profilesMap[p.user_id] = p;
-
-    const allPayments = paymentsResult.data || [];
-    const allReports = reportsResult.data || [];
-
-    let grantTermsMap: Record<string, boolean> = {};
-    for (const t of termsResult.data || []) grantTermsMap[t.user_id] = true;
-
-    // ─── 12) Calculate financial indicators ───
-    const totalMensal = activeSubs.reduce((sum: number, s: any) => sum + Number(s.valor_mensal), 0);
-
-    // Valor Total Estimado: mensal * duração do projeto temático
-    // Cálculo por diferença de meses do calendário (mesmo método do front-end)
-    const calcMonthsDiff = (startStr: string, endStr: string): number => {
-      const s = new Date(startStr);
-      const e = new Date(endStr);
-      return (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth()) + 1;
-    };
-    let duracaoMeses = 0;
-    if (tp.start_date && tp.end_date) {
-      duracaoMeses = Math.max(1, calcMonthsDiff(tp.start_date, tp.end_date));
-    }
-    const valorTotalEstimadoBolsas = totalMensal * duracaoMeses;
-
-    // Valor Total Atribuído: soma(valor_mensal * meses_vigencia) por bolsa ativa
-    let valorTotalAtribuido = 0;
-    for (const enr of activeEnrollments) {
-      const sub = subs.find((s: any) => s.id === enr.project_id);
-      if (!sub) continue;
-      const months = Math.max(1, calcMonthsDiff(enr.start_date, enr.end_date));
-      valorTotalAtribuido += months * Number(enr.grant_value);
-    }
-
-    // Override manual if set
-    if (tp.atribuicao_modo === "manual" && tp.valor_total_atribuido_bolsas_manual != null) {
-      valorTotalAtribuido = Number(tp.valor_total_atribuido_bolsas_manual);
-    }
-
-    const diferencaAtribuicao = valorTotalEstimadoBolsas - valorTotalAtribuido;
-    const percentualAtribuido = valorTotalEstimadoBolsas > 0
-      ? (valorTotalAtribuido / valorTotalEstimadoBolsas) * 100
-      : 0;
-
-    const valorTotalProjeto = Number(tp.valor_total_projeto || 0);
-    const taxaAdm = Number(tp.taxa_administrativa_percentual || 0);
-    const impostos = Number(tp.impostos_percentual || 0);
-    const valorTaxaAdm = valorTotalProjeto * (taxaAdm / 100);
-    const valorImpostos = valorTotalProjeto * (impostos / 100);
-    const encargosPrevistos = valorTaxaAdm + valorImpostos;
-    const custoOperacionalBruto = valorTotalProjeto + encargosPrevistos;
-    const percentualBolsasTeto = valorTotalProjeto > 0 ? (valorTotalEstimadoBolsas / valorTotalProjeto) * 100 : 0;
-
-    const totalPaid = allPayments.filter((p: any) => p.status === "paid").reduce((s: number, p: any) => s + Number(p.amount), 0);
-    const percentualExecutado = valorTotalProjeto > 0
-      ? (totalPaid / valorTotalProjeto) * 100
-      : 0;
-
-    // Temporal execution
-    let percentualTemporal = 0;
-    let mesesDecorridos = 0;
-    if (tp.start_date && tp.end_date) {
-      const start = new Date(tp.start_date).getTime();
-      const end = new Date(tp.end_date).getTime();
-      const now = Date.now();
-      percentualTemporal = Math.min(100, Math.max(0, ((now - start) / (end - start)) * 100));
-      mesesDecorridos = Math.max(0, Math.min(duracaoMeses, calcMonthsDiff(tp.start_date, new Date().toISOString().split("T")[0])));
-    }
-
-    // Pendencies
-    const pendingReports = allReports.filter((r: any) => ["under_review", "pending"].includes(r.status)).length;
-    const rejectedReports = allReports.filter((r: any) => r.status === "rejected").length;
-    const pendingDocs = scholarUserIds.filter((uid) => !grantTermsMap[uid]).length;
-    const pendingPayments = allPayments.filter((p: any) => ["pending", "eligible"].includes(p.status)).length;
-    const pendingPaymentsValue = allPayments.filter((p: any) => ["pending", "eligible"].includes(p.status)).reduce((s: number, p: any) => s + Number(p.amount), 0);
-    const cancelledPayments = allPayments.filter((p: any) => p.status === "cancelled").length;
-
-    // ─── Risk Score (0-100) ───
-    const riskPctComprometido = valorTotalProjeto > 0 ? valorTotalEstimadoBolsas / valorTotalProjeto : 0;
-    const riskSaldo = valorTotalProjeto - valorTotalEstimadoBolsas;
-    const riskExecFin = valorTotalProjeto > 0 ? totalPaid / valorTotalProjeto : 0;
-    const riskExecTempo = duracaoMeses > 0 ? mesesDecorridos / duracaoMeses : 0;
-    const riskDesvio = riskExecTempo - riskExecFin;
-
-    let riskA = 0;
-    if (riskPctComprometido <= 0.95) riskA = 0;
-    else if (riskPctComprometido <= 1.00) riskA = 10;
-    else if (riskPctComprometido <= 1.05) riskA = 25;
-    else if (riskPctComprometido <= 1.10) riskA = 35;
-    else riskA = 40;
-
-    let riskB = 0;
-    if (riskSaldo >= 0) riskB = 0;
-    else {
-      const ratio = valorTotalProjeto > 0 ? Math.abs(riskSaldo) / valorTotalProjeto : 1;
-      if (ratio <= 0.02) riskB = 10;
-      else if (ratio <= 0.05) riskB = 20;
-      else riskB = 30;
-    }
-
-    let riskC = 0;
-    if (riskDesvio <= 0.10) riskC = 0;
-    else if (riskDesvio <= 0.20) riskC = 8;
-    else if (riskDesvio <= 0.35) riskC = 14;
-    else riskC = 20;
-
-    let riskD = 0;
-    if (pendingPaymentsValue === 0 && pendingPayments === 0) riskD = 0;
-    else {
-      const ratioP = valorTotalProjeto > 0 ? pendingPaymentsValue / valorTotalProjeto : 0;
-      if (ratioP <= 0.01) riskD = 4;
-      else if (ratioP <= 0.03) riskD = 7;
-      else riskD = 10;
-    }
-
-    const riskScore = riskA + riskB + riskC + riskD;
-    const riskLevel = riskScore <= 24 ? "BAIXO" : riskScore <= 49 ? "MODERADO" : "ALTO";
-
-    // Alerts
-    const alerts: string[] = [];
-    if (percentualAtribuido < 80) alerts.push(`Apenas ${percentualAtribuido.toFixed(1)}% do orçamento estimado foi atribuído a bolsas.`);
-    if (percentualExecutado > percentualTemporal + 15) alerts.push("Execução financeira está acima do cronograma temporal.");
-    if (percentualExecutado < percentualTemporal - 20) alerts.push("Execução financeira está significativamente abaixo do cronograma.");
-    if (pendingDocs > 0) alerts.push(`${pendingDocs} bolsista(s) sem Termo de Outorga.`);
-    if (rejectedReports > 0) alerts.push(`${rejectedReports} relatório(s) reprovado(s) aguardando reenvio.`);
-    if (cancelledPayments > 0) alerts.push(`${cancelledPayments} pagamento(s) cancelado(s).`);
-    if (riskLevel === "ALTO") alerts.push(`Índice de Risco Financeiro: ${riskLevel} (${riskScore}/100).`);
-
-    // ─── 13) Build PDF ───
-    const pdfBytes = await buildExecutivePdf({
-      orgName: orgBranding.name,
-      primaryColor: orgBranding.primary_color,
-      watermarkText: orgBranding.watermark_text,
-      reportFooterText: orgBranding.report_footer_text,
-      projectTitle: tp.title,
-      sponsor: tp.sponsor_name,
-      status: tp.status,
-      startDate: tp.start_date,
-      endDate: tp.end_date,
-      duracaoMeses,
-      // Financial
-      valorTotalProjeto,
-      valorTotalEstimadoBolsas,
-      valorTotalAtribuido,
-      diferencaAtribuicao,
-      percentualAtribuido,
-      taxaAdm,
-      impostos,
-      valorTaxaAdm,
-      valorImpostos,
-      encargosPrevistos,
-      custoOperacionalBruto,
-      percentualBolsasTeto,
-      totalMensal,
-      totalPaid,
-      percentualExecutado,
-      percentualTemporal,
-      // Counts
-      totalBolsas: subs.length,
-      activeBolsas: activeSubs.length,
-      activeEnrollments: activeEnrollments.length,
-      // Pendencies
-      pendingReports,
-      rejectedReports,
-      pendingDocs,
-      pendingPayments,
-      pendingPaymentsValue,
-      cancelledPayments,
-      // Risk
-      riskScore,
-      riskLevel,
-      riskA,
-      riskB,
-      riskC,
-      riskD,
-      riskPctComprometido,
-      riskSaldo,
-      riskDesvio,
-      // Alerts
-      alerts,
-      // Audit
-      auditLogs: auditLogs.map((l: any) => ({
-        date: l.created_at,
-        action: l.action,
-        entityType: l.entity_type,
-        userEmail: l.user_email || "sistema",
-        details: typeof l.details === "object" ? JSON.stringify(l.details) : String(l.details || ""),
-      })),
-      // Meta
-      reportId: crypto.randomUUID(),
-      generatedAt: new Date().toISOString(),
-      generatedBy: user.email || "usuário",
-    });
-
-    // ─── 14) Upload ───
-    const uploadOrgId = tp.organization_id || "global";
-    const reportUuid = crypto.randomUUID();
-    const filePath = `tenant/${uploadOrgId}/relatorios/executivos/${reportUuid}.pdf`;
-
-    const { error: uploadError } = await db.storage
-      .from("relatorios")
-      .upload(filePath, pdfBytes, { contentType: "application/pdf", upsert: true });
-
-    if (uploadError) {
-      console.error("Upload error:", uploadError);
-      await db.from("pdf_logs").insert({
-        user_id: userId,
-        entity_type: "relatorio_executivo",
-        entity_id: projectId,
-        file_path: filePath,
-        status: "error",
-        error_message: uploadError.message,
-        organization_id: tp.organization_id,
-        generation_time_ms: Date.now() - startTime,
-      });
-      return jsonResponse({ error: "Falha ao salvar PDF: " + uploadError.message }, 500);
-    }
-
-    // ─── 15) Signed URL ───
-    const { data: signedData, error: signedError } = await db.storage
-      .from("relatorios")
-      .createSignedUrl(filePath, 900);
-
-    if (signedError) {
-      return jsonResponse({ error: "Falha ao gerar URL assinada" }, 500);
-    }
-
-    // Log
+    // Create job record
+    const jobId = crypto.randomUUID();
     await db.from("pdf_logs").insert({
+      id: jobId,
       user_id: userId,
       entity_type: "relatorio_executivo",
       entity_id: projectId,
-      file_path: filePath,
-      file_size: pdfBytes.length,
-      status: "success",
+      file_path: `pending/${jobId}`,
+      status: "processing",
       organization_id: tp.organization_id,
-      generation_time_ms: Date.now() - startTime,
     });
 
-    return jsonResponse({
-      signedUrl: signedData.signedUrl,
-      path: filePath,
-      reportId: reportUuid,
-    });
+    console.log(`[rid:${requestId}] Job ${jobId} created, starting background generation`);
+
+    // Start background processing
+    // @ts-ignore - EdgeRuntime.waitUntil is available in Supabase Edge Functions
+    EdgeRuntime.waitUntil(
+      generateInBackground(db, jobId, projectId, userId, user.email || "usuário", requestId, startTime)
+        .catch(async (err: any) => {
+          console.error(`[rid:${requestId}] Background generation failed:`, err);
+          await db.from("pdf_logs").update({
+            status: "error",
+            error_message: err.message || "Erro desconhecido na geração do PDF",
+            generation_time_ms: Date.now() - startTime,
+          }).eq("id", jobId);
+        })
+    );
+
+    // Return immediately with job ID
+    return jsonResponse({ jobId, status: "processing" });
   } catch (err: any) {
     console.error(`[rid:${requestId}] Executive report error:`, err);
     return jsonResponse({ error: err.message || "Erro interno", requestId }, 500);
   }
 });
+
+// ─── Background PDF generation ───
+async function generateInBackground(
+  db: any, jobId: string, projectId: string,
+  userId: string, userEmail: string, requestId: string, startTime: number,
+) {
+  console.log(`[rid:${requestId}] Background: fetching data for project ${projectId}`);
+
+  // ─── Fetch thematic project (full) ───
+  const { data: tp, error: tpErr } = await db
+    .from("thematic_projects")
+    .select("*")
+    .eq("id", projectId)
+    .maybeSingle();
+
+  if (tpErr || !tp) throw new Error("Projeto temático não encontrado");
+
+  const orgId = tp.organization_id || "00000000-0000-0000-0000-000000000000";
+
+  // Parallel fetches
+  const [orgResult, subsResult, auditResult] = await Promise.all([
+    tp.organization_id
+      ? db.from("organizations").select("name, logo_url, primary_color, secondary_color, watermark_text, report_footer_text").eq("id", tp.organization_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    db.from("projects").select("*").eq("thematic_project_id", projectId).order("code", { ascending: true }),
+    db.from("audit_logs").select("action, entity_type, details, created_at, user_email").or(`entity_id.eq.${projectId},organization_id.eq.${orgId}`).order("created_at", { ascending: false }).limit(20),
+  ]);
+
+  let orgBranding = { name: "Instituição", primary_color: "#1e3a5f", secondary_color: "#f0f4f8", logo_url: null as string | null, watermark_text: null as string | null, report_footer_text: null as string | null };
+  if (orgResult.data) {
+    const org = orgResult.data;
+    orgBranding = { name: org.name, primary_color: org.primary_color || "#1e3a5f", secondary_color: org.secondary_color || "#f0f4f8", logo_url: org.logo_url, watermark_text: org.watermark_text || null, report_footer_text: org.report_footer_text || null };
+  }
+
+  const subs = subsResult.data || [];
+  const subIds = subs.map((s: any) => s.id);
+  const activeSubs = subs.filter((s: any) => s.status === "active");
+  const auditLogs = auditResult.data || [];
+
+  let enrollments: any[] = [];
+  if (subIds.length > 0) {
+    const { data } = await db.from("enrollments").select("*").in("project_id", subIds);
+    enrollments = data || [];
+  }
+
+  const activeEnrollments = enrollments.filter((e: any) => e.status === "active");
+  const scholarUserIds = [...new Set(enrollments.map((e: any) => e.user_id))];
+  const enrollmentIds = enrollments.map((e: any) => e.id);
+
+  const [profilesResult, paymentsResult, reportsResult, termsResult] = await Promise.all([
+    scholarUserIds.length > 0 ? db.from("profiles").select("user_id, full_name, email").in("user_id", scholarUserIds) : Promise.resolve({ data: [] }),
+    enrollmentIds.length > 0 ? db.from("payments").select("*").in("enrollment_id", enrollmentIds) : Promise.resolve({ data: [] }),
+    scholarUserIds.length > 0 ? db.from("reports").select("*").in("user_id", scholarUserIds) : Promise.resolve({ data: [] }),
+    scholarUserIds.length > 0 ? db.from("grant_terms").select("user_id").in("user_id", scholarUserIds) : Promise.resolve({ data: [] }),
+  ]);
+
+  const allPayments = paymentsResult.data || [];
+  const allReports = reportsResult.data || [];
+
+  let grantTermsMap: Record<string, boolean> = {};
+  for (const t of termsResult.data || []) grantTermsMap[t.user_id] = true;
+
+  // ─── Calculate financial indicators ───
+  const totalMensal = activeSubs.reduce((sum: number, s: any) => sum + Number(s.valor_mensal), 0);
+
+  const calcMonthsDiff = (startStr: string, endStr: string): number => {
+    const s = new Date(startStr);
+    const e = new Date(endStr);
+    return (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth()) + 1;
+  };
+  let duracaoMeses = 0;
+  if (tp.start_date && tp.end_date) {
+    duracaoMeses = Math.max(1, calcMonthsDiff(tp.start_date, tp.end_date));
+  }
+  const valorTotalEstimadoBolsas = totalMensal * duracaoMeses;
+
+  let valorTotalAtribuido = 0;
+  for (const enr of activeEnrollments) {
+    const sub = subs.find((s: any) => s.id === enr.project_id);
+    if (!sub) continue;
+    const months = Math.max(1, calcMonthsDiff(enr.start_date, enr.end_date));
+    valorTotalAtribuido += months * Number(enr.grant_value);
+  }
+
+  if (tp.atribuicao_modo === "manual" && tp.valor_total_atribuido_bolsas_manual != null) {
+    valorTotalAtribuido = Number(tp.valor_total_atribuido_bolsas_manual);
+  }
+
+  const diferencaAtribuicao = valorTotalEstimadoBolsas - valorTotalAtribuido;
+  const percentualAtribuido = valorTotalEstimadoBolsas > 0 ? (valorTotalAtribuido / valorTotalEstimadoBolsas) * 100 : 0;
+
+  const valorTotalProjeto = Number(tp.valor_total_projeto || 0);
+  const taxaAdm = Number(tp.taxa_administrativa_percentual || 0);
+  const impostos = Number(tp.impostos_percentual || 0);
+  const valorTaxaAdm = valorTotalProjeto * (taxaAdm / 100);
+  const valorImpostos = valorTotalProjeto * (impostos / 100);
+  const encargosPrevistos = valorTaxaAdm + valorImpostos;
+  const custoOperacionalBruto = valorTotalProjeto + encargosPrevistos;
+  const percentualBolsasTeto = valorTotalProjeto > 0 ? (valorTotalEstimadoBolsas / valorTotalProjeto) * 100 : 0;
+
+  const totalPaid = allPayments.filter((p: any) => p.status === "paid").reduce((s: number, p: any) => s + Number(p.amount), 0);
+  const percentualExecutado = valorTotalProjeto > 0 ? (totalPaid / valorTotalProjeto) * 100 : 0;
+
+  let percentualTemporal = 0;
+  let mesesDecorridos = 0;
+  if (tp.start_date && tp.end_date) {
+    const start = new Date(tp.start_date).getTime();
+    const end = new Date(tp.end_date).getTime();
+    const now = Date.now();
+    percentualTemporal = Math.min(100, Math.max(0, ((now - start) / (end - start)) * 100));
+    mesesDecorridos = Math.max(0, Math.min(duracaoMeses, calcMonthsDiff(tp.start_date, new Date().toISOString().split("T")[0])));
+  }
+
+  const pendingReports = allReports.filter((r: any) => ["under_review", "pending"].includes(r.status)).length;
+  const rejectedReports = allReports.filter((r: any) => r.status === "rejected").length;
+  const pendingDocs = scholarUserIds.filter((uid) => !grantTermsMap[uid]).length;
+  const pendingPayments = allPayments.filter((p: any) => ["pending", "eligible"].includes(p.status)).length;
+  const pendingPaymentsValue = allPayments.filter((p: any) => ["pending", "eligible"].includes(p.status)).reduce((s: number, p: any) => s + Number(p.amount), 0);
+  const cancelledPayments = allPayments.filter((p: any) => p.status === "cancelled").length;
+
+  // Risk Score
+  const riskPctComprometido = valorTotalProjeto > 0 ? valorTotalEstimadoBolsas / valorTotalProjeto : 0;
+  const riskSaldo = valorTotalProjeto - valorTotalEstimadoBolsas;
+  const riskExecFin = valorTotalProjeto > 0 ? totalPaid / valorTotalProjeto : 0;
+  const riskExecTempo = duracaoMeses > 0 ? mesesDecorridos / duracaoMeses : 0;
+  const riskDesvio = riskExecTempo - riskExecFin;
+
+  let riskA = 0;
+  if (riskPctComprometido <= 0.95) riskA = 0;
+  else if (riskPctComprometido <= 1.00) riskA = 10;
+  else if (riskPctComprometido <= 1.05) riskA = 25;
+  else if (riskPctComprometido <= 1.10) riskA = 35;
+  else riskA = 40;
+
+  let riskB = 0;
+  if (riskSaldo >= 0) riskB = 0;
+  else {
+    const ratio = valorTotalProjeto > 0 ? Math.abs(riskSaldo) / valorTotalProjeto : 1;
+    if (ratio <= 0.02) riskB = 10;
+    else if (ratio <= 0.05) riskB = 20;
+    else riskB = 30;
+  }
+
+  let riskC = 0;
+  if (riskDesvio <= 0.10) riskC = 0;
+  else if (riskDesvio <= 0.20) riskC = 8;
+  else if (riskDesvio <= 0.35) riskC = 14;
+  else riskC = 20;
+
+  let riskD = 0;
+  if (pendingPaymentsValue === 0 && pendingPayments === 0) riskD = 0;
+  else {
+    const ratioP = valorTotalProjeto > 0 ? pendingPaymentsValue / valorTotalProjeto : 0;
+    if (ratioP <= 0.01) riskD = 4;
+    else if (ratioP <= 0.03) riskD = 7;
+    else riskD = 10;
+  }
+
+  const riskScore = riskA + riskB + riskC + riskD;
+  const riskLevel = riskScore <= 24 ? "BAIXO" : riskScore <= 49 ? "MODERADO" : "ALTO";
+
+  const alerts: string[] = [];
+  if (percentualAtribuido < 80) alerts.push(`Apenas ${percentualAtribuido.toFixed(1)}% do orçamento estimado foi atribuído a bolsas.`);
+  if (percentualExecutado > percentualTemporal + 15) alerts.push("Execução financeira está acima do cronograma temporal.");
+  if (percentualExecutado < percentualTemporal - 20) alerts.push("Execução financeira está significativamente abaixo do cronograma.");
+  if (pendingDocs > 0) alerts.push(`${pendingDocs} bolsista(s) sem Termo de Outorga.`);
+  if (rejectedReports > 0) alerts.push(`${rejectedReports} relatório(s) reprovado(s) aguardando reenvio.`);
+  if (cancelledPayments > 0) alerts.push(`${cancelledPayments} pagamento(s) cancelado(s).`);
+  if (riskLevel === "ALTO") alerts.push(`Índice de Risco Financeiro: ${riskLevel} (${riskScore}/100).`);
+
+  console.log(`[rid:${requestId}] Background: building PDF`);
+
+  const reportUuid = crypto.randomUUID();
+  const pdfBytes = await buildExecutivePdf({
+    orgName: orgBranding.name,
+    primaryColor: orgBranding.primary_color,
+    watermarkText: orgBranding.watermark_text,
+    reportFooterText: orgBranding.report_footer_text,
+    projectTitle: tp.title,
+    sponsor: tp.sponsor_name,
+    status: tp.status,
+    startDate: tp.start_date,
+    endDate: tp.end_date,
+    duracaoMeses,
+    valorTotalProjeto, valorTotalEstimadoBolsas, valorTotalAtribuido,
+    diferencaAtribuicao, percentualAtribuido, taxaAdm, impostos,
+    valorTaxaAdm, valorImpostos, encargosPrevistos, custoOperacionalBruto,
+    percentualBolsasTeto, totalMensal, totalPaid, percentualExecutado, percentualTemporal,
+    totalBolsas: subs.length, activeBolsas: activeSubs.length,
+    activeEnrollments: activeEnrollments.length,
+    pendingReports, rejectedReports, pendingDocs,
+    pendingPayments, pendingPaymentsValue, cancelledPayments,
+    riskScore, riskLevel, riskA, riskB, riskC, riskD,
+    riskPctComprometido, riskSaldo, riskDesvio, alerts,
+    auditLogs: auditLogs.map((l: any) => ({
+      date: l.created_at, action: l.action, entityType: l.entity_type,
+      userEmail: l.user_email || "sistema",
+      details: typeof l.details === "object" ? JSON.stringify(l.details) : String(l.details || ""),
+    })),
+    reportId: reportUuid,
+    generatedAt: new Date().toISOString(),
+    generatedBy: userEmail,
+  });
+
+  // Upload
+  const uploadOrgId = tp.organization_id || "global";
+  const filePath = `tenant/${uploadOrgId}/relatorios/executivos/${reportUuid}.pdf`;
+
+  console.log(`[rid:${requestId}] Background: uploading PDF (${pdfBytes.length} bytes)`);
+
+  const { error: uploadError } = await db.storage
+    .from("relatorios")
+    .upload(filePath, pdfBytes, { contentType: "application/pdf", upsert: true });
+
+  if (uploadError) {
+    console.error(`[rid:${requestId}] Upload error:`, uploadError);
+    await db.from("pdf_logs").update({
+      status: "error",
+      error_message: "Falha ao salvar PDF: " + uploadError.message,
+      generation_time_ms: Date.now() - startTime,
+    }).eq("id", jobId);
+    return;
+  }
+
+  // Update job as success
+  await db.from("pdf_logs").update({
+    status: "success",
+    file_path: filePath,
+    file_size: pdfBytes.length,
+    generation_time_ms: Date.now() - startTime,
+  }).eq("id", jobId);
+
+  console.log(`[rid:${requestId}] Background: PDF generation complete (${Date.now() - startTime}ms)`);
+}
 
 // ─── PDF Builder ─────────────────────────────────────────────────────────────
 

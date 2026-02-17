@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { calcularRiscoFinanceiro } from '@/lib/financial-risk';
-import { tracedInvoke, friendlyError } from '@/lib/logger';
+import { tracedInvokeWithPolling, friendlyError } from '@/lib/logger';
 import type { RiskResult } from '@/lib/financial-risk';
 import { useOrganizationContext } from '@/contexts/OrganizationContext';
 import { PdfReadyDialog } from '@/components/ui/PdfReadyDialog';
@@ -312,7 +312,7 @@ export default function FinancialManagement() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Não autenticado');
 
-      const { data } = await tracedInvoke<{ signedUrl: string }>(
+      const { data } = await tracedInvokeWithPolling<{ signedUrl: string }>(
         'generate-executive-report-pdf',
         { projeto_id: targetProjectId },
         'FinancialManagement',
