@@ -52,6 +52,7 @@ const adminNavigation: NavItem[] = [
   { name: "Operação de Bolsas", icon: Users, href: "/admin/operacao", managerOnly: true },
   { name: "Projetos Temáticos", icon: FolderOpen, href: "/admin/projetos-tematicos", managerOnly: true },
   { name: "Gestão Financeira", icon: BarChart3, href: "/admin/gestao-financeira", managerOnly: true },
+  { name: "Relatórios", icon: FileText, href: "/admin/relatorios", managerOnly: true },
   { name: "Mensagens", icon: Send, href: "/admin/mensagens", adminOnly: true },
   { name: "Documentos", icon: FileText, href: "/admin/documentos", adminOnly: true },
   { name: "Códigos de Convite", icon: Ticket, href: "/admin/codigos-convite", adminOnly: true, section: "Gestão Institucional" },
