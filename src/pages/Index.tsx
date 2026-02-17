@@ -7,7 +7,6 @@ import { ThematicProjectContext } from "@/components/scholar/ThematicProjectCont
 import { ScholarProfileCard } from "@/components/scholar/ScholarProfileCard";
 import { ScholarSummaryCards } from "@/components/scholar/ScholarSummaryCards";
 import { ScholarWorkflowBanner } from "@/components/scholar/ScholarWorkflowBanner";
-import { GrantTermSection } from "@/components/scholar/GrantTermSection";
 import { DocumentsSection } from "@/components/scholar/DocumentsSection";
 import { AwaitingAssignmentBanner } from "@/components/scholar/AwaitingAssignmentBanner";
 import { BankDataPendingBanner } from "@/components/scholar/BankDataPendingBanner";
@@ -158,13 +157,8 @@ const Index = () => {
                 <ScholarWorkflowBanner />
               </div>
 
-              {/* Grant Term Section */}
-              <div className="animate-fade-in" style={{ animationDelay: "190ms" }}>
-                <GrantTermSection />
-              </div>
-
               {/* Documents Section */}
-              <div className="animate-fade-in" style={{ animationDelay: "200ms" }}>
+              <div className="animate-fade-in" style={{ animationDelay: "190ms" }}>
                 <DocumentsSection />
               </div>
             </>

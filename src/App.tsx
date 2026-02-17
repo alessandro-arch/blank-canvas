@@ -28,6 +28,7 @@ import NotFound from "./pages/NotFound";
 import Index from "./pages/Index";
 import PaymentsReports from "./pages/PaymentsReports";
 import Documents from "./pages/Documents";
+import ScholarDocuments from "./pages/ScholarDocuments";
 import ScholarProfile from "./pages/ScholarProfile";
 import ScholarManual from "./pages/ScholarManual";
 import ChangePassword from "./pages/ChangePassword";
@@ -103,7 +104,7 @@ const App = () => (
               } />
               <Route path="/bolsista/documentos" element={
                 <ScholarProtectedRoute>
-                  <Documents />
+                  <ScholarDocuments />
                 </ScholarProtectedRoute>
               } />
               <Route path="/bolsista/perfil" element={
