@@ -170,17 +170,20 @@ export default function FinancialManagement() {
   // ── Aggregated KPIs ──
 
   const agg = useMemo(() => {
-    // Orçamento
-    const orcamentoTotal = filteredProjects.reduce((s, p) => s + (p.valor_total_projeto || 0), 0);
-    const totalMensalBolsas = (subprojects || [])
-      .filter(s => filteredThematicIds.has(s.thematic_project_id) && s.status === 'active')
-      .reduce((s, sp) => s + (sp.valor_mensal || 0), 0);
+    // ── Estrutura financeira padronizada ──
+    // teto_projeto = valor aprovado pelo financiador
+    const tetoProjeto = filteredProjects.reduce((s, p) => s + (p.valor_total_projeto || 0), 0);
 
+    // encargos_previstos = ISS + taxa administrativa (sobre o teto)
     const totalTaxaAdmin = filteredProjects.reduce((s, p) => s + ((p.valor_total_projeto || 0) * (p.taxa_administrativa_percentual || 0) / 100), 0);
     const totalImpostos = filteredProjects.reduce((s, p) => s + ((p.valor_total_projeto || 0) * (p.impostos_percentual || 0) / 100), 0);
-    const custoTotalEncargos = totalTaxaAdmin + totalImpostos;
+    const encargosPrevistos = totalTaxaAdmin + totalImpostos;
 
-    const totalEstimadoBolsas = filteredProjects.reduce((s, p) => {
+    // custo_operacional_bruto = teto_projeto + encargos_previstos (informativo)
+    const custoOperacionalBruto = tetoProjeto + encargosPrevistos;
+
+    // teto_bolsas = limite total de bolsas previsto (estimado por subprojetos x duração)
+    const tetoBolsas = filteredProjects.reduce((s, p) => {
       if (!p.start_date || !p.end_date) return s;
       try {
         const dur = Math.max(1, differenceInMonths(new Date(p.end_date), new Date(p.start_date)) + 1);
@@ -190,17 +193,16 @@ export default function FinancialManagement() {
       } catch { return s; }
     }, 0);
 
-    // Orçamento líquido disponível para bolsas (desconta encargos fixos)
-    const orcamentoLiquido = orcamentoTotal - custoTotalEncargos;
-    
-    // Comprometido = apenas bolsas estimadas (encargos já deduzidos do orçamento)
-    const comprometido = totalEstimadoBolsas;
-    const percentComprometido = orcamentoLiquido > 0 ? (comprometido / orcamentoLiquido) * 100 : 0;
+    const totalMensalBolsas = (subprojects || [])
+      .filter(s => filteredThematicIds.has(s.thematic_project_id) && s.status === 'active')
+      .reduce((s, sp) => s + (sp.valor_mensal || 0), 0);
 
-    // Execução
+    // Execução: % comprometido e % executado são sobre o teto do projeto
+    const percentComprometido = tetoProjeto > 0 ? (tetoBolsas / tetoProjeto) * 100 : 0;
+    const saldoDisponivel = tetoProjeto - tetoBolsas;
+
     const totalPago = filteredPayments.filter(p => p.status === 'paid').reduce((s, p) => s + Number(p.amount), 0);
-    const percentExecutado = orcamentoLiquido > 0 ? (totalPago / orcamentoLiquido) * 100 : 0;
-    const saldoDisponivel = orcamentoLiquido - comprometido;
+    const percentExecutado = tetoProjeto > 0 ? (totalPago / tetoProjeto) * 100 : 0;
 
     // Passivo programado
     const passivoProgramado = filteredPayments.filter(p => p.status === 'pending' || p.status === 'eligible').reduce((s, p) => s + Number(p.amount), 0);
@@ -233,14 +235,13 @@ export default function FinancialManagement() {
     })();
 
     return {
-      orcamentoTotal,
-      orcamentoLiquido,
-      totalMensalBolsas,
+      tetoProjeto,
+      tetoBolsas,
+      encargosPrevistos,
+      custoOperacionalBruto,
       totalTaxaAdmin,
       totalImpostos,
-      custoTotalEncargos,
-      totalEstimadoBolsas,
-      comprometido,
+      totalMensalBolsas,
       percentComprometido,
       totalPago,
       percentExecutado,
@@ -371,36 +372,33 @@ export default function FinancialManagement() {
                   <div className={`grid gap-4 ${isMobile ? 'grid-cols-2' : 'grid-cols-2 lg:grid-cols-4'}`}>
                     <KPICard
                       icon={<Wallet className="h-5 w-5" />}
-                      label="Orçamento Total"
-                      value={formatCurrency(agg.orcamentoTotal)}
-                      subtitle={`Encargos: ${formatCurrency(agg.custoTotalEncargos)}`}
+                      label="Teto do Projeto"
+                      value={formatCurrency(agg.tetoProjeto)}
+                      subtitle="Valor aprovado pelo financiador"
                       iconColor="text-primary"
                     />
                     <KPICard
-                      icon={<TrendingUp className="h-5 w-5" />}
-                      label="Comprometido (Bolsas)"
-                      value={formatCurrency(agg.comprometido)}
-                      subtitle={`${agg.percentComprometido.toFixed(1)}% do orç. líquido`}
+                      icon={<GraduationCap className="h-5 w-5" />}
+                      label="Teto em Bolsas"
+                      value={formatCurrency(agg.tetoBolsas)}
+                      subtitle={`${agg.percentComprometido.toFixed(1)}% do teto do projeto`}
                       iconColor="text-primary"
                     >
                       <Progress value={Math.min(agg.percentComprometido, 100)} className="mt-2 h-1.5" />
                     </KPICard>
                     <KPICard
-                      icon={<DollarSign className="h-5 w-5" />}
-                      label="Executado"
-                      value={formatCurrency(agg.totalPago)}
-                      subtitle={`${agg.percentExecutado.toFixed(1)}% do orç. líquido`}
-                      iconColor="text-success"
-                    >
-                      <Progress value={Math.min(agg.percentExecutado, 100)} className="mt-2 h-1.5" />
-                    </KPICard>
+                      icon={<Receipt className="h-5 w-5" />}
+                      label="Encargos Previstos"
+                      value={formatCurrency(agg.encargosPrevistos)}
+                      subtitle={`ISS: ${formatCurrency(agg.totalImpostos)} · Tx. Adm.: ${formatCurrency(agg.totalTaxaAdmin)}`}
+                      iconColor="text-muted-foreground"
+                    />
                     <KPICard
                       icon={<PiggyBank className="h-5 w-5" />}
-                      label="Saldo Disponível"
-                      value={formatCurrency(agg.saldoDisponivel)}
-                      subtitle={`Orç. líquido: ${formatCurrency(agg.orcamentoLiquido)}`}
-                      iconColor={agg.saldoDisponivel >= 0 ? 'text-success' : 'text-destructive'}
-                      valueColor={agg.saldoDisponivel >= 0 ? 'text-success' : 'text-destructive'}
+                      label="Custo Operacional Bruto"
+                      value={formatCurrency(agg.custoOperacionalBruto)}
+                      subtitle="Teto + Encargos (informativo)"
+                      iconColor="text-muted-foreground"
                     />
                   </div>
                 </section>
@@ -420,8 +418,8 @@ export default function FinancialManagement() {
                         </p>
                         <Progress value={Math.min(agg.percentComprometido, 100)} className="mt-3 h-2" />
                         <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-                          <span>Encargos: {formatCurrency(agg.custoTotalEncargos)}</span>
-                          <span>Bolsas: {formatCurrency(agg.totalEstimadoBolsas)}</span>
+                          <span>Encargos: {formatCurrency(agg.encargosPrevistos)}</span>
+                          <span>Bolsas: {formatCurrency(agg.tetoBolsas)}</span>
                         </div>
                       </CardContent>
                     </Card>
@@ -437,7 +435,7 @@ export default function FinancialManagement() {
                         <Progress value={Math.min(agg.percentExecutado, 100)} className="mt-3 h-2" />
                         <div className="flex justify-between mt-2 text-xs text-muted-foreground">
                           <span>Pago: {formatCurrency(agg.totalPago)}</span>
-                          <span>Líquido: {formatCurrency(agg.orcamentoLiquido)}</span>
+                          <span>Teto: {formatCurrency(agg.tetoProjeto)}</span>
                         </div>
                       </CardContent>
                     </Card>
@@ -547,13 +545,13 @@ export default function FinancialManagement() {
                     </CardHeader>
                     <CardContent>
                       <div className="rounded-lg border overflow-auto">
-                        <table className="w-full text-sm min-w-[800px]">
+                         <table className="w-full text-sm min-w-[800px]">
                           <thead className="bg-muted/50">
                             <tr>
                               <th className="text-left p-3 font-medium">Projeto</th>
                               <th className="text-left p-3 font-medium">Financiador</th>
-                              <th className="text-right p-3 font-medium">Orçamento</th>
-                              <th className="text-right p-3 font-medium">Encargos</th>
+                              <th className="text-right p-3 font-medium">Teto Projeto</th>
+                              <th className="text-right p-3 font-medium">Teto Bolsas</th>
                               <th className="text-right p-3 font-medium">Pago</th>
                               <th className="text-right p-3 font-medium">Saldo</th>
                               <th className="text-center p-3 font-medium">Bolsistas</th>
@@ -570,10 +568,8 @@ export default function FinancialManagement() {
                               if (p.start_date && p.end_date) {
                                 try { dur = Math.max(1, differenceInMonths(new Date(p.end_date), new Date(p.start_date)) + 1); } catch {}
                               }
-                              const estBolsas = dur ? mensal * dur : 0;
-                              const orcLiquido = (p.valor_total_projeto || 0) - encargos;
-                              const comprometido = estBolsas;
-                              const saldo = orcLiquido - comprometido;
+                              const tetoBolsasProj = dur ? mensal * dur : 0;
+                              const saldo = (p.valor_total_projeto || 0) - tetoBolsasProj;
 
                               const pago = filteredPayments
                                 .filter(pay => {
@@ -593,7 +589,7 @@ export default function FinancialManagement() {
                                   <td className="p-3 font-medium max-w-[200px] truncate" title={p.title}>{p.title}</td>
                                   <td className="p-3 text-muted-foreground">{p.sponsor_name}</td>
                                   <td className="p-3 text-right font-mono">{formatCurrency(p.valor_total_projeto || 0)}</td>
-                                  <td className="p-3 text-right font-mono">{formatCurrency(encargos)}</td>
+                                  <td className="p-3 text-right font-mono">{formatCurrency(tetoBolsasProj)}</td>
                                   <td className="p-3 text-right font-mono">{formatCurrency(pago)}</td>
                                   <td className={`p-3 text-right font-mono font-semibold ${saldo >= 0 ? 'text-success' : 'text-destructive'}`}>
                                     {formatCurrency(saldo)}
