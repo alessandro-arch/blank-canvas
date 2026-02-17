@@ -76,6 +76,9 @@ interface ThematicProject {
   plano_trabalho_url: string | null;
   plano_trabalho_nome: string | null;
   plano_trabalho_uploaded_at: string | null;
+  atribuicao_modo: string;
+  valor_total_atribuido_bolsas_manual: number | null;
+  atribuicao_justificativa: string | null;
 }
 
 interface SubprojectWithScholar {
@@ -351,11 +354,24 @@ export default function ThematicProjectDetail() {
   } : null;
 
   // Calculate financial values from subprojects
-  const valorTotalBolsas = subprojects
+  const valorTotalBolsasMensal = subprojects
     ?.filter(p => p.status === 'active')
     .reduce((sum, p) => sum + (p.valor_mensal || 0), 0) ?? 0;
 
-  const valorTotalEstimadoBolsas = subprojects
+  // Valor Total Estimado: total_mensal * duração do PROJETO TEMÁTICO
+  const duracaoMesesProjeto = (() => {
+    if (!thematicProject?.start_date || !thematicProject?.end_date) return null;
+    try {
+      return Math.max(1, differenceInMonths(new Date(thematicProject.end_date), new Date(thematicProject.start_date)) + 1);
+    } catch { return null; }
+  })();
+
+  const valorTotalEstimadoBolsas = duracaoMesesProjeto !== null
+    ? valorTotalBolsasMensal * duracaoMesesProjeto
+    : 0;
+
+  // Valor Total Atribuído: soma(valor_mensal * meses_bolsa) por bolsa ativa
+  const valorTotalAtribuidoAuto = subprojects
     ?.filter(p => p.status === 'active')
     .reduce((sum, p) => {
       const months = Math.max(1, differenceInMonths(new Date(p.end_date), new Date(p.start_date)) + 1);
@@ -458,8 +474,13 @@ export default function ThematicProjectDetail() {
                   valorTotalProjeto={thematicProject.valor_total_projeto || 0}
                   taxaAdministrativaPercentual={thematicProject.taxa_administrativa_percentual || 0}
                   impostosPercentual={thematicProject.impostos_percentual || 0}
-                  valorTotalBolsas={valorTotalBolsas}
+                  valorTotalBolsasMensal={valorTotalBolsasMensal}
                   valorTotalEstimadoBolsas={valorTotalEstimadoBolsas}
+                  duracaoMesesProjeto={duracaoMesesProjeto}
+                  valorTotalAtribuidoAuto={valorTotalAtribuidoAuto}
+                  atribuicaoModo={thematicProject.atribuicao_modo || 'auto'}
+                  valorTotalAtribuidoManual={thematicProject.valor_total_atribuido_bolsas_manual || 0}
+                  atribuicaoJustificativa={thematicProject.atribuicao_justificativa || ''}
                   onUpdate={() => queryClient.invalidateQueries({ queryKey: ['thematic-project', id] })}
                 />
                 <ProjectDocumentsSection

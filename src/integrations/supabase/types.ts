@@ -1066,6 +1066,8 @@ export type Database = {
       }
       thematic_projects: {
         Row: {
+          atribuicao_justificativa: string | null
+          atribuicao_modo: string
           contrato_projeto_nome: string | null
           contrato_projeto_uploaded_at: string | null
           contrato_projeto_url: string | null
@@ -1084,9 +1086,12 @@ export type Database = {
           taxa_administrativa_percentual: number | null
           title: string
           updated_at: string
+          valor_total_atribuido_bolsas_manual: number | null
           valor_total_projeto: number | null
         }
         Insert: {
+          atribuicao_justificativa?: string | null
+          atribuicao_modo?: string
           contrato_projeto_nome?: string | null
           contrato_projeto_uploaded_at?: string | null
           contrato_projeto_url?: string | null
@@ -1105,9 +1110,12 @@ export type Database = {
           taxa_administrativa_percentual?: number | null
           title: string
           updated_at?: string
+          valor_total_atribuido_bolsas_manual?: number | null
           valor_total_projeto?: number | null
         }
         Update: {
+          atribuicao_justificativa?: string | null
+          atribuicao_modo?: string
           contrato_projeto_nome?: string | null
           contrato_projeto_uploaded_at?: string | null
           contrato_projeto_url?: string | null
@@ -1126,6 +1134,7 @@ export type Database = {
           taxa_administrativa_percentual?: number | null
           title?: string
           updated_at?: string
+          valor_total_atribuido_bolsas_manual?: number | null
           valor_total_projeto?: number | null
         }
         Relationships: [
