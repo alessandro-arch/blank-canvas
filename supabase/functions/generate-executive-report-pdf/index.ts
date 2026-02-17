@@ -309,9 +309,9 @@ serve(async (req) => {
     });
 
     // ─── 14) Upload ───
-    const orgId = tp.organization_id || "global";
+    const uploadOrgId = tp.organization_id || "global";
     const reportUuid = crypto.randomUUID();
-    const filePath = `tenant/${orgId}/relatorios/executivos/${reportUuid}.pdf`;
+    const filePath = `tenant/${uploadOrgId}/relatorios/executivos/${reportUuid}.pdf`;
 
     const { error: uploadError } = await db.storage
       .from("relatorios")
