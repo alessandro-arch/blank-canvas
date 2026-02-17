@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.send-org-invite-email]
 verify_jwt = false
+
+[functions.generate-scholarship-pdf]
+verify_jwt = false
