@@ -221,18 +221,23 @@ export default function FinancialManagement() {
     const taxaAtivacao = totalActiveSubs > 0 ? (bolsistasAtivos / totalActiveSubs) * 100 : 0;
     const custoMedioBolsista = bolsistasAtivos > 0 ? totalPago / bolsistasAtivos : 0;
 
-    // Risco
+    // Risco — base: teto_projeto (não considerar encargos previstos)
     const pagamentosPendentes = filteredPayments.filter(p => p.status === 'pending' || p.status === 'eligible').length;
     const indiceRisco = (() => {
-      let score = 0;
-      if (percentComprometido > 90) score += 3;
-      else if (percentComprometido > 75) score += 1;
-      if (saldoDisponivel < 0) score += 3;
-      if (pagamentosPendentes > 10) score += 2;
-      else if (pagamentosPendentes > 5) score += 1;
-      if (taxaAtivacao < 50) score += 1;
-      if (score >= 5) return { level: 'Alto', color: 'text-destructive', bgColor: 'bg-destructive/10' };
-      if (score >= 3) return { level: 'Médio', color: 'text-warning', bgColor: 'bg-warning/10' };
+      // ALTO: comprometido > 110% OU saldo < 0 OU ativação < 50%
+      if (percentComprometido > 110 || saldoDisponivel < 0 || taxaAtivacao < 50) {
+        return { level: 'Alto', color: 'text-destructive', bgColor: 'bg-destructive/10' };
+      }
+      // MODERADO: comprometido > 100% e ≤ 110% OU saldo próximo de zero OU ativação entre 50% e 80%
+      const saldoProximoZero = tetoProjeto > 0 && saldoDisponivel >= 0 && saldoDisponivel < tetoProjeto * 0.05;
+      if (
+        (percentComprometido > 100 && percentComprometido <= 110) ||
+        saldoProximoZero ||
+        (taxaAtivacao >= 50 && taxaAtivacao < 80)
+      ) {
+        return { level: 'Moderado', color: 'text-warning', bgColor: 'bg-warning/10' };
+      }
+      // BAIXO: comprometido ≤ 100%, saldo ≥ 0, ativação ≥ 80%
       return { level: 'Baixo', color: 'text-success', bgColor: 'bg-success/10' };
     })();
 
