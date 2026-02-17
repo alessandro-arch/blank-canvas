@@ -52,6 +52,7 @@ import AdminMembers from "./pages/AdminMembers";
 import AllUsers from "./pages/AllUsers";
 import InviteAccept from "./pages/InviteAccept";
 import Settings from "./pages/Settings";
+import PdfReports from "./pages/PdfReports";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -177,6 +178,11 @@ const App = () => (
               <Route path="/admin/gestao-financeira" element={
                 <AdminProtectedRoute>
                   <FinancialManagement />
+                </AdminProtectedRoute>
+              } />
+              <Route path="/admin/relatorios" element={
+                <AdminProtectedRoute>
+                  <PdfReports />
                 </AdminProtectedRoute>
               } />
               <Route path="/admin/membros" element={
