@@ -207,8 +207,8 @@ export function SubprojectsTable({
 
   return (
     <>
-      <ScrollArea className="max-h-[400px] rounded-lg border">
-        <Table>
+      <div className="rounded-lg border overflow-auto max-h-[500px]">
+        <Table className="min-w-[1100px]">
           <TableHeader className="sticky top-0 bg-card z-10">
             <TableRow>
               <TableHead className="w-[100px]">Código</TableHead>
@@ -318,7 +318,7 @@ export function SubprojectsTable({
             ))}
           </TableBody>
         </Table>
-      </ScrollArea>
+      </div>
 
       {/* Dialogs */}
       {selectedProject && (
