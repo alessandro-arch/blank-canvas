@@ -206,7 +206,8 @@ export default function FinancialManagement() {
     const percentExecutado = tetoProjeto > 0 ? (totalPago / tetoProjeto) * 100 : 0;
 
     // Passivo programado
-    const passivoProgramado = filteredPayments.filter(p => p.status === 'pending' || p.status === 'eligible').reduce((s, p) => s + Number(p.amount), 0);
+    // Passivo programado = teto_bolsas - valor_pago (compromisso futuro real)
+    const passivoProgramado = Math.max(0, tetoBolsas - totalPago);
 
     // Força de trabalho
     const activeEnrollments = (enrollmentsData || []).filter(e => {
@@ -411,44 +412,41 @@ export default function FinancialManagement() {
                 {/* ═══ Bloco 2: Execução ═══ */}
                 <section>
                   <SectionHeader icon={<Activity className="h-4 w-4" />} title="Execução" />
-                  <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3'}`}>
-                    <Card>
-                      <CardContent className="p-5">
-                        <div className="flex items-center justify-between mb-3">
-                          <p className="text-xs text-muted-foreground font-medium">% Comprometido</p>
-                          <Percent className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                        <p className={`text-3xl font-bold ${agg.percentComprometido > 100 ? 'text-destructive' : 'text-foreground'}`}>
-                          {agg.percentComprometido.toFixed(1)}%
-                        </p>
-                        <Progress value={Math.min(agg.percentComprometido, 100)} className="mt-3 h-2" />
-                        <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-                          <span>Encargos: {formatCurrency(agg.encargosPrevistos)}</span>
-                          <span>Bolsas: {formatCurrency(agg.tetoBolsas)}</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="p-5">
-                        <div className="flex items-center justify-between mb-3">
-                          <p className="text-xs text-muted-foreground font-medium">% Executado</p>
-                          <Target className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                        <p className="text-3xl font-bold text-success">
-                          {agg.percentExecutado.toFixed(1)}%
-                        </p>
-                        <Progress value={Math.min(agg.percentExecutado, 100)} className="mt-3 h-2" />
-                        <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-                          <span>Pago: {formatCurrency(agg.totalPago)}</span>
-                          <span>Teto: {formatCurrency(agg.tetoProjeto)}</span>
-                        </div>
-                      </CardContent>
-                    </Card>
+                  <div className={`grid gap-4 ${isMobile ? 'grid-cols-2' : 'grid-cols-2 lg:grid-cols-4'}`}>
+                    <KPICard
+                      icon={<GraduationCap className="h-5 w-5" />}
+                      label="Bolsas em Execução"
+                      value={formatCurrency(agg.tetoBolsas)}
+                      subtitle={`${agg.percentComprometido.toFixed(1)}% do teto do projeto`}
+                      tooltip="Valor total atribuído a bolsas ativas. Calculado pela soma mensal das bolsas × duração. Base: teto do projeto."
+                      iconColor="text-primary"
+                    >
+                      <Progress value={Math.min(agg.percentComprometido, 100)} className="mt-2 h-1.5" />
+                    </KPICard>
+                    <KPICard
+                      icon={<DollarSign className="h-5 w-5" />}
+                      label="Valor Pago"
+                      value={formatCurrency(agg.totalPago)}
+                      subtitle={`${agg.percentExecutado.toFixed(1)}% do teto do projeto`}
+                      tooltip="Total efetivamente pago em bolsas. O percentual de execução é calculado sobre o teto do projeto (valor_pago ÷ teto_projeto)."
+                      iconColor="text-success"
+                    >
+                      <Progress value={Math.min(agg.percentExecutado, 100)} className="mt-2 h-1.5" />
+                    </KPICard>
+                    <KPICard
+                      icon={<Target className="h-5 w-5" />}
+                      label="% Execução Projeto"
+                      value={`${agg.percentExecutado.toFixed(1)}%`}
+                      subtitle={`${formatCurrency(agg.totalPago)} de ${formatCurrency(agg.tetoProjeto)}`}
+                      tooltip="Percentual de execução financeira do projeto. Fórmula: valor_atribuído ÷ teto_projeto. Não utiliza orçamento líquido como base."
+                      iconColor={agg.percentExecutado >= 80 ? 'text-success' : agg.percentExecutado >= 50 ? 'text-warning' : 'text-primary'}
+                    />
                     <KPICard
                       icon={<Clock className="h-5 w-5" />}
                       label="Passivo Programado"
                       value={formatCurrency(agg.passivoProgramado)}
                       subtitle={`${agg.pagamentosPendentes} parcela(s) pendente(s)`}
+                      tooltip="Compromisso financeiro futuro. Fórmula: teto_bolsas − valor_pago. Representa o quanto ainda será desembolsado em bolsas."
                       iconColor="text-warning"
                     />
                   </div>
