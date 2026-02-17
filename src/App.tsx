@@ -155,12 +155,12 @@ const App = () => (
                 </AdminProtectedRoute>
               } />
               <Route path="/admin/importar" element={
-                <AdminProtectedRoute>
+                <AdminProtectedRoute allowedRoles={["admin"]}>
                   <Import />
                 </AdminProtectedRoute>
               } />
               <Route path="/admin/mensagens" element={
-                <AdminProtectedRoute>
+                <AdminProtectedRoute allowedRoles={["admin"]}>
                   <AdminMessages />
                 </AdminProtectedRoute>
               } />
@@ -190,12 +190,12 @@ const App = () => (
                 </AdminProtectedRoute>
               } />
               <Route path="/admin/documentos" element={
-                <AdminProtectedRoute>
+                <AdminProtectedRoute allowedRoles={["admin"]}>
                   <Documents />
                 </AdminProtectedRoute>
               } />
               <Route path="/admin/codigos-convite" element={
-                <AdminProtectedRoute>
+                <AdminProtectedRoute allowedRoles={["admin"]}>
                   <InviteCodes />
                 </AdminProtectedRoute>
               } />
@@ -207,7 +207,7 @@ const App = () => (
               
               {/* Admin-only routes */}
               <Route path="/admin/dashboard-icca" element={
-                <AdminProtectedRoute allowedRoles={["admin"]}>
+                <AdminProtectedRoute>
                   <AdminIccaDashboard />
                 </AdminProtectedRoute>
               } />
@@ -222,7 +222,7 @@ const App = () => (
                 </AdminProtectedRoute>
               } />
               <Route path="/admin/configuracoes" element={
-                <AdminProtectedRoute>
+                <AdminProtectedRoute allowedRoles={["admin"]}>
                   <Settings />
                 </AdminProtectedRoute>
               } />

@@ -47,20 +47,20 @@ const scholarNavigation: NavItem[] = [
 ];
 
 const adminNavigation: NavItem[] = [
-  { name: "Dashboard Estratégico", icon: Globe, href: "/admin/dashboard-icca", adminOnly: true, section: "Governança" },
+  { name: "Dashboard Estratégico", icon: Globe, href: "/admin/dashboard-icca", managerOnly: true, section: "Governança" },
   { name: "Dashboard Executivo", icon: LayoutDashboard, href: "/admin/dashboard", managerOnly: true },
   { name: "Operação de Bolsas", icon: Users, href: "/admin/operacao", managerOnly: true },
   { name: "Projetos Temáticos", icon: FolderOpen, href: "/admin/projetos-tematicos", managerOnly: true },
   { name: "Gestão Financeira", icon: BarChart3, href: "/admin/gestao-financeira", managerOnly: true },
-  { name: "Mensagens", icon: Send, href: "/admin/mensagens", managerOnly: true },
-  { name: "Documentos", icon: FileText, href: "/admin/documentos", managerOnly: true },
-  { name: "Códigos de Convite", icon: Ticket, href: "/admin/codigos-convite", managerOnly: true, section: "Gestão Institucional" },
+  { name: "Mensagens", icon: Send, href: "/admin/mensagens", adminOnly: true },
+  { name: "Documentos", icon: FileText, href: "/admin/documentos", adminOnly: true },
+  { name: "Códigos de Convite", icon: Ticket, href: "/admin/codigos-convite", adminOnly: true, section: "Gestão Institucional" },
   { name: "Todos os Usuários", icon: Users, href: "/admin/usuarios-plataforma", adminOnly: true },
   { name: "Membros Admin", icon: UserCog, href: "/admin/membros", adminOnly: true },
-  { name: "Importar Dados", icon: Upload, href: "/admin/importar", managerOnly: true },
+  { name: "Importar Dados", icon: Upload, href: "/admin/importar", adminOnly: true },
   { name: "Organizações", icon: Building2, href: "/admin/organizacoes", adminOnly: true },
   { name: "Trilha de Auditoria", icon: ShieldAlert, href: "/admin/trilha-auditoria", adminOnly: true },
-  { name: "Configurações", icon: Settings, href: "/admin/configuracoes", managerOnly: true },
+  { name: "Configurações", icon: Settings, href: "/admin/configuracoes", adminOnly: true },
 ];
 
 interface SidebarContentProps {
