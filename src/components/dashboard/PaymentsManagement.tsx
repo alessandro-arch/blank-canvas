@@ -54,6 +54,7 @@ import { ScholarPaymentRowComponent, type ScholarPaymentRow, type PaymentRecord 
 import { PaymentMobileCard } from "./PaymentMobileCard";
 import { cn } from "@/lib/utils";
 import { PeriodFilter, type PeriodRange } from "./PeriodFilter";
+import { MobileFiltersDrawer } from "./MobileFiltersDrawer";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 function formatCurrency(value: number): string {
@@ -531,58 +532,128 @@ export function PaymentsManagement() {
         )}
 
         {/* Filters */}
-        <div className="flex flex-col gap-4">
-          {/* Period filter row */}
-          <PeriodFilter
-            availableMonths={data?.availableMonths || []}
-            value={periodRange}
-            onChange={handlePeriodChange}
-          />
-
-          {/* Other filters row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-
-          {/* Search */}
-          <div className="relative lg:col-span-2">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nome, email ou código..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+        {isMobile ? (
+          <div className="flex flex-col gap-3">
+            {/* Search always visible on mobile */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nome, email ou código..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <MobileFiltersDrawer
+              activeCount={
+                (statusFilter !== "all" ? 1 : 0) +
+                (thematicFilter !== "all" ? 1 : 0) +
+                (periodRange ? 1 : 0)
+              }
+              onApply={() => {}}
+              onClear={() => {
+                setStatusFilter("all");
+                handleStatusFilterChange("all");
+                setThematicFilter("all");
+              }}
+            >
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Período</label>
+                  <PeriodFilter
+                    availableMonths={data?.availableMonths || []}
+                    value={periodRange}
+                    onChange={handlePeriodChange}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Status</label>
+                  <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
+                    <SelectTrigger>
+                      <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os status</SelectItem>
+                      <SelectItem value="pending">Pendentes</SelectItem>
+                      <SelectItem value="eligible">Liberados</SelectItem>
+                      <SelectItem value="paid">Pagos</SelectItem>
+                      <SelectItem value="cancelled">Cancelados</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Projeto Temático</label>
+                  <Select value={thematicFilter} onValueChange={setThematicFilter}>
+                    <SelectTrigger>
+                      <Building2 className="h-4 w-4 mr-2 text-muted-foreground" />
+                      <SelectValue placeholder="Projeto Temático" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os projetos</SelectItem>
+                      {(data?.thematicProjects || []).map(tp => (
+                        <SelectItem key={tp.id} value={tp.id}>{tp.title}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </MobileFiltersDrawer>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {/* Period filter row */}
+            <PeriodFilter
+              availableMonths={data?.availableMonths || []}
+              value={periodRange}
+              onChange={handlePeriodChange}
             />
-          </div>
 
-          {/* Status filter */}
-          <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
-            <SelectTrigger>
-              <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os status</SelectItem>
-              <SelectItem value="pending">Pendentes</SelectItem>
-              <SelectItem value="eligible">Liberados</SelectItem>
-              <SelectItem value="paid">Pagos</SelectItem>
-              <SelectItem value="cancelled">Cancelados</SelectItem>
-            </SelectContent>
-          </Select>
+            {/* Other filters row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
-          {/* Thematic project filter */}
-          <Select value={thematicFilter} onValueChange={setThematicFilter}>
-            <SelectTrigger>
-              <Building2 className="h-4 w-4 mr-2 text-muted-foreground" />
-              <SelectValue placeholder="Projeto Temático" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os projetos</SelectItem>
-              {(data?.thematicProjects || []).map(tp => (
-                <SelectItem key={tp.id} value={tp.id}>{tp.title}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            {/* Search */}
+            <div className="relative lg:col-span-2">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nome, email ou código..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
+            {/* Status filter */}
+            <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
+              <SelectTrigger>
+                <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os status</SelectItem>
+                <SelectItem value="pending">Pendentes</SelectItem>
+                <SelectItem value="eligible">Liberados</SelectItem>
+                <SelectItem value="paid">Pagos</SelectItem>
+                <SelectItem value="cancelled">Cancelados</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Thematic project filter */}
+            <Select value={thematicFilter} onValueChange={setThematicFilter}>
+              <SelectTrigger>
+                <Building2 className="h-4 w-4 mr-2 text-muted-foreground" />
+                <SelectValue placeholder="Projeto Temático" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os projetos</SelectItem>
+                {(data?.thematicProjects || []).map(tp => (
+                  <SelectItem key={tp.id} value={tp.id}>{tp.title}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Scholar Table / Mobile Cards */}
         <div className={cn(!isMobile && "rounded-lg border overflow-hidden")}>
