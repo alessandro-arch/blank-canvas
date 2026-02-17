@@ -222,7 +222,7 @@ async function generateInBackground(
   const percentualBolsasTeto = valorTotalProjeto > 0 ? (valorTotalEstimadoBolsas / valorTotalProjeto) * 100 : 0;
 
   const totalPaid = allPayments.filter((p: any) => p.status === "paid").reduce((s: number, p: any) => s + Number(p.amount), 0);
-  const percentualExecutado = valorTotalProjeto > 0 ? (totalPaid / valorTotalProjeto) * 100 : 0;
+  const percentualExecutado = valorTotalEstimadoBolsas > 0 ? (totalPaid / valorTotalEstimadoBolsas) * 100 : 0;
 
   let percentualTemporal = 0;
   let mesesDecorridos = 0;
@@ -651,7 +651,7 @@ async function buildExecutivePdf(data: ExecutiveData): Promise<Uint8Array> {
     { label: "% Atribuido", value: fmtPct(data.percentualAtribuido), bold: true },
     { label: "Valor Mensal Total (bolsas ativas)", value: fmtCur(data.totalMensal), bold: false },
     { label: "Total Efetivamente Pago", value: fmtCur(data.totalPaid), bold: true },
-    { label: "% Executado (pago/teto projeto)", value: fmtPct(data.percentualExecutado), bold: true },
+    { label: "% Execução de Bolsas (pago/teto bolsas)", value: fmtPct(data.percentualExecutado), bold: true },
   ];
 
   for (const row of finRows) {
