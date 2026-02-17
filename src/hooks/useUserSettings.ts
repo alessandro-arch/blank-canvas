@@ -10,7 +10,7 @@ export interface UserSettings {
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
-  theme_mode: "system",
+  theme_mode: "light",
   sidebar_behavior: "expanded",
   density: "comfortable",
 };

@@ -23,27 +23,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const applyTheme = (mode: string) => {
-      if (mode === "system") {
-        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        setResolvedTheme(prefersDark ? "dark" : "light");
-        document.documentElement.classList.toggle("dark", prefersDark);
-      } else {
-        setResolvedTheme(mode as "light" | "dark");
-        document.documentElement.classList.toggle("dark", mode === "dark");
-      }
+      // Only apply dark if explicitly chosen; "system" and any other value default to light
+      const isDark = mode === "dark";
+      setResolvedTheme(isDark ? "dark" : "light");
+      document.documentElement.classList.toggle("dark", isDark);
     };
 
     applyTheme(settings.theme_mode);
-
-    // Listen for system theme changes
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const handler = () => {
-      if (settings.theme_mode === "system") {
-        applyTheme("system");
-      }
-    };
-    mediaQuery.addEventListener("change", handler);
-    return () => mediaQuery.removeEventListener("change", handler);
   }, [settings.theme_mode]);
 
   // Apply density
