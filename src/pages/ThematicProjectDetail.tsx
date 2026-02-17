@@ -39,8 +39,10 @@ import {
   UserPlus,
   UserX,
   Building2,
-  FileText
+  FileText,
+  Loader2
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { MasterProjectCard } from '@/components/projects/MasterProjectCard';
 import { ProjectDetailsDialog } from '@/components/projects/ProjectDetailsDialog';
 import { EditProjectDialog } from '@/components/projects/EditProjectDialog';
@@ -100,6 +102,7 @@ export default function ThematicProjectDetail() {
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   // Fetch thematic project
   const { data: thematicProject, isLoading: loadingThematic } = useQuery({
@@ -260,6 +263,38 @@ export default function ThematicProjectDetail() {
     queryClient.invalidateQueries({ queryKey: ['thematic-projects-list'] });
   };
 
+  const handleGenerateProjectPdf = async () => {
+    if (generatingPdf || !id) return;
+    setGeneratingPdf(true);
+    const toastId = toast.loading('Gerando relatório consolidado...');
+    const newWindow = window.open('about:blank', '_blank');
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Não autenticado');
+
+      const res = await supabase.functions.invoke('generate-thematic-project-pdf', {
+        body: { thematic_project_id: id },
+      });
+
+      if (res.error) throw res.error;
+      const { signedUrl } = res.data as { signedUrl: string };
+
+      if (newWindow) {
+        newWindow.location.href = signedUrl;
+      } else {
+        toast.error('Permita pop-ups no navegador para visualizar o arquivo');
+      }
+      toast.success('Relatório consolidado gerado com sucesso', { id: toastId });
+    } catch (err: any) {
+      console.error('Thematic PDF error:', err);
+      newWindow?.close();
+      toast.error(err?.message || 'Erro ao gerar relatório PDF', { id: toastId });
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
   const handleExport = () => {
     if (!filteredProjects?.length) return;
     
@@ -338,6 +373,18 @@ export default function ThematicProjectDetail() {
                 </p>
               </div>
               <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={handleGenerateProjectPdf} 
+                  disabled={generatingPdf || !thematicProject}
+                >
+                  {generatingPdf ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <FileText className="h-4 w-4 mr-2" />
+                  )}
+                  {generatingPdf ? 'Gerando...' : 'Relatório PDF'}
+                </Button>
                 <Button variant="outline" onClick={handleExport} disabled={!filteredProjects?.length}>
                   <Download className="h-4 w-4 mr-2" />
                   Exportar
