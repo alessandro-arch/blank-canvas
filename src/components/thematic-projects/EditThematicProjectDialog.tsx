@@ -4,6 +4,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
+import { CalendarIcon } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -23,11 +27,15 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
   title: z.string().min(10, 'O título deve ter pelo menos 10 caracteres'),
   sponsor_name: z.string().min(2, 'O financiador é obrigatório'),
+  start_date: z.date().nullable().optional(),
+  end_date: z.date().nullable().optional(),
   observations: z.string().optional(),
 });
 
@@ -63,6 +71,8 @@ export function EditThematicProjectDialog({
     defaultValues: {
       title: project.title,
       sponsor_name: project.sponsor_name,
+      start_date: project.start_date ? new Date(project.start_date) : null,
+      end_date: project.end_date ? new Date(project.end_date) : null,
       observations: project.observations || '',
     },
   });
@@ -72,6 +82,8 @@ export function EditThematicProjectDialog({
     form.reset({
       title: project.title,
       sponsor_name: project.sponsor_name,
+      start_date: project.start_date ? new Date(project.start_date) : null,
+      end_date: project.end_date ? new Date(project.end_date) : null,
       observations: project.observations || '',
     });
   }, [project, form]);
@@ -85,6 +97,8 @@ export function EditThematicProjectDialog({
         .update({
           title: data.title,
           sponsor_name: data.sponsor_name,
+          start_date: data.start_date ? format(data.start_date, 'yyyy-MM-dd') : null,
+          end_date: data.end_date ? format(data.end_date, 'yyyy-MM-dd') : null,
           observations: data.observations || null,
         })
         .eq('id', project.id);
@@ -145,6 +159,80 @@ export function EditThematicProjectDialog({
                 </FormItem>
               )}
             />
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="start_date"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Data de Início</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full pl-3 text-left font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value ? format(field.value, "dd/MM/yyyy", { locale: ptBR }) : <span>Selecionar</span>}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value ?? undefined}
+                          onSelect={field.onChange}
+                          initialFocus
+                          className={cn("p-3 pointer-events-auto")}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="end_date"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Data de Término</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full pl-3 text-left font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value ? format(field.value, "dd/MM/yyyy", { locale: ptBR }) : <span>Selecionar</span>}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value ?? undefined}
+                          onSelect={field.onChange}
+                          initialFocus
+                          className={cn("p-3 pointer-events-auto")}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <FormField
               control={form.control}
