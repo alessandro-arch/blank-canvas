@@ -118,6 +118,7 @@ export default function ThematicProjectDetail() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [generatingExecPdf, setGeneratingExecPdf] = useState(false);
 
   // Fetch thematic project
   const { data: thematicProject, isLoading: loadingThematic } = useQuery({
@@ -310,6 +311,38 @@ export default function ThematicProjectDetail() {
     }
   };
 
+  const handleGenerateExecutivePdf = async () => {
+    if (generatingExecPdf || !id) return;
+    setGeneratingExecPdf(true);
+    const toastId = toast.loading('Gerando relatório executivo...');
+    const newWindow = window.open('about:blank', '_blank');
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Não autenticado');
+
+      const res = await supabase.functions.invoke('generate-executive-report-pdf', {
+        body: { projeto_id: id },
+      });
+
+      if (res.error) throw res.error;
+      const { signedUrl } = res.data as { signedUrl: string };
+
+      if (newWindow) {
+        newWindow.location.href = signedUrl;
+      } else {
+        toast.error('Permita pop-ups no navegador para visualizar o arquivo');
+      }
+      toast.success('Relatório executivo gerado com sucesso', { id: toastId });
+    } catch (err: any) {
+      console.error('Executive PDF error:', err);
+      newWindow?.close();
+      toast.error(err?.message || 'Erro ao gerar relatório executivo', { id: toastId });
+    } finally {
+      setGeneratingExecPdf(false);
+    }
+  };
+
   const handleExport = () => {
     if (!filteredProjects?.length) return;
     
@@ -434,7 +467,7 @@ export default function ThematicProjectDetail() {
                   Visualize e gerencie os subprojetos vinculados
                 </p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Button 
                   variant="outline" 
                   onClick={handleGenerateProjectPdf} 
@@ -446,6 +479,19 @@ export default function ThematicProjectDetail() {
                     <FileText className="h-4 w-4 mr-2" />
                   )}
                   {generatingPdf ? 'Gerando...' : 'Relatório PDF'}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={handleGenerateExecutivePdf} 
+                  disabled={generatingExecPdf || !thematicProject}
+                  className="border-primary text-primary hover:bg-primary/10"
+                >
+                  {generatingExecPdf ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <FileText className="h-4 w-4 mr-2" />
+                  )}
+                  {generatingExecPdf ? 'Gerando...' : 'Relatório Executivo'}
                 </Button>
                 <Button variant="outline" onClick={handleExport} disabled={!filteredProjects?.length}>
                   <Download className="h-4 w-4 mr-2" />

@@ -703,9 +703,12 @@ export type Database = {
           is_active: boolean
           logo_url: string | null
           name: string
+          primary_color: string | null
+          secondary_color: string | null
           settings: Json | null
           slug: string
           updated_at: string
+          watermark_url: string | null
         }
         Insert: {
           created_at?: string
@@ -714,9 +717,12 @@ export type Database = {
           is_active?: boolean
           logo_url?: string | null
           name: string
+          primary_color?: string | null
+          secondary_color?: string | null
           settings?: Json | null
           slug: string
           updated_at?: string
+          watermark_url?: string | null
         }
         Update: {
           created_at?: string
@@ -725,9 +731,12 @@ export type Database = {
           is_active?: boolean
           logo_url?: string | null
           name?: string
+          primary_color?: string | null
+          secondary_color?: string | null
           settings?: Json | null
           slug?: string
           updated_at?: string
+          watermark_url?: string | null
         }
         Relationships: []
       }
