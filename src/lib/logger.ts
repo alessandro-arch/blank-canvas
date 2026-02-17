@@ -59,6 +59,7 @@ export function getRequestIdFromHeaders(headers: Headers): string {
 
 /**
  * Invoke a Supabase edge function with automatic x-request-id header.
+ * Includes automatic session refresh and single retry on transient failures.
  * Returns the data or throws an error with request_id for tracing.
  */
 export async function tracedInvoke<T = Record<string, unknown>>(
@@ -70,22 +71,63 @@ export async function tracedInvoke<T = Record<string, unknown>>(
   const log = createLogger(component || functionName);
   const ctx = { requestId, component: component || functionName, action: functionName };
 
+  // Ensure session is valid before calling
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    log.warn("Session missing, attempting refresh", ctx);
+    const { error: refreshErr } = await supabase.auth.refreshSession();
+    if (refreshErr) {
+      log.error("Session refresh failed", ctx, refreshErr);
+      const err = new Error("Sessão expirada. Faça login novamente.");
+      (err as any).requestId = requestId;
+      throw err;
+    }
+  }
+
+  const invoke = async () => {
+    const res = await supabase.functions.invoke(functionName, {
+      body,
+      headers: { "x-request-id": requestId },
+    });
+    return res;
+  };
+
   log.info(`Invoking ${functionName}`, ctx);
 
-  const res = await supabase.functions.invoke(functionName, {
-    body,
-    headers: { "x-request-id": requestId },
-  });
+  let res = await invoke();
+
+  // Retry once on transient "Failed to send" errors (network/CORS/session)
+  if (res.error && isTransientError(res.error)) {
+    log.warn(`Transient error on ${functionName}, retrying after session refresh`, ctx);
+    await supabase.auth.refreshSession();
+    // Small delay to let the refreshed token propagate
+    await new Promise((r) => setTimeout(r, 500));
+    res = await invoke();
+  }
 
   if (res.error) {
     log.error(`${functionName} failed`, ctx, res.error);
     const err = new Error(res.error.message || `Erro ao chamar ${functionName}`);
     (err as any).requestId = requestId;
+    (err as any).isTransient = isTransientError(res.error);
     throw err;
   }
 
   log.info(`${functionName} succeeded`, ctx);
   return { data: res.data as T, requestId };
+}
+
+/** Check if an error is transient (network/CORS/session) and worth retrying */
+function isTransientError(error: any): boolean {
+  const msg = (error?.message || error?.msg || "").toLowerCase();
+  return (
+    msg.includes("failed to send") ||
+    msg.includes("failed to fetch") ||
+    msg.includes("networkerror") ||
+    msg.includes("load failed") ||
+    msg.includes("cors") ||
+    msg.includes("timeout")
+  );
 }
 
 /**
@@ -95,7 +137,14 @@ export async function tracedInvoke<T = Record<string, unknown>>(
 export function friendlyError(err: unknown, fallback = "Ocorreu um erro inesperado."): string {
   const msg = err instanceof Error ? err.message : fallback;
   const rid = (err as any)?.requestId;
-  return rid ? `${msg} (ref: ${rid})` : msg;
+  const isTransient = (err as any)?.isTransient;
+
+  let displayMsg = msg;
+  if (isTransient || msg.toLowerCase().includes("failed to send") || msg.toLowerCase().includes("failed to fetch")) {
+    displayMsg = "Conexão instável ou sessão expirada. Recarregue a página e tente novamente.";
+  }
+
+  return rid ? `${displayMsg} (ref: ${rid})` : displayMsg;
 }
 
 export { generateRequestId };
