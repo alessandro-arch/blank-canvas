@@ -215,6 +215,11 @@ const App = () => (
                   <Organizations />
                 </AdminProtectedRoute>
               } />
+              <Route path="/admin/configuracoes" element={
+                <AdminProtectedRoute>
+                  <Settings />
+                </AdminProtectedRoute>
+              } />
               
               {/* Legacy routes - redirect to new paths */}
               <Route path="/painel-gestor" element={<Navigate to="/admin/dashboard" replace />} />
