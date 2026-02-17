@@ -337,6 +337,27 @@ async function buildConsolidatedPdf(data: ConsolidatedData): Promise<Uint8Array>
     page.drawText(t, { x, y: yy, size, font: f, color });
   };
 
+  // Word-wrap text into lines that fit within maxWidth
+  const wrapText = (text: string, size: number, maxWidth: number, f = font): string[] => {
+    const charWidth = size * 0.48;
+    const maxChars = Math.floor(maxWidth / charWidth);
+    if (text.length <= maxChars) return [text];
+    const words = text.split(" ");
+    const lines: string[] = [];
+    let current = "";
+    for (const word of words) {
+      const test = current ? `${current} ${word}` : word;
+      if (test.length > maxChars && current) {
+        lines.push(current);
+        current = word;
+      } else {
+        current = test;
+      }
+    }
+    if (current) lines.push(current);
+    return lines;
+  };
+
   const line = (yy: number, thick = 0.5) => {
     page.drawLine({ start: { x: M, y: yy }, end: { x: W - M, y: yy }, thickness: thick, color: rgb(0.78, 0.78, 0.78) });
   };
@@ -413,32 +434,52 @@ async function buildConsolidatedPdf(data: ConsolidatedData): Promise<Uint8Array>
   // ═══ SEÇÃO 2: Subprojetos ═══
   sectionTitle("SUBPROJETOS VINCULADOS", "2");
 
-  // Table header
+  // Table header — fixed column widths
+  // Código:80 Bolsista:150 Orientador:150 Modalidade:120 Valor:80 Início:70 Fim:70 Status:60
   check(LH * 2);
-  const cols = [M, M + 75, M + 220, M + 365, M + 480, M + 570, M + 660, M + 720];
-  txt("CODIGO", cols[0], y, 7, fontBold, rgb(0.5, 0.5, 0.55));
-  txt("BOLSISTA", cols[1], y, 7, fontBold, rgb(0.5, 0.5, 0.55));
-  txt("ORIENTADOR", cols[2], y, 7, fontBold, rgb(0.5, 0.5, 0.55));
-  txt("MODALIDADE", cols[3], y, 7, fontBold, rgb(0.5, 0.5, 0.55));
-  txt("VALOR", cols[4], y, 7, fontBold, rgb(0.5, 0.5, 0.55));
-  txt("INICIO", cols[5], y, 7, fontBold, rgb(0.5, 0.5, 0.55));
-  txt("FIM", cols[6], y, 7, fontBold, rgb(0.5, 0.5, 0.55));
-  txt("STATUS", cols[7], y, 7, fontBold, rgb(0.5, 0.5, 0.55));
+  const colWidths = [80, 150, 150, 120, 80, 70, 70, 60];
+  const cols: number[] = [];
+  let cx = M;
+  for (const w of colWidths) { cols.push(cx); cx += w; }
+  const headers = ["CODIGO", "BOLSISTA", "ORIENTADOR", "MODALIDADE", "VALOR", "INICIO", "FIM", "STATUS"];
+  for (let i = 0; i < headers.length; i++) {
+    txt(headers[i], cols[i] + 4, y, 7, fontBold, rgb(0.5, 0.5, 0.55));
+  }
   y -= 4;
   line(y);
   y -= LH - 2;
 
+  const fontSize = 8;
+  const cellPadY = 4;
+
   for (const row of data.subRows) {
-    check(LH + 2);
-    txt(row.code, cols[0], y, 8);
-    txt(row.scholar, cols[1], y, 8);
-    txt(row.orientador, cols[2], y, 8);
-    txt(row.modalidade, cols[3], y, 8);
-    txt(fmtCur(row.valor), cols[4], y, 8);
-    txt(fmtDate(row.inicio), cols[5], y, 8);
-    txt(fmtDate(row.fim), cols[6], y, 8);
-    txt(sLabel(row.status), cols[7], y, 8);
-    y -= LH;
+    // Calculate the max lines needed (mainly for modalidade)
+    const cellTexts = [
+      row.code, row.scholar, row.orientador, row.modalidade,
+      fmtCur(row.valor), fmtDate(row.inicio), fmtDate(row.fim), sLabel(row.status),
+    ];
+    const cellLines = cellTexts.map((t, i) => wrapText(t, fontSize, colWidths[i] - 8));
+    const maxLines = Math.max(...cellLines.map(l => l.length));
+    const rowHeight = maxLines * (LH - 2) + cellPadY * 2;
+
+    check(rowHeight + 2);
+
+    // Draw each cell's wrapped lines
+    for (let i = 0; i < cellLines.length; i++) {
+      for (let j = 0; j < cellLines[i].length; j++) {
+        page.drawText(cellLines[i][j], {
+          x: cols[i] + 4,
+          y: y - j * (LH - 2),
+          size: fontSize,
+          font,
+          color: rgb(0.1, 0.1, 0.12),
+        });
+      }
+    }
+
+    y -= rowHeight;
+    // Separator line
+    line(y + cellPadY - 1, 0.3);
   }
 
   if (data.subRows.length === 0) {
