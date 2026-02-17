@@ -11,11 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { format, subDays, subMonths } from "date-fns";
+import { format, subDays, subMonths, differenceInMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   FileText, DollarSign, XCircle, Users, Calendar,
   AlertTriangle, ArrowRight, TrendingUp, BarChart3,
+  Wallet, ArrowUpDown, Percent, PiggyBank,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
@@ -136,6 +137,47 @@ const ExecutiveDashboard = () => {
         totalPaid,
         chartData: chartMonths,
       };
+    },
+  });
+
+  // Scholarship financial indicators query
+  const { data: bolsasData, isLoading: bolsasLoading } = useQuery({
+    queryKey: ["executive-bolsas-financials"],
+    staleTime: 2 * 60 * 1000,
+    queryFn: async () => {
+      // 1. Fetch all active thematic projects with dates
+      const { data: thematicProjects } = await supabase
+        .from("thematic_projects")
+        .select("id, start_date, end_date, status");
+
+      // 2. Fetch all active subprojects
+      const { data: projects } = await supabase
+        .from("projects")
+        .select("id, thematic_project_id, valor_mensal, status")
+        .eq("status", "active");
+
+      // 3. Calculate estimated: sum of (monthly_total * project_duration) per thematic project
+      let valorEstimado = 0;
+      if (thematicProjects && projects) {
+        for (const tp of thematicProjects) {
+          if (!tp.start_date || !tp.end_date) continue;
+          const months = Math.max(1, differenceInMonths(new Date(tp.end_date), new Date(tp.start_date)) + 1);
+          const monthlyTotal = projects
+            .filter(p => p.thematic_project_id === tp.id)
+            .reduce((sum, p) => sum + (p.valor_mensal || 0), 0);
+          valorEstimado += monthlyTotal * months;
+        }
+      }
+
+      // 4. Calculate attributed: sum of all paid payments
+      const { data: paidPayments } = await supabase
+        .from("payments")
+        .select("amount")
+        .eq("status", "paid");
+
+      const valorAtribuido = paidPayments?.reduce((sum, p) => sum + Number(p.amount), 0) ?? 0;
+
+      return { valorEstimado, valorAtribuido };
     },
   });
 
@@ -260,6 +302,53 @@ const ExecutiveDashboard = () => {
                   </Card>
                 ))}
               </div>
+
+              {/* Gestão de Bolsas */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Wallet className="h-5 w-5 text-primary" />
+                    Gestão de Bolsas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {bolsasLoading ? (
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                      {Array.from({ length: 4 }).map((_, i) => (
+                        <Skeleton key={i} className="h-24 w-full" />
+                      ))}
+                    </div>
+                  ) : (() => {
+                    const est = bolsasData?.valorEstimado ?? 0;
+                    const atr = bolsasData?.valorAtribuido ?? 0;
+                    const dif = est - atr;
+                    const pct = est > 0 ? (atr / est) * 100 : 0;
+
+                    const items = [
+                      { label: "Valor Estimado", value: formatCurrency(est), icon: TrendingUp, colorClass: "text-primary bg-primary/10" },
+                      { label: "Total Pago", value: formatCurrency(atr), icon: PiggyBank, colorClass: "text-success bg-success/10" },
+                      { label: "Diferença", value: `${dif >= 0 ? "+" : ""}${formatCurrency(dif)}`, icon: ArrowUpDown, colorClass: dif >= 0 ? "text-success bg-success/10" : "text-destructive bg-destructive/10" },
+                      { label: "% Executado", value: `${pct.toFixed(1)}%`, icon: Percent, colorClass: pct <= 100 ? "text-primary bg-primary/10" : "text-destructive bg-destructive/10" },
+                    ];
+
+                    return (
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        {items.map((item) => (
+                          <div key={item.label} className="border rounded-lg p-4 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", item.colorClass)}>
+                                <item.icon className="w-4 h-4" />
+                              </div>
+                              <span className="text-xs font-medium text-muted-foreground">{item.label}</span>
+                            </div>
+                            <p className="text-xl font-bold text-foreground">{item.value}</p>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
 
               {/* Chart placeholder + Alerts side by side */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
