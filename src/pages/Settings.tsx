@@ -7,10 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useTheme } from "@/contexts/ThemeContext";
 import { useUserRole } from "@/hooks/useUserRole";
 import { OrgSettingsTab } from "@/components/settings/OrgSettingsTab";
-import { Sun, Moon, Monitor, PanelLeft, PanelLeftClose, MousePointerClick, Maximize, Minimize } from "lucide-react";
+import { Sun, Moon, PanelLeft, PanelLeftClose, MousePointerClick, Maximize, Minimize } from "lucide-react";
 
 export default function Settings() {
-  const { settings, updateSettings, loading } = useTheme();
+  const { theme, setTheme, settings, updateSettings, loading } = useTheme();
   const { hasManagerAccess } = useUserRole();
 
   return (
@@ -41,24 +41,23 @@ export default function Settings() {
                     <CardDescription>Escolha o modo de aparência da interface.</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 gap-3">
                       {[
-                        { value: "light", label: "Claro", icon: Sun },
-                        { value: "dark", label: "Escuro", icon: Moon },
-                        { value: "system", label: "Sistema", icon: Monitor },
+                        { value: "light" as const, label: "Claro", icon: Sun },
+                        { value: "dark" as const, label: "Escuro", icon: Moon },
                       ].map(({ value, label, icon: Icon }) => (
                         <button
                           key={value}
-                          onClick={() => updateSettings({ theme_mode: value as any })}
+                          onClick={() => setTheme(value)}
                           className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
-                            settings.theme_mode === value
+                            theme === value
                               ? "border-primary bg-primary/5"
                               : "border-border hover:border-muted-foreground/30"
                           }`}
                           disabled={loading}
                         >
-                          <Icon className={`w-6 h-6 ${settings.theme_mode === value ? "text-primary" : "text-muted-foreground"}`} />
-                          <span className={`text-sm font-medium ${settings.theme_mode === value ? "text-primary" : "text-muted-foreground"}`}>
+                          <Icon className={`w-6 h-6 ${theme === value ? "text-primary" : "text-muted-foreground"}`} />
+                          <span className={`text-sm font-medium ${theme === value ? "text-primary" : "text-muted-foreground"}`}>
                             {label}
                           </span>
                         </button>
