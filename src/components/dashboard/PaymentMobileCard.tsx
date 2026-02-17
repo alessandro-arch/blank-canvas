@@ -100,19 +100,19 @@ export function PaymentMobileCard({ scholar, onMarkAsPaid, onAttachReceipt, onSe
 
         {/* Actions */}
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={() => setDetailOpen(true)}>
-            <Eye className="w-3.5 h-3.5 mr-1" />
+          <Button variant="outline" size="sm" className="flex-1 min-h-[44px] text-sm" onClick={() => setDetailOpen(true)}>
+            <Eye className="w-4 h-4 mr-1.5" />
             Ver detalhes
           </Button>
           {payment?.status === "eligible" && (
-            <Button size="sm" className="flex-1 text-xs" onClick={() => onMarkAsPaid(payment, scholar)}>
-              <CheckCircle className="w-3.5 h-3.5 mr-1" />
+            <Button size="sm" className="flex-1 min-h-[44px] text-sm" onClick={() => onMarkAsPaid(payment, scholar)}>
+              <CheckCircle className="w-4 h-4 mr-1.5" />
               Pagar
             </Button>
           )}
           {payment?.status === "paid" && (
-            <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={() => onAttachReceipt(payment, scholar)}>
-              <Paperclip className="w-3.5 h-3.5 mr-1" />
+            <Button variant="outline" size="sm" className="flex-1 min-h-[44px] text-sm" onClick={() => onAttachReceipt(payment, scholar)}>
+              <Paperclip className="w-4 h-4 mr-1.5" />
               Comprovante
             </Button>
           )}

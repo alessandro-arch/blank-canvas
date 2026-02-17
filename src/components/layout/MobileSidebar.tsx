@@ -18,7 +18,7 @@ export function MobileSidebar() {
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <button
-          className="p-2 rounded-lg hover:bg-muted transition-colors"
+          className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-muted transition-colors"
           aria-label="Abrir menu de navegação"
         >
           <Menu className="w-6 h-6 text-foreground" />

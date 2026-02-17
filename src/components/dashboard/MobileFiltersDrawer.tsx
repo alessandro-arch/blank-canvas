@@ -65,14 +65,14 @@ export function MobileFiltersDrawer({
         <SheetFooter className="flex-row gap-2 pt-2">
           <Button
             variant="outline"
-            className="flex-1"
+            className="flex-1 min-h-[44px]"
             onClick={handleClear}
           >
             <X className="h-4 w-4 mr-2" />
             Limpar
           </Button>
           <Button
-            className="flex-1"
+            className="flex-1 min-h-[44px]"
             onClick={handleApply}
           >
             Aplicar
