@@ -252,14 +252,20 @@ function InstallmentActions({ installment, onRefresh }: InstallmentActionsProps)
               <>
                 <DropdownMenuItem 
                   className="gap-2"
-                  onSelect={() => openReportPdf(installment.reportFileUrl!)}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    openReportPdf(installment.reportFileUrl!);
+                  }}
                 >
                   <Eye className="w-4 h-4" />
                   Visualizar PDF
                 </DropdownMenuItem>
                 <DropdownMenuItem 
                   className="gap-2"
-                  onSelect={() => downloadReportPdf(installment.reportFileUrl!, `relatorio_${installment.referenceMonthRaw}.pdf`)}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    downloadReportPdf(installment.reportFileUrl!, `relatorio_${installment.referenceMonthRaw}.pdf`);
+                  }}
                 >
                   <Download className="w-4 h-4" />
                   Baixar relatório
@@ -315,7 +321,10 @@ function InstallmentActions({ installment, onRefresh }: InstallmentActionsProps)
                 <DropdownMenuSeparator />
                 <DropdownMenuItem 
                   className="gap-2"
-                  onSelect={() => downloadPaymentReceipt(installment.receiptUrl!, `comprovante_${installment.referenceMonthRaw}.pdf`)}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    downloadPaymentReceipt(installment.receiptUrl!, `comprovante_${installment.referenceMonthRaw}.pdf`);
+                  }}
                 >
                   <Download className="w-4 h-4" />
                   Baixar comprovante
