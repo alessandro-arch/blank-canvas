@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
+import { ErrorState, EmptyState, LoadingSkeleton } from "@/components/ui/MobileStateDisplays";
 import { useQuery } from "@tanstack/react-query";
 import {
   DollarSign,
@@ -109,7 +110,7 @@ export function PaymentsManagement() {
     setPeriodRange(range);
   }, []);
 
-  const { data, isLoading, isFetching, refetch } = useQuery({
+  const { data, isLoading, isFetching, error: queryError, refetch } = useQuery({
     queryKey: ['payments-management-v2'],
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
@@ -658,25 +659,41 @@ export function PaymentsManagement() {
 
         {/* Scholar Table / Mobile Cards */}
         <div className={cn(!isMobile && "rounded-lg border overflow-hidden")}>
-          {isLoading ? (
-            <div className="p-6 space-y-4">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="flex gap-4 items-center">
-                  <Skeleton className="w-8 h-8 rounded-full" />
-                  <div className="flex-1 space-y-1">
-                    <Skeleton className="h-4 w-40" />
-                    <Skeleton className="h-3 w-24" />
+          {queryError ? (
+            <ErrorState
+              message="Não foi possível carregar os pagamentos."
+              onRetry={() => refetch()}
+            />
+          ) : isLoading ? (
+            isMobile ? (
+              <LoadingSkeleton rows={4} variant="card" />
+            ) : (
+              <div className="p-6 space-y-4">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="flex gap-4 items-center">
+                    <Skeleton className="w-8 h-8 rounded-full" />
+                    <div className="flex-1 space-y-1">
+                      <Skeleton className="h-4 w-40" />
+                      <Skeleton className="h-3 w-24" />
+                    </div>
+                    <Skeleton className="h-6 w-20" />
+                    <Skeleton className="h-4 w-20" />
                   </div>
-                  <Skeleton className="h-6 w-20" />
-                  <Skeleton className="h-4 w-20" />
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )
           ) : filteredScholars.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <DollarSign className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="text-sm">Nenhum bolsista encontrado para os filtros selecionados</p>
-            </div>
+            <EmptyState
+              icon={<DollarSign className="w-7 h-7 text-muted-foreground" />}
+              title="Nenhum pagamento encontrado"
+              description="Nenhum bolsista corresponde aos filtros selecionados."
+              onClearFilters={() => {
+                setSearchTerm("");
+                setStatusFilter("all");
+                handleStatusFilterChange("all");
+                setThematicFilter("all");
+              }}
+            />
           ) : isMobile ? (
             <div className="space-y-3">
               {filteredScholars.map(scholar => (

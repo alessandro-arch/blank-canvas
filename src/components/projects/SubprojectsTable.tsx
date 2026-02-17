@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/MobileStateDisplays';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Table,
@@ -51,13 +52,17 @@ interface SubprojectsTableProps {
   thematicProjectId: string;
   selectedMonth: string;
   onRefresh: () => void;
+  isLoading?: boolean;
+  error?: Error | null;
 }
 
 export function SubprojectsTable({ 
   subprojects, 
   thematicProjectId,
   selectedMonth,
-  onRefresh 
+  onRefresh,
+  isLoading = false,
+  error = null,
 }: SubprojectsTableProps) {
   const queryClient = useQueryClient();
   const { hasManagerAccess, isAdmin } = useUserRole();
@@ -209,11 +214,38 @@ export function SubprojectsTable({
     updated_at: subproject.updated_at,
   });
 
+  if (error) {
+    return (
+      <ErrorState
+        message="Não foi possível carregar os subprojetos."
+        onRetry={onRefresh}
+      />
+    );
+  }
+
+  if (isLoading) {
+    return isMobile ? (
+      <LoadingSkeleton rows={3} variant="card" />
+    ) : (
+      <div className="p-6 space-y-4">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="flex gap-4 items-center">
+            <div className="flex-1 space-y-1">
+              <div className="h-4 w-40 bg-muted animate-pulse rounded" />
+              <div className="h-3 w-24 bg-muted animate-pulse rounded" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   if (subprojects.length === 0) {
     return (
-      <div className="text-center py-8 text-muted-foreground border rounded-lg">
-        Nenhum subprojeto cadastrado neste projeto temático.
-      </div>
+      <EmptyState
+        title="Nenhum subprojeto cadastrado"
+        description="Este projeto temático ainda não possui subprojetos cadastrados."
+      />
     );
   }
 
