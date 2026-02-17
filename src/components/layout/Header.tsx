@@ -16,12 +16,16 @@ import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { Button } from "@/components/ui/button";
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { MobileSidebar } from "./MobileSidebar";
+
 export function Header() {
   const { user, signOut } = useAuth();
   const { hasManagerAccess, role } = useUserRole();
   const navigate = useNavigate();
   const { avatarUrl, uploading, uploadAvatar, refreshAvatar } = useAvatarUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     refreshAvatar();
@@ -46,30 +50,32 @@ export function Header() {
     if (file) {
       await uploadAvatar(file);
     }
-    // Reset input
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   };
 
   return (
-    <header className="h-16 bg-card border-b border-border px-6 flex items-center justify-between">
-      {/* Search */}
-      <div className="relative w-96">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input 
-          placeholder="Buscar bolsistas, bolsas, documentos..." 
-          className="pl-10 bg-muted/50 border-0 focus-visible:ring-1"
-        />
+    <header className="h-16 bg-card border-b border-border px-4 md:px-6 flex items-center justify-between">
+      {/* Left side: hamburger on mobile, search on desktop */}
+      <div className="flex items-center gap-3">
+        {isMobile && <MobileSidebar />}
+        <div className={cn("relative", isMobile ? "hidden" : "w-96")}>
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar bolsistas, bolsas, documentos..."
+            className="pl-10 bg-muted/50 border-0 focus-visible:ring-1"
+          />
+        </div>
       </div>
 
       {/* Right side */}
-      <div className="flex items-center gap-4">
-        {/* Change Password */}
+      <div className="flex items-center gap-2 md:gap-4">
+        {/* Change Password — hidden on mobile */}
         <Button
           variant="outline"
           size="sm"
-          className="gap-2"
+          className="gap-2 hidden md:inline-flex"
           onClick={() => navigate("/alterar-senha")}
         >
           <KeyRound className="w-4 h-4" />
@@ -89,7 +95,7 @@ export function Header() {
                   {getInitials(user?.email || "")}
                 </AvatarFallback>
               </Avatar>
-              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              <ChevronDown className="w-4 h-4 text-muted-foreground hidden md:block" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
@@ -120,30 +126,27 @@ export function Header() {
                 </p>
                 <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
                 <div className="flex items-center gap-1.5 mt-1">
-                  <span className={cn(
-                    "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold",
-                    hasManagerAccess 
-                      ? "bg-primary text-primary-foreground" 
-                      : "bg-info text-white"
-                  )}>
-                    {hasManagerAccess ? (
-                      <Shield className="w-3 h-3" />
-                    ) : (
-                      <User className="w-3 h-3" />
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold",
+                      hasManagerAccess ? "bg-primary text-primary-foreground" : "bg-info text-white"
                     )}
+                  >
+                    {hasManagerAccess ? <Shield className="w-3 h-3" /> : <User className="w-3 h-3" />}
                     {getRoleLabel()}
                   </span>
                 </div>
               </div>
             </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="hidden"
-            />
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
             <DropdownMenuSeparator />
+            {/* Mobile-only: change password link */}
+            {isMobile && (
+              <DropdownMenuItem onClick={() => navigate("/alterar-senha")}>
+                <KeyRound className="w-4 h-4 mr-2" />
+                Alterar senha
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive">
               <LogOut className="w-4 h-4 mr-2" />
               Sair
