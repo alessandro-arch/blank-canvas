@@ -144,13 +144,13 @@ export function SidebarContent({ collapsed, onToggleCollapse, isMobile }: Sideba
       )}
 
       {/* Main Navigation */}
-      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+      <nav className={cn("flex-1 p-3 overflow-y-auto", isMobile ? "space-y-1.5" : "space-y-1")}>
         {filteredNavigation.map((item, index) => {
           const isActive = location.pathname === item.href;
           const prevItem = filteredNavigation[index - 1];
           const showSectionHeader = item.section && (!prevItem || prevItem.section !== item.section);
 
-          const linkClasses = cn("nav-item", isActive && "active", collapsed && "justify-center px-2");
+          const linkClasses = cn("nav-item", isActive && "active", collapsed && "justify-center px-2", isMobile && "py-3.5 gap-4");
 
           return (
             <div key={item.name}>
@@ -188,14 +188,14 @@ export function SidebarContent({ collapsed, onToggleCollapse, isMobile }: Sideba
 
       {/* Secondary Navigation (footer) */}
       {secondaryNavigation.length > 0 && (
-        <div className="p-3 border-t border-border space-y-1">
+        <div className={cn("p-3 border-t border-border", isMobile ? "space-y-1.5" : "space-y-1")}>
           {secondaryNavigation.map((item) => {
             const isActive = location.pathname === item.href;
             return (
               <Link
                 key={item.name}
                 to={item.href}
-                className={cn("nav-item", isActive && "active", collapsed && "justify-center px-2")}
+                className={cn("nav-item", isActive && "active", collapsed && "justify-center px-2", isMobile && "py-3.5 gap-4")}
                 title={collapsed ? item.name : undefined}
               >
                 <item.icon className="w-5 h-5 flex-shrink-0" />
