@@ -248,7 +248,7 @@ export function FinancialInfoSection({
             <div className="border rounded-lg p-4 space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-xs text-muted-foreground">
-                  Valor Total Atribuído com Bolsas
+                  Total Pago em Bolsas
                 </Label>
                 {editing && (
                   <Select
