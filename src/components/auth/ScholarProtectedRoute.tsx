@@ -42,5 +42,5 @@ export function ScholarProtectedRoute({ children }: ScholarProtectedRouteProps) 
     return <Navigate to="/acesso-negado" replace />;
   }
 
-  return <ThemeProvider>{children}</ThemeProvider>;
+  return <ThemeProvider forceTheme="light">{children}</ThemeProvider>;
 }
