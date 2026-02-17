@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import {
   Select,
   SelectContent,
@@ -375,6 +376,7 @@ export default function FinancialManagement() {
                       label="Teto do Projeto"
                       value={formatCurrency(agg.tetoProjeto)}
                       subtitle="Valor aprovado pelo financiador"
+                      tooltip="Limite financeiro real aprovado em contrato pelo financiador. Todos os indicadores de execução são calculados sobre este valor."
                       iconColor="text-primary"
                     />
                     <KPICard
@@ -382,6 +384,7 @@ export default function FinancialManagement() {
                       label="Teto em Bolsas"
                       value={formatCurrency(agg.tetoBolsas)}
                       subtitle={`${agg.percentComprometido.toFixed(1)}% do teto do projeto`}
+                      tooltip="Limite total de investimento em capital humano (bolsas). Calculado pela soma mensal das bolsas ativas × duração do projeto."
                       iconColor="text-primary"
                     >
                       <Progress value={Math.min(agg.percentComprometido, 100)} className="mt-2 h-1.5" />
@@ -391,6 +394,7 @@ export default function FinancialManagement() {
                       label="Encargos Previstos"
                       value={formatCurrency(agg.encargosPrevistos)}
                       subtitle={`ISS: ${formatCurrency(agg.totalImpostos)} · Tx. Adm.: ${formatCurrency(agg.totalTaxaAdmin)}`}
+                      tooltip="Custos tributários e administrativos previstos no contrato (ISS + Taxa Administrativa). Não reduzem o teto do projeto e não geram risco financeiro."
                       iconColor="text-muted-foreground"
                     />
                     <KPICard
@@ -398,6 +402,7 @@ export default function FinancialManagement() {
                       label="Custo Operacional Bruto"
                       value={formatCurrency(agg.custoOperacionalBruto)}
                       subtitle="Teto + Encargos (informativo)"
+                      tooltip="Soma do teto do projeto com os encargos previstos. Valor apenas informativo que representa o custo total da operação para o financiador."
                       iconColor="text-muted-foreground"
                     />
                   </div>
@@ -634,13 +639,14 @@ interface KPICardProps {
   label: string;
   value: string;
   subtitle?: string;
+  tooltip?: string;
   iconColor?: string;
   valueColor?: string;
   children?: React.ReactNode;
 }
 
-function KPICard({ icon, label, value, subtitle, iconColor = 'text-primary', valueColor, children }: KPICardProps) {
-  return (
+function KPICard({ icon, label, value, subtitle, tooltip, iconColor = 'text-primary', valueColor, children }: KPICardProps) {
+  const content = (
     <Card>
       <CardContent className="p-4 md:p-5">
         <div className="flex items-start gap-3">
@@ -657,4 +663,19 @@ function KPICard({ icon, label, value, subtitle, iconColor = 'text-primary', val
       </CardContent>
     </Card>
   );
+
+  if (tooltip) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div>{content}</div>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" className="max-w-[250px] text-xs">
+          {tooltip}
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return content;
 }
