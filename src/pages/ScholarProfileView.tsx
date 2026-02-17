@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getModalityLabel } from "@/lib/modality-labels";
-import { tracedInvoke, friendlyError } from "@/lib/logger";
+import { tracedInvokeWithPolling, friendlyError } from "@/lib/logger";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { PdfReadyDialog } from "@/components/ui/PdfReadyDialog";
 import type { Database } from "@/integrations/supabase/types";
@@ -225,7 +225,7 @@ const ScholarProfileView = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Não autenticado');
 
-      const { data } = await tracedInvoke<{ signedUrl: string }>(
+      const { data } = await tracedInvokeWithPolling<{ signedUrl: string }>(
         'generate-scholarship-pdf',
         { user_id: userId },
         'ScholarProfileView',

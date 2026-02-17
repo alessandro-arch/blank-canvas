@@ -340,7 +340,7 @@ export default function ThematicProjectDetail() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Não autenticado');
 
-      const { data } = await tracedInvoke<{ signedUrl: string }>(
+      const { data } = await tracedInvokeWithPolling<{ signedUrl: string }>(
         'generate-thematic-project-pdf',
         { thematic_project_id: id },
         'ThematicProjectDetail',

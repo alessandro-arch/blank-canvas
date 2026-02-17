@@ -20,7 +20,7 @@ function jsonResponse(body: Record<string, unknown>, status = 200) {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   const startTime = Date.now();
@@ -43,40 +43,44 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } =
-      await supabaseUser.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
+    if (userError || !user) {
       return jsonResponse({ error: "Token inválido" }, 401);
     }
-    const userId = claimsData.claims.sub as string;
+    const userId = user.id;
 
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    const db = createClient(supabaseUrl, supabaseServiceKey);
 
     // Check role
-    const { data: roles } = await supabaseAdmin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId);
-
+    const { data: roles } = await db.from("user_roles").select("role").eq("user_id", userId);
     const userRoles = (roles || []).map((r: any) => r.role);
     if (!userRoles.includes("admin") && !userRoles.includes("manager")) {
       return jsonResponse({ error: "Acesso restrito a gestores e administradores" }, 403);
     }
 
-    // ─── 2) Parse input ───
+    // ─── Parse input ───
     const body = await req.json();
+
+    // ─── STATUS CHECK MODE ───
+    if (body.job_id) {
+      const { data: log } = await db.from("pdf_logs").select("*").eq("id", body.job_id).maybeSingle();
+      if (!log) return jsonResponse({ error: "Job não encontrado" }, 404);
+      if (log.status === "processing") return jsonResponse({ status: "processing", jobId: body.job_id });
+      if (log.status === "error") return jsonResponse({ status: "error", error: log.error_message, jobId: body.job_id });
+      const { data: signedData } = await db.storage.from("relatorios").createSignedUrl(log.file_path, 900);
+      return jsonResponse({ status: "success", signedUrl: signedData?.signedUrl, jobId: body.job_id });
+    }
+
+    // ─── GENERATION MODE ───
     const bolsaId = body.bolsa_id;
     if (!bolsaId) {
       return jsonResponse({ error: "bolsa_id é obrigatório" }, 400);
     }
 
-    // ─── 3) Fetch all data ───
-
-    // Subproject
-    const { data: project, error: projectError } = await supabaseAdmin
+    // Quick check project exists
+    const { data: project, error: projectError } = await db
       .from("projects")
-      .select("*, thematic_projects(id, title, sponsor_name, status, start_date, end_date, organization_id)")
+      .select("id, thematic_project_id, thematic_projects(organization_id)")
       .eq("id", bolsaId)
       .maybeSingle();
 
@@ -84,298 +88,263 @@ serve(async (req) => {
       return jsonResponse({ error: "Subprojeto/bolsa não encontrado" }, 404);
     }
 
-    const thematic = project.thematic_projects as any;
-    const orgId = thematic?.organization_id || null;
+    const orgId = (project.thematic_projects as any)?.organization_id || null;
 
-    // Fetch organization branding
-    let orgBranding = { name: "Instituição", primary_color: "#1e3a5f", watermark_text: null as string | null, report_footer_text: null as string | null };
-    if (orgId) {
-      const { data: org } = await supabaseAdmin
-        .from("organizations")
-        .select("name, primary_color, watermark_text, report_footer_text")
-        .eq("id", orgId)
-        .maybeSingle();
-      if (org) {
-        orgBranding = {
-          name: org.name,
-          primary_color: org.primary_color || "#1e3a5f",
-          watermark_text: org.watermark_text || null,
-          report_footer_text: org.report_footer_text || null,
-        };
-      }
-    }
-    // Enrollment
-    const { data: enrollments } = await supabaseAdmin
-      .from("enrollments")
-      .select("*")
-      .eq("project_id", bolsaId)
-      .order("created_at", { ascending: false })
-      .limit(1);
-
-    const enrollment = enrollments?.[0] || null;
-
-    // Scholar profile
-    let scholarName = "Não atribuído";
-    let scholarEmail = "";
-    let institution: string | null = null;
-    let academicLevel: string | null = null;
-
-    if (enrollment) {
-      const { data: profile } = await supabaseAdmin
-        .from("profiles")
-        .select("full_name, email, institution, academic_level")
-        .eq("user_id", enrollment.user_id)
-        .maybeSingle();
-
-      if (profile) {
-        scholarName = profile.full_name || "Sem nome";
-        scholarEmail = profile.email || "";
-        institution = profile.institution;
-        academicLevel = profile.academic_level;
-      }
-    }
-
-    const scholarUserId = enrollment?.user_id || "00000000-0000-0000-0000-000000000000";
-
-    // Reports
-    const { data: reports } = await supabaseAdmin
-      .from("reports")
-      .select("id, reference_month, status, submitted_at, reviewed_at, installment_number")
-      .eq("user_id", scholarUserId)
-      .order("reference_month", { ascending: true });
-
-    // Payments
-    const { data: payments } = await supabaseAdmin
-      .from("payments")
-      .select("id, reference_month, status, amount, installment_number, paid_at")
-      .eq("enrollment_id", enrollment?.id || "00000000-0000-0000-0000-000000000000")
-      .order("reference_month", { ascending: true });
-
-    // Grant term
-    const { data: grantTerms } = await supabaseAdmin
-      .from("grant_terms")
-      .select("id, file_name, signed_at")
-      .eq("user_id", scholarUserId)
-      .order("created_at", { ascending: false })
-      .limit(1);
-
-    // ─── 4) Build template data ───
-
-    const reportList = reports || [];
-    const paymentList = payments || [];
-    const term = grantTerms?.[0] || null;
-
-    const approvedReports = reportList.filter((r: any) => r.status === "approved").length;
-    const pendingReports = reportList.filter((r: any) => ["under_review", "pending"].includes(r.status)).length;
-    const rejectedReports = reportList.filter((r: any) => r.status === "rejected").length;
-    const paidPayments = paymentList.filter((p: any) => p.status === "paid");
-    const totalPaid = paidPayments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
-    const pendingPayments = paymentList.filter((p: any) => ["pending", "eligible"].includes(p.status)).length;
-
-    // Conformidade: % of expected deliverables completed
-    const expectedDeliverables = enrollment?.total_installments || 1;
-    const completedDeliverables = approvedReports + (term ? 1 : 0);
-    const conformidade = Math.min(100, Math.round((completedDeliverables / (expectedDeliverables + 1)) * 100));
-
-    // Determine situação
-    let situacao = enrollment?.status || "active";
-    if (situacao === "active" && pendingReports > 0) {
-      situacao = "pending_report";
-    }
-
-    // Build eventos
-    const eventos: EventoProximo[] = [];
-    const today = new Date();
-
-    if (project.end_date) {
-      const endDate = new Date(project.end_date);
-      const daysToEnd = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-      if (daysToEnd <= 0) {
-        eventos.push({ tipo: "vigencia", descricao: "Vigência encerrada", data: project.end_date, urgencia: "critico" });
-      } else if (daysToEnd <= 30) {
-        eventos.push({ tipo: "vigencia", descricao: `Vigência encerra em ${daysToEnd} dia(s)`, data: project.end_date, urgencia: "critico" });
-      } else if (daysToEnd <= 90) {
-        eventos.push({ tipo: "vigencia", descricao: `Vigência encerra em ${daysToEnd} dia(s)`, data: project.end_date, urgencia: "atencao" });
-      }
-    }
-
-    if (pendingReports > 0) {
-      eventos.push({ tipo: "relatorio", descricao: `${pendingReports} relatório(s) aguardando revisão`, data: null, urgencia: "atencao" });
-    }
-    if (rejectedReports > 0) {
-      eventos.push({ tipo: "relatorio", descricao: `${rejectedReports} relatório(s) recusado(s) — aguardando reenvio`, data: null, urgencia: "critico" });
-    }
-    if (!term) {
-      eventos.push({ tipo: "alerta", descricao: "Termo de Outorga pendente de upload", data: null, urgencia: "atencao" });
-    }
-
-    // Build documentos
-    const documentos: DocumentoAnexo[] = [];
-    if (term) {
-      documentos.push({
-        nome: term.file_name,
-        tipo: "Termo de Outorga",
-        status: "anexado",
-        dataUpload: term.signed_at,
-        dataAssinatura: term.signed_at,
-      });
-    } else {
-      documentos.push({
-        nome: "Termo de Outorga",
-        tipo: "Termo de Outorga",
-        status: "pendente",
-        dataUpload: null,
-        dataAssinatura: null,
-      });
-    }
-
-    // Map reports and payments
-    const relatorioItems: RelatorioItem[] = reportList.map((r: any) => ({
-      competencia: r.reference_month,
-      parcela: r.installment_number,
-      status: r.status,
-      enviadoEm: r.submitted_at,
-      revisadoEm: r.reviewed_at,
-    }));
-
-    const pagamentoItems: PagamentoItem[] = paymentList.map((p: any) => ({
-      competencia: p.reference_month,
-      parcela: p.installment_number,
-      valor: Number(p.amount),
-      status: p.status,
-      pagoEm: p.paid_at,
-    }));
-
-    const reportId = crypto.randomUUID();
-    const bolsaUrl = `${appUrl}/projetos-tematicos/${project.thematic_project_id}`;
-
-    const templateData: RelatorioBolsaData = {
-      reportId,
-      generatedAt: new Date().toISOString(),
-      bolsaUrl,
-
-      financiador: thematic?.sponsor_name || "—",
-      projetoTematicoTitulo: thematic?.title || "—",
-      projetoTematicoStatus: thematic?.status || "—",
-      subprojetoCodigo: project.code,
-      subprojetoTitulo: project.title,
-      modalidade: project.modalidade_bolsa || "—",
-      valorMensal: project.valor_mensal,
-      vigenciaInicio: project.start_date,
-      vigenciaFim: project.end_date,
-      coordenadorTecnico: project.coordenador_tecnico_icca,
-
-      bolsistaNome: scholarName,
-      bolsistaEmail: scholarEmail,
-      orientador: project.orientador,
-      instituicao: institution,
-      nivelAcademico: academicLevel,
-
-      situacao,
-      enrollmentStartDate: enrollment?.start_date || null,
-      enrollmentEndDate: enrollment?.end_date || null,
-      totalParcelas: enrollment?.total_installments || 0,
-
-      eventos,
-
-      indicadores: {
-        totalRelatorios: reportList.length,
-        relatoriosAprovados: approvedReports,
-        relatoriosPendentes: pendingReports,
-        relatoriosRecusados: rejectedReports,
-        totalPagamentos: paymentList.length,
-        pagamentosRealizados: paidPayments.length,
-        pagamentosPendentes: pendingPayments,
-        totalPago: totalPaid,
-        termoOutorgaAnexado: !!term,
-        conformidade,
-      },
-
-      documentos,
-      relatorios: relatorioItems,
-      pagamentos: pagamentoItems,
-    };
-
-    // ─── 5) Render HTML ───
-    const html = renderRelatorioBolsaHtml(templateData);
-
-    // ─── 6) Convert HTML to PDF with pdf-lib ───
-    // Since Deno edge functions can't run a browser engine,
-    // we build a structured PDF from the same data using pdf-lib.
-    const pdfBytes = await buildPdfFromData(templateData, orgBranding);
-
-    // ─── 7) Upload to storage ───
-    const filePath = `tenant/${orgId || "global"}/bolsas/${bolsaId}/relatorio.pdf`;
-
-    const { error: uploadError } = await supabaseAdmin.storage
-      .from("relatorios")
-      .upload(filePath, pdfBytes, {
-        contentType: "application/pdf",
-        upsert: true,
-      });
-
-    if (uploadError) {
-      console.error("Upload error:", uploadError);
-      await supabaseAdmin.from("pdf_logs").insert({
-        user_id: userId,
-        entity_type: "bolsa",
-        entity_id: bolsaId,
-        file_path: filePath,
-        status: "error",
-        error_message: uploadError.message,
-        organization_id: orgId,
-        generation_time_ms: Date.now() - startTime,
-      });
-      return jsonResponse({ error: "Falha ao salvar PDF: " + uploadError.message }, 500);
-    }
-
-    // Also save the HTML version
-    const htmlPath = `tenant/${orgId || "global"}/bolsas/${bolsaId}/relatorio.html`;
-    await supabaseAdmin.storage
-      .from("relatorios")
-      .upload(htmlPath, new TextEncoder().encode(html), {
-        contentType: "text/html; charset=utf-8",
-        upsert: true,
-      });
-
-    // ─── 8) Generate signed URL ───
-    const { data: signedData, error: signedError } = await supabaseAdmin.storage
-      .from("relatorios")
-      .createSignedUrl(filePath, 900);
-
-    if (signedError) {
-      console.error("Signed URL error:", signedError);
-      return jsonResponse({ error: "Falha ao gerar URL assinada" }, 500);
-    }
-
-    // HTML signed URL
-    const { data: htmlSignedData } = await supabaseAdmin.storage
-      .from("relatorios")
-      .createSignedUrl(htmlPath, 900);
-
-    // Log success
-    await supabaseAdmin.from("pdf_logs").insert({
+    // Create job record
+    const jobId = crypto.randomUUID();
+    await db.from("pdf_logs").insert({
+      id: jobId,
       user_id: userId,
       entity_type: "bolsa",
       entity_id: bolsaId,
-      file_path: filePath,
-      file_size: pdfBytes.length,
-      status: "success",
+      file_path: `pending/${jobId}`,
+      status: "processing",
       organization_id: orgId,
-      generation_time_ms: Date.now() - startTime,
     });
 
-    return jsonResponse({
-      signedUrl: signedData.signedUrl,
-      htmlUrl: htmlSignedData?.signedUrl || null,
-      path: filePath,
-      reportId,
-    });
+    console.log(`[rid:${requestId}] Job ${jobId} created, starting background generation`);
+
+    // @ts-ignore - EdgeRuntime.waitUntil is available in Supabase Edge Functions
+    EdgeRuntime.waitUntil(
+      generateInBackground(db, jobId, bolsaId, userId, appUrl, requestId, startTime)
+        .catch(async (err: any) => {
+          console.error(`[rid:${requestId}] Background generation failed:`, err);
+          await db.from("pdf_logs").update({
+            status: "error",
+            error_message: err.message || "Erro desconhecido na geração do PDF",
+            generation_time_ms: Date.now() - startTime,
+          }).eq("id", jobId);
+        })
+    );
+
+    return jsonResponse({ jobId, status: "processing" });
   } catch (err: any) {
     console.error("PDF generation error:", err);
     return jsonResponse({ error: err.message || "Erro interno na geração do PDF" }, 500);
   }
 });
+
+// ─── Background PDF generation ───
+async function generateInBackground(
+  db: any, jobId: string, bolsaId: string,
+  userId: string, appUrl: string, requestId: string, startTime: number,
+) {
+  console.log(`[rid:${requestId}] Background: fetching data for bolsa ${bolsaId}`);
+
+  // Subproject
+  const { data: project, error: projectError } = await db
+    .from("projects")
+    .select("*, thematic_projects(id, title, sponsor_name, status, start_date, end_date, organization_id)")
+    .eq("id", bolsaId)
+    .maybeSingle();
+
+  if (projectError || !project) throw new Error("Subprojeto/bolsa não encontrado");
+
+  const thematic = project.thematic_projects as any;
+  const orgId = thematic?.organization_id || null;
+
+  // Fetch organization branding
+  let orgBranding = { name: "Instituição", primary_color: "#1e3a5f", watermark_text: null as string | null, report_footer_text: null as string | null };
+  if (orgId) {
+    const { data: org } = await db
+      .from("organizations")
+      .select("name, primary_color, watermark_text, report_footer_text")
+      .eq("id", orgId)
+      .maybeSingle();
+    if (org) {
+      orgBranding = {
+        name: org.name,
+        primary_color: org.primary_color || "#1e3a5f",
+        watermark_text: org.watermark_text || null,
+        report_footer_text: org.report_footer_text || null,
+      };
+    }
+  }
+
+  // Enrollment
+  const { data: enrollments } = await db
+    .from("enrollments")
+    .select("*")
+    .eq("project_id", bolsaId)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  const enrollment = enrollments?.[0] || null;
+
+  // Scholar profile
+  let scholarName = "Não atribuído";
+  let scholarEmail = "";
+  let institution: string | null = null;
+  let academicLevel: string | null = null;
+
+  if (enrollment) {
+    const { data: profile } = await db
+      .from("profiles")
+      .select("full_name, email, institution, academic_level")
+      .eq("user_id", enrollment.user_id)
+      .maybeSingle();
+
+    if (profile) {
+      scholarName = profile.full_name || "Sem nome";
+      scholarEmail = profile.email || "";
+      institution = profile.institution;
+      academicLevel = profile.academic_level;
+    }
+  }
+
+  const scholarUserId = enrollment?.user_id || "00000000-0000-0000-0000-000000000000";
+
+  // Reports & Payments & Grant terms
+  const [reportsResult, paymentsResult, grantTermsResult] = await Promise.all([
+    db.from("reports").select("id, reference_month, status, submitted_at, reviewed_at, installment_number").eq("user_id", scholarUserId).order("reference_month", { ascending: true }),
+    db.from("payments").select("id, reference_month, status, amount, installment_number, paid_at").eq("enrollment_id", enrollment?.id || "00000000-0000-0000-0000-000000000000").order("reference_month", { ascending: true }),
+    db.from("grant_terms").select("id, file_name, signed_at").eq("user_id", scholarUserId).order("created_at", { ascending: false }).limit(1),
+  ]);
+
+  const reportList = reportsResult.data || [];
+  const paymentList = paymentsResult.data || [];
+  const term = grantTermsResult.data?.[0] || null;
+
+  const approvedReports = reportList.filter((r: any) => r.status === "approved").length;
+  const pendingReports = reportList.filter((r: any) => ["under_review", "pending"].includes(r.status)).length;
+  const rejectedReports = reportList.filter((r: any) => r.status === "rejected").length;
+  const paidPayments = paymentList.filter((p: any) => p.status === "paid");
+  const totalPaid = paidPayments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
+  const pendingPayments = paymentList.filter((p: any) => ["pending", "eligible"].includes(p.status)).length;
+
+  const expectedDeliverables = enrollment?.total_installments || 1;
+  const completedDeliverables = approvedReports + (term ? 1 : 0);
+  const conformidade = Math.min(100, Math.round((completedDeliverables / (expectedDeliverables + 1)) * 100));
+
+  let situacao = enrollment?.status || "active";
+  if (situacao === "active" && pendingReports > 0) {
+    situacao = "pending_report";
+  }
+
+  // Build eventos
+  const eventos: EventoProximo[] = [];
+  const today = new Date();
+
+  if (project.end_date) {
+    const endDate = new Date(project.end_date);
+    const daysToEnd = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysToEnd <= 0) {
+      eventos.push({ tipo: "vigencia", descricao: "Vigência encerrada", data: project.end_date, urgencia: "critico" });
+    } else if (daysToEnd <= 30) {
+      eventos.push({ tipo: "vigencia", descricao: `Vigência encerra em ${daysToEnd} dia(s)`, data: project.end_date, urgencia: "critico" });
+    } else if (daysToEnd <= 90) {
+      eventos.push({ tipo: "vigencia", descricao: `Vigência encerra em ${daysToEnd} dia(s)`, data: project.end_date, urgencia: "atencao" });
+    }
+  }
+
+  if (pendingReports > 0) {
+    eventos.push({ tipo: "relatorio", descricao: `${pendingReports} relatório(s) aguardando revisão`, data: null, urgencia: "atencao" });
+  }
+  if (rejectedReports > 0) {
+    eventos.push({ tipo: "relatorio", descricao: `${rejectedReports} relatório(s) recusado(s) — aguardando reenvio`, data: null, urgencia: "critico" });
+  }
+  if (!term) {
+    eventos.push({ tipo: "alerta", descricao: "Termo de Outorga pendente de upload", data: null, urgencia: "atencao" });
+  }
+
+  // Build documentos
+  const documentos: DocumentoAnexo[] = [];
+  if (term) {
+    documentos.push({ nome: term.file_name, tipo: "Termo de Outorga", status: "anexado", dataUpload: term.signed_at, dataAssinatura: term.signed_at });
+  } else {
+    documentos.push({ nome: "Termo de Outorga", tipo: "Termo de Outorga", status: "pendente", dataUpload: null, dataAssinatura: null });
+  }
+
+  const relatorioItems: RelatorioItem[] = reportList.map((r: any) => ({
+    competencia: r.reference_month, parcela: r.installment_number, status: r.status, enviadoEm: r.submitted_at, revisadoEm: r.reviewed_at,
+  }));
+
+  const pagamentoItems: PagamentoItem[] = paymentList.map((p: any) => ({
+    competencia: p.reference_month, parcela: p.installment_number, valor: Number(p.amount), status: p.status, pagoEm: p.paid_at,
+  }));
+
+  const reportId = crypto.randomUUID();
+  const bolsaUrl = `${appUrl}/projetos-tematicos/${project.thematic_project_id}`;
+
+  const templateData: RelatorioBolsaData = {
+    reportId,
+    generatedAt: new Date().toISOString(),
+    bolsaUrl,
+    financiador: thematic?.sponsor_name || "—",
+    projetoTematicoTitulo: thematic?.title || "—",
+    projetoTematicoStatus: thematic?.status || "—",
+    subprojetoCodigo: project.code,
+    subprojetoTitulo: project.title,
+    modalidade: project.modalidade_bolsa || "—",
+    valorMensal: project.valor_mensal,
+    vigenciaInicio: project.start_date,
+    vigenciaFim: project.end_date,
+    coordenadorTecnico: project.coordenador_tecnico_icca,
+    bolsistaNome: scholarName,
+    bolsistaEmail: scholarEmail,
+    orientador: project.orientador,
+    instituicao: institution,
+    nivelAcademico: academicLevel,
+    situacao,
+    enrollmentStartDate: enrollment?.start_date || null,
+    enrollmentEndDate: enrollment?.end_date || null,
+    totalParcelas: enrollment?.total_installments || 0,
+    eventos,
+    indicadores: {
+      totalRelatorios: reportList.length,
+      relatoriosAprovados: approvedReports,
+      relatoriosPendentes: pendingReports,
+      relatoriosRecusados: rejectedReports,
+      totalPagamentos: paymentList.length,
+      pagamentosRealizados: paidPayments.length,
+      pagamentosPendentes: pendingPayments,
+      totalPago: totalPaid,
+      termoOutorgaAnexado: !!term,
+      conformidade,
+    },
+    documentos,
+    relatorios: relatorioItems,
+    pagamentos: pagamentoItems,
+  };
+
+  // Render HTML
+  const html = renderRelatorioBolsaHtml(templateData);
+
+  // Build PDF
+  console.log(`[rid:${requestId}] Background: building PDF`);
+  const pdfBytes = await buildPdfFromData(templateData, orgBranding);
+
+  // Upload PDF + HTML
+  const filePath = `tenant/${orgId || "global"}/bolsas/${bolsaId}/relatorio.pdf`;
+  const htmlPath = `tenant/${orgId || "global"}/bolsas/${bolsaId}/relatorio.html`;
+
+  console.log(`[rid:${requestId}] Background: uploading PDF (${pdfBytes.length} bytes)`);
+
+  const [uploadResult, htmlUploadResult] = await Promise.all([
+    db.storage.from("relatorios").upload(filePath, pdfBytes, { contentType: "application/pdf", upsert: true }),
+    db.storage.from("relatorios").upload(htmlPath, new TextEncoder().encode(html), { contentType: "text/html; charset=utf-8", upsert: true }),
+  ]);
+
+  if (uploadResult.error) {
+    console.error(`[rid:${requestId}] Upload error:`, uploadResult.error);
+    await db.from("pdf_logs").update({
+      status: "error",
+      error_message: "Falha ao salvar PDF: " + uploadResult.error.message,
+      generation_time_ms: Date.now() - startTime,
+    }).eq("id", jobId);
+    return;
+  }
+
+  // Update job as success
+  await db.from("pdf_logs").update({
+    status: "success",
+    file_path: filePath,
+    file_size: pdfBytes.length,
+    generation_time_ms: Date.now() - startTime,
+  }).eq("id", jobId);
+
+  console.log(`[rid:${requestId}] Background: PDF generation complete (${Date.now() - startTime}ms)`);
+}
 
 // ─── PDF Builder using pdf-lib ───────────────────────────────────────────────
 
@@ -410,7 +379,6 @@ async function buildPdfFromData(data: RelatorioBolsaData, branding: OrgBranding)
   let y = H - M;
 
   const txt = (text: string, x: number, yy: number, size = 9.5, f = font, color = rgb(0.1, 0.1, 0.12)) => {
-    // Truncate if too long
     const maxChars = Math.floor((W - x - M) / (size * 0.5));
     const t = text.length > maxChars ? text.substring(0, maxChars - 2) + '…' : text;
     page.drawText(t, { x, y: yy, size, font: f, color });
@@ -442,27 +410,11 @@ async function buildPdfFromData(data: RelatorioBolsaData, branding: OrgBranding)
   const sectionTitle = (title: string, num: string) => {
     check(40);
     y -= 6;
-    // Draw number box with primary color
     page.drawRectangle({ x: M, y: y - 4, width: 16, height: 16, color: primaryRgb, borderColor: primaryRgb });
     txt(num, M + 5, y, 8, fontBold, rgb(1, 1, 1));
     txt(title, M + 22, y, 10.5, fontBold, primaryRgb);
     y -= 8;
     page.drawLine({ start: { x: M, y }, end: { x: W - M, y }, thickness: 1, color: primaryRgb });
-    y -= LH;
-  };
-
-  const field = (label: string, value: string, x = M, bold = false) => {
-    check(LH + 4);
-    txt(label + ':', x, y, 7.5, fontBold, rgb(0.5, 0.5, 0.55));
-    y -= 11;
-    txt(value, x, y, 9.5, bold ? fontBold : font);
-    y -= LH;
-  };
-
-  const fieldInline = (label: string, value: string, x = M) => {
-    check(LH);
-    txt(label + ': ', x, y, 8, fontBold, rgb(0.5, 0.5, 0.55));
-    txt(value, x + label.length * 4.5 + 8, y, 9.5);
     y -= LH;
   };
 
@@ -472,7 +424,6 @@ async function buildPdfFromData(data: RelatorioBolsaData, branding: OrgBranding)
   txt('BolsaGO', M + 36, y + 8, 18, fontBold, primaryRgb);
   txt('Relatorio de Bolsa', M + 36, y - 6, 9, font, rgb(0.5, 0.5, 0.55));
 
-  // Right side: org name + date
   txt(branding.name, W - M - 180, y + 8, 8, fontBold, rgb(0.5, 0.5, 0.55));
   const genDate = fmtDate(data.generatedAt);
   txt(`Gerado em: ${genDate}`, W - M - 120, y - 4, 8, font, rgb(0.5, 0.5, 0.55));
@@ -486,7 +437,6 @@ async function buildPdfFromData(data: RelatorioBolsaData, branding: OrgBranding)
 
   const col2X = M + COL / 2 + 10;
 
-  // Row 1
   check(LH * 3);
   txt('FINANCIADOR:', M, y, 7.5, fontBold, rgb(0.5, 0.5, 0.55));
   txt('PROJETO TEMATICO:', col2X, y, 7.5, fontBold, rgb(0.5, 0.5, 0.55));
@@ -495,7 +445,6 @@ async function buildPdfFromData(data: RelatorioBolsaData, branding: OrgBranding)
   txt(data.projetoTematicoTitulo, col2X, y, 9.5);
   y -= LH + 2;
 
-  // Row 2
   txt('SUBPROJETO:', M, y, 7.5, fontBold, rgb(0.5, 0.5, 0.55));
   txt('MODALIDADE:', col2X, y, 7.5, fontBold, rgb(0.5, 0.5, 0.55));
   y -= 11;
@@ -503,7 +452,6 @@ async function buildPdfFromData(data: RelatorioBolsaData, branding: OrgBranding)
   txt(data.modalidade, col2X, y, 9.5);
   y -= LH + 2;
 
-  // Row 3
   txt('VALOR MENSAL:', M, y, 7.5, fontBold, rgb(0.5, 0.5, 0.55));
   txt('VIGENCIA:', col2X, y, 7.5, fontBold, rgb(0.5, 0.5, 0.55));
   y -= 11;
@@ -539,7 +487,6 @@ async function buildPdfFromData(data: RelatorioBolsaData, branding: OrgBranding)
   sectionTitle('SITUACAO ATUAL', '3');
   check(40);
 
-  // Status highlight box
   const sitInfo = getSitInfo(data.situacao);
   page.drawRectangle({
     x: M, y: y - 22, width: COL, height: 34,
@@ -607,7 +554,6 @@ async function buildPdfFromData(data: RelatorioBolsaData, branding: OrgBranding)
     txt('Nenhum documento registrado.', M, y, 9, font, rgb(0.5, 0.5, 0.55));
     y -= LH;
   } else {
-    // Table header
     check(LH * 2);
     txt('DOCUMENTO', M, y, 7.5, fontBold, rgb(0.5, 0.5, 0.55));
     txt('TIPO', M + 200, y, 7.5, fontBold, rgb(0.5, 0.5, 0.55));
@@ -682,7 +628,6 @@ async function buildPdfFromData(data: RelatorioBolsaData, branding: OrgBranding)
       y -= LH;
     }
 
-    // Total row
     check(LH + 4);
     line(y + 4);
     y -= 2;
