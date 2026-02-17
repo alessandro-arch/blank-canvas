@@ -72,9 +72,16 @@ export function PaymentsManagement() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [statusFilter, setStatusFilter] = useState<string>(searchParams.get("payStatus") || "all");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [thematicFilter, setThematicFilter] = useState<string>("all");
-  const [periodRange, setPeriodRange] = useState<PeriodRange | null>(null);
+  const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || "");
+  const [thematicFilter, setThematicFilter] = useState<string>(searchParams.get("tp") || "all");
+  const [periodRange, setPeriodRange] = useState<PeriodRange | null>(() => {
+    const startMonth = searchParams.get("ps");
+    const endMonth = searchParams.get("pe");
+    if (startMonth && endMonth) {
+      return { startMonth, endMonth, label: `${startMonth} – ${endMonth}` };
+    }
+    return null;
+  });
 
   // Payment confirmation dialog
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
@@ -106,9 +113,22 @@ export function PaymentsManagement() {
     updateQueryParams({ payStatus: val });
   };
 
+  const handleSearchChange = (val: string) => {
+    setSearchTerm(val);
+    if (isMobile) updateQueryParams({ q: val });
+  };
+
+  const handleThematicFilterChange = (val: string) => {
+    setThematicFilter(val);
+    if (isMobile) updateQueryParams({ tp: val });
+  };
+
   const handlePeriodChange = useCallback((range: PeriodRange) => {
     setPeriodRange(range);
-  }, []);
+    if (isMobile) {
+      updateQueryParams({ ps: range.startMonth, pe: range.endMonth });
+    }
+  }, [isMobile]);
 
   const { data, isLoading, isFetching, error: queryError, refetch } = useQuery({
     queryKey: ['payments-management-v2'],
@@ -542,7 +562,7 @@ export function PaymentsManagement() {
                 type="search"
                 placeholder="Buscar por nome, email ou código..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 className="pl-10 min-h-[44px]"
               />
             </div>
@@ -554,9 +574,15 @@ export function PaymentsManagement() {
               }
               onApply={() => {}}
               onClear={() => {
-                setStatusFilter("all");
                 handleStatusFilterChange("all");
-                setThematicFilter("all");
+                handleThematicFilterChange("all");
+                handleSearchChange("");
+                setPeriodRange(null);
+                // Clear all filter query params
+                const newParams = new URLSearchParams(searchParams);
+                ["payStatus", "q", "tp", "ps", "pe"].forEach(k => newParams.delete(k));
+                if (newParams.has("tab")) setSearchParams(newParams, { replace: true });
+                else setSearchParams(newParams, { replace: true });
               }}
             >
               <div className="space-y-4">
@@ -586,7 +612,7 @@ export function PaymentsManagement() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">Projeto Temático</label>
-                  <Select value={thematicFilter} onValueChange={setThematicFilter}>
+                  <Select value={thematicFilter} onValueChange={handleThematicFilterChange}>
                     <SelectTrigger>
                       <Building2 className="h-4 w-4 mr-2 text-muted-foreground" />
                       <SelectValue placeholder="Projeto Temático" />
@@ -688,10 +714,13 @@ export function PaymentsManagement() {
               title="Nenhum pagamento encontrado"
               description="Nenhum bolsista corresponde aos filtros selecionados."
               onClearFilters={() => {
-                setSearchTerm("");
-                setStatusFilter("all");
+                handleSearchChange("");
                 handleStatusFilterChange("all");
-                setThematicFilter("all");
+                handleThematicFilterChange("all");
+                setPeriodRange(null);
+                const newParams = new URLSearchParams(searchParams);
+                ["payStatus", "q", "tp", "ps", "pe"].forEach(k => newParams.delete(k));
+                setSearchParams(newParams, { replace: true });
               }}
             />
           ) : isMobile ? (
