@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { calcularRiscoFinanceiro } from '@/lib/financial-risk';
+import type { RiskResult } from '@/lib/financial-risk';
 import { useOrganizationContext } from '@/contexts/OrganizationContext';
 import { Header } from '@/components/layout/Header';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -221,25 +223,35 @@ export default function FinancialManagement() {
     const taxaAtivacao = totalActiveSubs > 0 ? (bolsistasAtivos / totalActiveSubs) * 100 : 0;
     const custoMedioBolsista = bolsistasAtivos > 0 ? totalPago / bolsistasAtivos : 0;
 
-    // Risco — base: teto_projeto (não considerar encargos previstos)
+    // Risco — algoritmo completo (score 0-100)
     const pagamentosPendentes = filteredPayments.filter(p => p.status === 'pending' || p.status === 'eligible').length;
-    const indiceRisco = (() => {
-      // ALTO: comprometido > 110% OU saldo < 0 OU ativação < 50%
-      if (percentComprometido > 110 || saldoDisponivel < 0 || taxaAtivacao < 50) {
-        return { level: 'Alto', color: 'text-destructive', bgColor: 'bg-destructive/10' };
+    const pendenteValor = filteredPayments
+      .filter(p => p.status === 'pending' || p.status === 'eligible')
+      .reduce((s, p) => s + Number(p.amount), 0);
+
+    // Calcular meses decorridos e totais para o desvio tempo×financeiro
+    let mesesTotais = 0;
+    let mesesDecorridos = 0;
+    for (const p of filteredProjects) {
+      if (p.start_date && p.end_date) {
+        const dur = Math.max(1, differenceInMonths(new Date(p.end_date), new Date(p.start_date)) + 1);
+        mesesTotais += dur;
+        const now = new Date();
+        const start = new Date(p.start_date);
+        const elapsed = Math.max(0, Math.min(dur, differenceInMonths(now, start) + 1));
+        mesesDecorridos += elapsed;
       }
-      // MODERADO: comprometido > 100% e ≤ 110% OU saldo próximo de zero OU ativação entre 50% e 80%
-      const saldoProximoZero = tetoProjeto > 0 && saldoDisponivel >= 0 && saldoDisponivel < tetoProjeto * 0.05;
-      if (
-        (percentComprometido > 100 && percentComprometido <= 110) ||
-        saldoProximoZero ||
-        (taxaAtivacao >= 50 && taxaAtivacao < 80)
-      ) {
-        return { level: 'Moderado', color: 'text-warning', bgColor: 'bg-warning/10' };
-      }
-      // BAIXO: comprometido ≤ 100%, saldo ≥ 0, ativação ≥ 80%
-      return { level: 'Baixo', color: 'text-success', bgColor: 'bg-success/10' };
-    })();
+    }
+
+    const indiceRisco: RiskResult = calcularRiscoFinanceiro({
+      tetoProjeto,
+      valorComprometido: tetoBolsas,
+      valorPago: totalPago,
+      mesesDecorridos,
+      mesesTotais,
+      pendenteValor,
+      pendenteCount: pagamentosPendentes,
+    });
 
     return {
       tetoProjeto,
@@ -259,6 +271,7 @@ export default function FinancialManagement() {
       taxaAtivacao,
       custoMedioBolsista,
       pagamentosPendentes,
+      pendenteValor,
       indiceRisco,
     };
   }, [filteredProjects, filteredPayments, subprojects, enrollmentsData, projectToThematic, filteredThematicIds]);
@@ -492,38 +505,65 @@ export default function FinancialManagement() {
                   </div>
                 </section>
 
-                {/* ═══ Bloco 4: Risco ═══ */}
+                {/* ═══ Bloco 4: Governança e Risco ═══ */}
                 <section>
-                  <SectionHeader icon={<ShieldAlert className="h-4 w-4" />} title="Risco" />
+                  <SectionHeader icon={<ShieldAlert className="h-4 w-4" />} title="Governança Financeira e Risco" />
                   <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                    {/* Semáforo de risco com score */}
                     <Card>
                       <CardContent className="p-5">
                         <div className="flex items-start gap-4">
-                          <div className={`p-3 rounded-xl ${agg.indiceRisco.bgColor}`}>
-                            <AlertTriangle className={`h-6 w-6 ${agg.indiceRisco.color}`} />
-                          </div>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className={`p-3 rounded-xl ${agg.indiceRisco.bgColor} cursor-help`}>
+                                <AlertTriangle className={`h-6 w-6 ${agg.indiceRisco.color}`} />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="max-w-xs text-xs space-y-1 p-3">
+                              <p className="font-semibold mb-2">Composição do Score ({agg.indiceRisco.scoreTotal}/100)</p>
+                              {Object.values(agg.indiceRisco.breakdown).map((factor) => (
+                                <div key={factor.label} className="flex justify-between gap-4">
+                                  <span>{factor.label}: <span className="text-muted-foreground">{factor.detail}</span></span>
+                                  <span className="font-mono font-medium">{factor.score}/{factor.max}</span>
+                                </div>
+                              ))}
+                              <Separator className="my-1.5" />
+                              <p className="text-muted-foreground">Base: teto_projeto. Encargos previstos não geram risco.</p>
+                            </TooltipContent>
+                          </Tooltip>
                           <div className="flex-1">
                             <p className="text-xs text-muted-foreground font-medium mb-1">Índice de Risco Financeiro</p>
-                            <p className={`text-2xl font-bold ${agg.indiceRisco.color}`}>
-                              {agg.indiceRisco.level}
-                            </p>
+                            <div className="flex items-baseline gap-3">
+                              <Badge variant="outline" className={`${agg.indiceRisco.bgColor} ${agg.indiceRisco.color} border-0 text-sm font-bold px-3 py-1`}>
+                                {agg.indiceRisco.level}
+                              </Badge>
+                              <span className={`text-lg font-bold font-mono ${agg.indiceRisco.color}`}>
+                                {agg.indiceRisco.scoreTotal}/100
+                              </span>
+                            </div>
                             <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
                               <div className="flex justify-between">
-                                <span>Comprometimento</span>
-                                <span className={agg.percentComprometido > 90 ? 'text-destructive font-medium' : ''}>
-                                  {agg.percentComprometido.toFixed(1)}%
+                                <span>A. Comprometimento</span>
+                                <span className={agg.indiceRisco.breakdown.A.score > 20 ? 'text-destructive font-medium' : ''}>
+                                  {agg.indiceRisco.breakdown.A.score}/{agg.indiceRisco.breakdown.A.max}
                                 </span>
                               </div>
                               <div className="flex justify-between">
-                                <span>Saldo</span>
-                                <span className={agg.saldoDisponivel < 0 ? 'text-destructive font-medium' : ''}>
-                                  {formatCurrency(agg.saldoDisponivel)}
+                                <span>B. Saldo</span>
+                                <span className={agg.indiceRisco.breakdown.B.score > 15 ? 'text-destructive font-medium' : ''}>
+                                  {agg.indiceRisco.breakdown.B.score}/{agg.indiceRisco.breakdown.B.max}
                                 </span>
                               </div>
                               <div className="flex justify-between">
-                                <span>Taxa de Ativação</span>
-                                <span className={agg.taxaAtivacao < 50 ? 'text-warning font-medium' : ''}>
-                                  {agg.taxaAtivacao.toFixed(0)}%
+                                <span>C. Desvio tempo×financeiro</span>
+                                <span className={agg.indiceRisco.breakdown.C.score > 10 ? 'text-warning font-medium' : ''}>
+                                  {agg.indiceRisco.breakdown.C.score}/{agg.indiceRisco.breakdown.C.max}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>D. Pendências</span>
+                                <span className={agg.indiceRisco.breakdown.D.score > 5 ? 'text-warning font-medium' : ''}>
+                                  {agg.indiceRisco.breakdown.D.score}/{agg.indiceRisco.breakdown.D.max}
                                 </span>
                               </div>
                             </div>
@@ -536,6 +576,7 @@ export default function FinancialManagement() {
                       label="Pagamentos Pendentes"
                       value={String(agg.pagamentosPendentes)}
                       subtitle={`Total: ${formatCurrency(agg.passivoProgramado)}`}
+                      tooltip="Quantidade de pagamentos com status pendente ou liberado. O valor total refere-se ao passivo programado."
                       iconColor={agg.pagamentosPendentes > 10 ? 'text-destructive' : 'text-warning'}
                     />
                   </div>

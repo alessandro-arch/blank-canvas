@@ -206,11 +206,13 @@ serve(async (req) => {
 
     // Temporal execution
     let percentualTemporal = 0;
+    let mesesDecorridos = 0;
     if (tp.start_date && tp.end_date) {
       const start = new Date(tp.start_date).getTime();
       const end = new Date(tp.end_date).getTime();
       const now = Date.now();
       percentualTemporal = Math.min(100, Math.max(0, ((now - start) / (end - start)) * 100));
+      mesesDecorridos = Math.max(0, Math.min(duracaoMeses, calcMonthsDiff(tp.start_date, new Date().toISOString().split("T")[0])));
     }
 
     // Pendencies
@@ -218,7 +220,49 @@ serve(async (req) => {
     const rejectedReports = allReports.filter((r: any) => r.status === "rejected").length;
     const pendingDocs = scholarUserIds.filter((uid) => !grantTermsMap[uid]).length;
     const pendingPayments = allPayments.filter((p: any) => ["pending", "eligible"].includes(p.status)).length;
+    const pendingPaymentsValue = allPayments.filter((p: any) => ["pending", "eligible"].includes(p.status)).reduce((s: number, p: any) => s + Number(p.amount), 0);
     const cancelledPayments = allPayments.filter((p: any) => p.status === "cancelled").length;
+
+    // ─── Risk Score (0-100) ───
+    const riskPctComprometido = valorTotalProjeto > 0 ? valorTotalEstimadoBolsas / valorTotalProjeto : 0;
+    const riskSaldo = valorTotalProjeto - valorTotalEstimadoBolsas;
+    const riskExecFin = valorTotalProjeto > 0 ? totalPaid / valorTotalProjeto : 0;
+    const riskExecTempo = duracaoMeses > 0 ? mesesDecorridos / duracaoMeses : 0;
+    const riskDesvio = riskExecTempo - riskExecFin;
+
+    let riskA = 0;
+    if (riskPctComprometido <= 0.95) riskA = 0;
+    else if (riskPctComprometido <= 1.00) riskA = 10;
+    else if (riskPctComprometido <= 1.05) riskA = 25;
+    else if (riskPctComprometido <= 1.10) riskA = 35;
+    else riskA = 40;
+
+    let riskB = 0;
+    if (riskSaldo >= 0) riskB = 0;
+    else {
+      const ratio = valorTotalProjeto > 0 ? Math.abs(riskSaldo) / valorTotalProjeto : 1;
+      if (ratio <= 0.02) riskB = 10;
+      else if (ratio <= 0.05) riskB = 20;
+      else riskB = 30;
+    }
+
+    let riskC = 0;
+    if (riskDesvio <= 0.10) riskC = 0;
+    else if (riskDesvio <= 0.20) riskC = 8;
+    else if (riskDesvio <= 0.35) riskC = 14;
+    else riskC = 20;
+
+    let riskD = 0;
+    if (pendingPaymentsValue === 0 && pendingPayments === 0) riskD = 0;
+    else {
+      const ratioP = valorTotalProjeto > 0 ? pendingPaymentsValue / valorTotalProjeto : 0;
+      if (ratioP <= 0.01) riskD = 4;
+      else if (ratioP <= 0.03) riskD = 7;
+      else riskD = 10;
+    }
+
+    const riskScore = riskA + riskB + riskC + riskD;
+    const riskLevel = riskScore <= 24 ? "BAIXO" : riskScore <= 49 ? "MODERADO" : "ALTO";
 
     // Alerts
     const alerts: string[] = [];
@@ -228,6 +272,7 @@ serve(async (req) => {
     if (pendingDocs > 0) alerts.push(`${pendingDocs} bolsista(s) sem Termo de Outorga.`);
     if (rejectedReports > 0) alerts.push(`${rejectedReports} relatório(s) reprovado(s) aguardando reenvio.`);
     if (cancelledPayments > 0) alerts.push(`${cancelledPayments} pagamento(s) cancelado(s).`);
+    if (riskLevel === "ALTO") alerts.push(`Índice de Risco Financeiro: ${riskLevel} (${riskScore}/100).`);
 
     // ─── 13) Build PDF ───
     const pdfBytes = await buildExecutivePdf({
@@ -267,7 +312,18 @@ serve(async (req) => {
       rejectedReports,
       pendingDocs,
       pendingPayments,
+      pendingPaymentsValue,
       cancelledPayments,
+      // Risk
+      riskScore,
+      riskLevel,
+      riskA,
+      riskB,
+      riskC,
+      riskD,
+      riskPctComprometido,
+      riskSaldo,
+      riskDesvio,
       // Alerts
       alerts,
       // Audit
@@ -376,7 +432,17 @@ interface ExecutiveData {
   rejectedReports: number;
   pendingDocs: number;
   pendingPayments: number;
+  pendingPaymentsValue: number;
   cancelledPayments: number;
+  riskScore: number;
+  riskLevel: string;
+  riskA: number;
+  riskB: number;
+  riskC: number;
+  riskD: number;
+  riskPctComprometido: number;
+  riskSaldo: number;
+  riskDesvio: number;
   alerts: string[];
   auditLogs: { date: string; action: string; entityType: string; userEmail: string; details: string }[];
   reportId: string;
@@ -718,8 +784,77 @@ async function buildExecutivePdf(data: ExecutiveData): Promise<Uint8Array> {
   txt(`Diagnóstico: ${diagnosis}`, M + 8, y, 8, font, diagColor);
   y -= 30;
 
+  // ═══ GOVERNANÇA FINANCEIRA E RISCO ═══
+  sectionTitle("GOVERNANÇA FINANCEIRA E RISCO", "5");
+
+  // Classification badge
+  check(50);
+  const riskColor = data.riskLevel === "BAIXO" ? greenColor : data.riskLevel === "MODERADO" ? orangeColor : redColor;
+  const riskBg = data.riskLevel === "BAIXO" ? rgb(0.92, 0.98, 0.93) : data.riskLevel === "MODERADO" ? rgb(1, 0.97, 0.91) : rgb(1, 0.93, 0.93);
+  page.drawRectangle({ x: M, y: y - 30, width: COL, height: 40, color: riskBg, borderColor: riskColor, borderWidth: 1.5 });
+  txt("ÍNDICE DE RISCO FINANCEIRO", M + 10, y - 6, 8, fontBold, grayText);
+  txt(data.riskLevel, M + 10, y - 22, 16, fontBold, riskColor);
+  txt(`Score: ${data.riskScore}/100`, M + 120, y - 22, 12, fontBold, riskColor);
+  txt("Base: teto_projeto. Encargos previstos não geram risco.", W - M - 260, y - 6, 7, font, grayText);
+  y -= 48;
+
+  // Indicators summary
+  check(60);
+  const riskIndicators = [
+    { label: "Comprometimento (teto bolsas / teto projeto)", value: fmtPct(data.riskPctComprometido * 100) },
+    { label: "Saldo disponível", value: fmtCur(data.riskSaldo) },
+    { label: "Desvio tempo × financeiro", value: fmtPct(data.riskDesvio * 100) },
+    { label: "Pagamentos pendentes", value: `${data.pendingPayments} (${fmtCur(data.pendingPaymentsValue)})` },
+  ];
+  for (const ind of riskIndicators) {
+    check(LH + 4);
+    txt(ind.label, M + 6, y, 9, font);
+    txt(ind.value, W - M - 140, y, 10, fontBold);
+    y -= LH + 3;
+  }
+  y -= 6;
+
+  // Factors table
+  check(90);
+  txt("DECOMPOSIÇÃO DO SCORE", M, y, 8, fontBold, grayText);
+  y -= LH;
+
+  page.drawRectangle({ x: M, y: y - 4, width: COL, height: LH + 6, color: primaryRgb });
+  txt("FATOR", M + 6, y, 8, fontBold, white);
+  txt("PONTOS", W - M - 110, y, 8, fontBold, white);
+  txt("MÁXIMO", W - M - 55, y, 8, fontBold, white);
+  y -= LH + 6;
+
+  const riskFactors = [
+    { label: "A) Comprometimento orçamentário", score: data.riskA, max: 40 },
+    { label: "B) Saldo financeiro", score: data.riskB, max: 30 },
+    { label: "C) Desvio tempo × financeiro", score: data.riskC, max: 20 },
+    { label: "D) Pendências operacionais", score: data.riskD, max: 10 },
+  ];
+
+  for (let i = 0; i < riskFactors.length; i++) {
+    check(LH + 4);
+    const f = riskFactors[i];
+    if (i % 2 === 0) {
+      page.drawRectangle({ x: M, y: y - 4, width: COL, height: LH + 4, color: rgb(0.96, 0.97, 0.98) });
+    }
+    txt(f.label, M + 6, y, 9, font);
+    const fColor = f.score > f.max * 0.6 ? redColor : f.score > f.max * 0.3 ? orangeColor : greenColor;
+    txt(String(f.score), W - M - 110, y, 10, fontBold, fColor);
+    txt(String(f.max), W - M - 55, y, 10, font, grayText);
+    y -= LH + 4;
+  }
+
+  // Total row
+  check(LH + 6);
+  page.drawRectangle({ x: M, y: y - 4, width: COL, height: LH + 6, color: riskBg, borderColor: riskColor, borderWidth: 0.5 });
+  txt("TOTAL", M + 6, y, 10, fontBold);
+  txt(String(data.riskScore), W - M - 110, y, 12, fontBold, riskColor);
+  txt("100", W - M - 55, y, 10, font, grayText);
+  y -= LH + 10;
+
   // ═══ PENDÊNCIAS ═══
-  sectionTitle("PENDÊNCIAS DOCUMENTAIS E OPERACIONAIS", "5");
+  sectionTitle("PENDÊNCIAS DOCUMENTAIS E OPERACIONAIS", "6");
 
   const pendItems = [
     { label: "Relatórios em análise/pendentes", value: data.pendingReports, color: data.pendingReports > 0 ? orangeColor : greenColor },
@@ -740,7 +875,7 @@ async function buildExecutivePdf(data: ExecutiveData): Promise<Uint8Array> {
   y -= 8;
 
   // ═══ HISTÓRICO DE ALTERAÇÕES ═══
-  sectionTitle("HISTÓRICO DE ALTERAÇÕES RECENTES", "6");
+  sectionTitle("HISTÓRICO DE ALTERAÇÕES RECENTES", "7");
 
   if (data.auditLogs.length === 0) {
     txt("Nenhum registro de alteração encontrado.", M, y, 9, font, grayText);
@@ -774,7 +909,7 @@ async function buildExecutivePdf(data: ExecutiveData): Promise<Uint8Array> {
 
   // ═══ ALERTAS ═══
   if (data.alerts.length > 0) {
-    sectionTitle("ALERTAS", "7");
+    sectionTitle("ALERTAS", "8");
     for (const alert of data.alerts) {
       check(LH + 4);
       txt("▲", M + 2, y, 8, fontBold, orangeColor);
