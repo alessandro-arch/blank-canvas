@@ -791,6 +791,56 @@ export type Database = {
           },
         ]
       }
+      pdf_logs: {
+        Row: {
+          created_at: string
+          entity_id: string
+          entity_type: string
+          error_message: string | null
+          file_path: string
+          file_size: number | null
+          generation_time_ms: number | null
+          id: string
+          organization_id: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          entity_id: string
+          entity_type?: string
+          error_message?: string | null
+          file_path: string
+          file_size?: number | null
+          generation_time_ms?: number | null
+          id?: string
+          organization_id?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          error_message?: string | null
+          file_path?: string
+          file_size?: number | null
+          generation_time_ms?: number | null
+          id?: string
+          organization_id?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pdf_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           academic_level: string | null
