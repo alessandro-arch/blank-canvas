@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -52,6 +52,7 @@ import { ptBR } from "date-fns/locale";
 import { PaymentReceiptUpload } from "./PaymentReceiptUpload";
 import { ScholarPaymentRowComponent, type ScholarPaymentRow, type PaymentRecord } from "./ScholarPaymentRow";
 import { cn } from "@/lib/utils";
+import { PeriodFilter, type PeriodRange } from "./PeriodFilter";
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("pt-BR", {
@@ -68,7 +69,7 @@ export function PaymentsManagement() {
   const [statusFilter, setStatusFilter] = useState<string>(searchParams.get("payStatus") || "all");
   const [searchTerm, setSearchTerm] = useState("");
   const [thematicFilter, setThematicFilter] = useState<string>("all");
-  const [monthFilter, setMonthFilter] = useState<string>(searchParams.get("payMes") || "");
+  const [periodRange, setPeriodRange] = useState<PeriodRange | null>(null);
 
   // Payment confirmation dialog
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
@@ -97,13 +98,12 @@ export function PaymentsManagement() {
 
   const handleStatusFilterChange = (val: string) => {
     setStatusFilter(val);
-    updateQueryParams({ payStatus: val, payMes: monthFilter });
+    updateQueryParams({ payStatus: val });
   };
 
-  const handleMonthFilterChange = (val: string) => {
-    setMonthFilter(val);
-    updateQueryParams({ payMes: val, payStatus: statusFilter });
-  };
+  const handlePeriodChange = useCallback((range: PeriodRange) => {
+    setPeriodRange(range);
+  }, []);
 
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['payments-management-v2'],
@@ -222,15 +222,20 @@ export function PaymentsManagement() {
     },
   });
 
-  // Auto-select current month
-  const effectiveMonth = useMemo(() => {
-    if (monthFilter) return monthFilter;
-    if (data?.availableMonths && data.availableMonths.length > 0) {
-      return data.availableMonths[0];
+  // Helper: check if a payment's reference_month is within the selected period
+  const isInPeriod = useCallback((refMonth: string, paidAt: string | null) => {
+    if (!periodRange) return true;
+    const { startMonth, endMonth } = periodRange;
+    // Use paid_at month if available, otherwise reference_month
+    let effectiveMonth = refMonth;
+    if (paidAt) {
+      try {
+        const d = parseISO(paidAt);
+        effectiveMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      } catch { /* fallback to refMonth */ }
     }
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  }, [monthFilter, data?.availableMonths]);
+    return effectiveMonth >= startMonth && effectiveMonth <= endMonth;
+  }, [periodRange]);
 
   // Apply filters
   const filteredScholars = useMemo(() => {
@@ -239,8 +244,11 @@ export function PaymentsManagement() {
 
     return data.scholars
       .map(s => {
-        const currentPayment = s.all_payments.find(p => p.reference_month === effectiveMonth) || null;
-        return { ...s, current_payment: currentPayment };
+        // Get all payments in the selected period
+        const periodPayments = s.all_payments.filter(p => isInPeriod(p.reference_month, p.paid_at));
+        // Use the most recent as "current"
+        const currentPayment = periodPayments.length > 0 ? periodPayments[0] : null;
+        return { ...s, current_payment: currentPayment, period_payments: periodPayments };
       })
       .filter(s => {
         if (searchTerm) {
@@ -252,8 +260,13 @@ export function PaymentsManagement() {
         }
 
         if (statusFilter !== "all") {
-          const payStatus = s.current_payment?.status || "pending";
-          if (payStatus !== statusFilter) return false;
+          // Check if any payment in the period matches the status
+          if (s.period_payments.length === 0) {
+            if (statusFilter !== "pending") return false;
+          } else {
+            const hasStatus = s.period_payments.some(p => p.status === statusFilter);
+            if (!hasStatus) return false;
+          }
         }
 
         if (thematicFilter !== "all") {
@@ -263,25 +276,27 @@ export function PaymentsManagement() {
 
         return true;
       });
-  }, [data, searchTerm, statusFilter, thematicFilter, effectiveMonth]);
+  }, [data, searchTerm, statusFilter, thematicFilter, isInPeriod]);
 
-  // Stats for the selected month
+  // Stats for the selected period
   const monthStats = useMemo(() => {
     if (!data) return { pending: 0, eligible: 0, paid: 0, cancelled: 0, total: 0, totalAmount: 0 };
-    const scholars = data.scholars.map(s => ({
-      ...s,
-      current_payment: s.all_payments.find(p => p.reference_month === effectiveMonth) || null,
-    }));
-    const total = scholars.length;
-    const pending = scholars.filter(s => !s.current_payment || s.current_payment.status === "pending").length;
-    const eligible = scholars.filter(s => s.current_payment?.status === "eligible").length;
-    const paid = scholars.filter(s => s.current_payment?.status === "paid").length;
-    const cancelled = scholars.filter(s => s.current_payment?.status === "cancelled").length;
-    const totalAmount = scholars
-      .filter(s => s.current_payment?.status === "eligible")
-      .reduce((sum, s) => sum + (s.current_payment?.amount || 0), 0);
+    
+    // Collect all payments in the period across all scholars
+    const allPeriodPayments = data.scholars.flatMap(s =>
+      s.all_payments.filter(p => isInPeriod(p.reference_month, p.paid_at))
+    );
+    
+    const total = allPeriodPayments.length;
+    const pending = allPeriodPayments.filter(p => p.status === "pending").length;
+    const eligible = allPeriodPayments.filter(p => p.status === "eligible").length;
+    const paid = allPeriodPayments.filter(p => p.status === "paid").length;
+    const cancelled = allPeriodPayments.filter(p => p.status === "cancelled").length;
+    const totalAmount = allPeriodPayments
+      .filter(p => p.status === "eligible")
+      .reduce((sum, p) => sum + (p.amount || 0), 0);
     return { pending, eligible, paid, cancelled, total, totalAmount };
-  }, [data, effectiveMonth]);
+  }, [data, isInPeriod]);
 
   // Actions
   const handleOpenConfirm = (payment: PaymentRecord, scholar: ScholarPaymentRow) => {
@@ -426,7 +441,7 @@ export function PaymentsManagement() {
       s.project_title,
       s.project_code,
       s.thematic_project_title,
-      effectiveMonth,
+      s.current_payment?.reference_month || (periodRange?.label || ""),
       s.current_payment?.amount?.toFixed(2).replace(".", ",") || "",
       statusLabels[s.current_payment?.status || "pending"] || "Pendente",
       s.current_payment?.paid_at ? format(parseISO(s.current_payment.paid_at), "dd/MM/yyyy") : "",
@@ -440,7 +455,7 @@ export function PaymentsManagement() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `pagamentos_${effectiveMonth}_${format(new Date(), "yyyy-MM-dd")}.csv`;
+    link.download = `pagamentos_${periodRange?.label || "periodo"}_${format(new Date(), "yyyy-MM-dd")}.csv`;
     link.click();
     URL.revokeObjectURL(url);
     toast.success("CSV exportado com sucesso!");
@@ -513,21 +528,16 @@ export function PaymentsManagement() {
         )}
 
         {/* Filters */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          {/* Month filter - primary */}
-          <Select value={effectiveMonth} onValueChange={handleMonthFilterChange}>
-            <SelectTrigger className="border-primary/30 bg-primary/5">
-              <Calendar className="h-4 w-4 mr-2 text-primary" />
-              <SelectValue placeholder="Mês/Ano" />
-            </SelectTrigger>
-            <SelectContent>
-              {(data?.availableMonths || []).map(month => (
-                <SelectItem key={month} value={month}>
-                  {formatMonthLabel(month)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex flex-col gap-4">
+          {/* Period filter row */}
+          <PeriodFilter
+            availableMonths={data?.availableMonths || []}
+            value={periodRange}
+            onChange={handlePeriodChange}
+          />
+
+          {/* Other filters row */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
           {/* Search */}
           <div className="relative lg:col-span-2">
@@ -568,6 +578,7 @@ export function PaymentsManagement() {
               ))}
             </SelectContent>
           </Select>
+          </div>
         </div>
 
         {/* Scholar Table */}
