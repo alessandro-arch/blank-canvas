@@ -195,10 +195,13 @@ serve(async (req) => {
     const impostos = Number(tp.impostos_percentual || 0);
     const valorTaxaAdm = valorTotalProjeto * (taxaAdm / 100);
     const valorImpostos = valorTotalProjeto * (impostos / 100);
+    const encargosPrevistos = valorTaxaAdm + valorImpostos;
+    const custoOperacionalBruto = valorTotalProjeto + encargosPrevistos;
+    const percentualBolsasTeto = valorTotalProjeto > 0 ? (valorTotalEstimadoBolsas / valorTotalProjeto) * 100 : 0;
 
     const totalPaid = allPayments.filter((p: any) => p.status === "paid").reduce((s: number, p: any) => s + Number(p.amount), 0);
-    const percentualExecutado = valorTotalEstimadoBolsas > 0
-      ? (totalPaid / valorTotalEstimadoBolsas) * 100
+    const percentualExecutado = valorTotalProjeto > 0
+      ? (totalPaid / valorTotalProjeto) * 100
       : 0;
 
     // Temporal execution
@@ -248,6 +251,9 @@ serve(async (req) => {
       impostos,
       valorTaxaAdm,
       valorImpostos,
+      encargosPrevistos,
+      custoOperacionalBruto,
+      percentualBolsasTeto,
       totalMensal,
       totalPaid,
       percentualExecutado,
@@ -356,6 +362,9 @@ interface ExecutiveData {
   impostos: number;
   valorTaxaAdm: number;
   valorImpostos: number;
+  encargosPrevistos: number;
+  custoOperacionalBruto: number;
+  percentualBolsasTeto: number;
   totalMensal: number;
   totalPaid: number;
   percentualExecutado: number;
@@ -550,20 +559,73 @@ async function buildExecutivePdf(data: ExecutiveData): Promise<Uint8Array> {
   page = pdfDoc.addPage([W, H]);
   y = H - M;
 
-  sectionTitle("VISÃO FINANCEIRA", "1");
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SEÇÃO: ESTRUTURA ORÇAMENTÁRIA DO PROJETO
+  // ═══════════════════════════════════════════════════════════════════════════
+  sectionTitle("ESTRUTURA ORÇAMENTÁRIA DO PROJETO", "1");
 
-  // Main financial table
+  // Texto institucional explicativo
+  check(80);
+  const orcTexto = [
+    `O projeto "${data.projectTitle}", financiado por ${data.sponsor}, possui orcamento total aprovado de ${fmtCur(data.valorTotalProjeto)}.`,
+    `Desse montante, o teto destinado as bolsas e de ${fmtCur(data.valorTotalEstimadoBolsas)}, representando ${fmtPct(data.percentualBolsasTeto)} do orcamento total.`,
+    `Os encargos previstos totalizam ${fmtCur(data.encargosPrevistos)}, compostos por ISS (${fmtCur(data.valorImpostos)}) e Taxa Administrativa (${fmtCur(data.valorTaxaAdm)}).`,
+    `O custo operacional bruto e de ${fmtCur(data.custoOperacionalBruto)} (orcamento + encargos), valor informativo para o financiador.`,
+  ];
+  for (const linha of orcTexto) {
+    check(LH + 2);
+    txt(linha, M, y, 8.5, font);
+    y -= LH + 2;
+  }
+  y -= 6;
+
+  // Tabela orçamentária
+  check(140);
+  const orcRows = [
+    { label: "Orcamento Total Aprovado (Teto do Projeto)", value: fmtCur(data.valorTotalProjeto), bold: true, highlight: true },
+    { label: "Teto em Bolsas", value: fmtCur(data.valorTotalEstimadoBolsas), bold: true, highlight: true },
+    { label: `ISS (${fmtPct(data.impostos)})`, value: fmtCur(data.valorImpostos), bold: false, highlight: false },
+    { label: `Taxa Administrativa (${fmtPct(data.taxaAdm)})`, value: fmtCur(data.valorTaxaAdm), bold: false, highlight: false },
+    { label: "Encargos Previstos (ISS + Tx. Adm.)", value: fmtCur(data.encargosPrevistos), bold: true, highlight: false },
+    { label: "Custo Operacional Bruto (Teto + Encargos)", value: fmtCur(data.custoOperacionalBruto), bold: true, highlight: true },
+  ];
+
+  // Table header
+  page.drawRectangle({ x: M, y: y - 4, width: COL, height: LH + 6, color: primaryRgb });
+  txt("ITEM", M + 6, y, 8, fontBold, white);
+  txt("VALOR", W - M - 110, y, 8, fontBold, white);
+  y -= LH + 6;
+
+  for (const row of orcRows) {
+    check(LH + 4);
+    if (row.highlight) {
+      page.drawRectangle({ x: M, y: y - 4, width: COL, height: LH + 4, color: rgb(0.96, 0.97, 0.98) });
+    }
+    txt(row.label, M + 6, y, 9, row.bold ? fontBold : font);
+    txt(row.value, W - M - 110, y, 10, row.bold ? fontBold : font, row.bold ? primaryRgb : darkText);
+    y -= LH + 4;
+  }
+
+  // Indicador percentual
+  y -= 4;
+  check(LH + 4);
+  page.drawRectangle({ x: M, y: y - 4, width: COL, height: LH + 6, color: rgb(0.94, 0.96, 0.99), borderColor: primaryRgb, borderWidth: 0.5 });
+  txt("% do orcamento destinado a bolsas:", M + 6, y, 8, fontBold, grayText);
+  txt(fmtPct(data.percentualBolsasTeto), W - M - 110, y, 11, fontBold, primaryRgb);
+  y -= LH + 10;
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // VISÃO FINANCEIRA (EXECUÇÃO)
+  // ═══════════════════════════════════════════════════════════════════════════
+  sectionTitle("EXECUÇÃO FINANCEIRA", "2");
+
   const finRows = [
-    { label: "Valor Total do Projeto", value: fmtCur(data.valorTotalProjeto), bold: true },
-    { label: `Taxa Administrativa (${fmtPct(data.taxaAdm)})`, value: fmtCur(data.valorTaxaAdm), bold: false },
-    { label: `Impostos (${fmtPct(data.impostos)})`, value: fmtCur(data.valorImpostos), bold: false },
-    { label: "Valor Total Estimado de Bolsas", value: fmtCur(data.valorTotalEstimadoBolsas), bold: true },
-    { label: "Valor Total Atribuído a Bolsas", value: fmtCur(data.valorTotalAtribuido), bold: true },
-    { label: "Diferença (Estimado - Atribuído)", value: fmtCur(data.diferencaAtribuicao), bold: false },
-    { label: "% Atribuído", value: fmtPct(data.percentualAtribuido), bold: true },
+    { label: "Valor Total Atribuido a Bolsas", value: fmtCur(data.valorTotalAtribuido), bold: true },
+    { label: "Diferenca (Estimado - Atribuido)", value: fmtCur(data.diferencaAtribuicao), bold: false },
+    { label: "% Atribuido", value: fmtPct(data.percentualAtribuido), bold: true },
     { label: "Valor Mensal Total (bolsas ativas)", value: fmtCur(data.totalMensal), bold: false },
     { label: "Total Efetivamente Pago", value: fmtCur(data.totalPaid), bold: true },
-    { label: "% Executado (pago/estimado)", value: fmtPct(data.percentualExecutado), bold: true },
+    { label: "% Executado (pago/teto projeto)", value: fmtPct(data.percentualExecutado), bold: true },
   ];
 
   for (const row of finRows) {
@@ -579,7 +641,7 @@ async function buildExecutivePdf(data: ExecutiveData): Promise<Uint8Array> {
   y -= 10;
 
   // ═══ INDICADORES ESTRATÉGICOS ═══
-  sectionTitle("INDICADORES ESTRATÉGICOS", "2");
+  sectionTitle("INDICADORES ESTRATÉGICOS", "3");
 
   const indicatorKpiW = (COL - 10) / 2;
   const indicatorRows = [
@@ -611,7 +673,7 @@ async function buildExecutivePdf(data: ExecutiveData): Promise<Uint8Array> {
   y -= 6;
 
   // ═══ ANÁLISE AUTOMÁTICA ═══
-  sectionTitle("ANÁLISE AUTOMÁTICA", "3");
+  sectionTitle("ANÁLISE AUTOMÁTICA", "4");
 
   // Progress bars comparison
   check(60);
@@ -657,7 +719,7 @@ async function buildExecutivePdf(data: ExecutiveData): Promise<Uint8Array> {
   y -= 30;
 
   // ═══ PENDÊNCIAS ═══
-  sectionTitle("PENDÊNCIAS DOCUMENTAIS E OPERACIONAIS", "4");
+  sectionTitle("PENDÊNCIAS DOCUMENTAIS E OPERACIONAIS", "5");
 
   const pendItems = [
     { label: "Relatórios em análise/pendentes", value: data.pendingReports, color: data.pendingReports > 0 ? orangeColor : greenColor },
@@ -678,7 +740,7 @@ async function buildExecutivePdf(data: ExecutiveData): Promise<Uint8Array> {
   y -= 8;
 
   // ═══ HISTÓRICO DE ALTERAÇÕES ═══
-  sectionTitle("HISTÓRICO DE ALTERAÇÕES RECENTES", "5");
+  sectionTitle("HISTÓRICO DE ALTERAÇÕES RECENTES", "6");
 
   if (data.auditLogs.length === 0) {
     txt("Nenhum registro de alteração encontrado.", M, y, 9, font, grayText);
@@ -712,7 +774,7 @@ async function buildExecutivePdf(data: ExecutiveData): Promise<Uint8Array> {
 
   // ═══ ALERTAS ═══
   if (data.alerts.length > 0) {
-    sectionTitle("ALERTAS", "6");
+    sectionTitle("ALERTAS", "7");
     for (const alert of data.alerts) {
       check(LH + 4);
       txt("▲", M + 2, y, 8, fontBold, orangeColor);
