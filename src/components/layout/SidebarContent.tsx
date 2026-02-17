@@ -19,6 +19,7 @@ import {
   Mail,
   Send,
   UserCog,
+  BarChart3,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -50,6 +51,7 @@ const adminNavigation: NavItem[] = [
   { name: "Dashboard Executivo", icon: LayoutDashboard, href: "/admin/dashboard", managerOnly: true },
   { name: "Operação de Bolsas", icon: Users, href: "/admin/operacao", managerOnly: true },
   { name: "Projetos Temáticos", icon: FolderOpen, href: "/admin/projetos-tematicos", managerOnly: true },
+  { name: "Gestão Financeira", icon: BarChart3, href: "/admin/gestao-financeira", managerOnly: true },
   { name: "Mensagens", icon: Send, href: "/admin/mensagens", managerOnly: true },
   { name: "Documentos", icon: FileText, href: "/admin/documentos", managerOnly: true },
   { name: "Códigos de Convite", icon: Ticket, href: "/admin/codigos-convite", managerOnly: true, section: "Gestão Institucional" },
