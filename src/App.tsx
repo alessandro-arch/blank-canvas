@@ -46,6 +46,7 @@ import AuditTrail from "./pages/AuditTrail";
 import ScholarMessages from "./pages/ScholarMessages";
 import AdminMessages from "./pages/AdminMessages";
 import AdminMembers from "./pages/AdminMembers";
+import AllUsers from "./pages/AllUsers";
 import InviteAccept from "./pages/InviteAccept";
 
 const queryClient = new QueryClient({
@@ -167,6 +168,11 @@ const App = () => (
               <Route path="/admin/membros" element={
                 <AdminProtectedRoute allowedRoles={["admin"]}>
                   <AdminMembers />
+                </AdminProtectedRoute>
+              } />
+              <Route path="/admin/usuarios-plataforma" element={
+                <AdminProtectedRoute allowedRoles={["admin"]}>
+                  <AllUsers />
                 </AdminProtectedRoute>
               } />
               <Route path="/admin/documentos" element={
