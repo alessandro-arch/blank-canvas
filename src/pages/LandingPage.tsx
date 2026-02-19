@@ -48,15 +48,20 @@ const HeroSection = () => {
     <Section className="pt-[140px] pb-[60px]">
       <div className="max-w-[600px]">
         <p className="text-[13px] font-semibold text-primary tracking-wider uppercase mb-4">Uma solução InnovaGO</p>
-        <h1 className="text-[42px] leading-[1.15] font-bold text-foreground mb-5">
-          A plataforma para gestão e comprovação de PD&I.
+        <h1 className="text-[36px] sm:text-[42px] leading-[1.15] font-bold text-foreground mb-5">
+          Plataforma BolsaGO: Inteligência digital para a gestão de bolsas e projetos.
         </h1>
         <p className="text-[16px] text-muted-foreground leading-relaxed mb-8 max-w-[520px]">
-          Organize, acompanhe e comprove atividades de Pesquisa, Desenvolvimento e Inovação com rastreabilidade e conformidade regulatória.
+          Organize, acompanhe e comprove atividades de Pesquisa, Desenvolvimento e Inovação com rastreabilidade, transparência e conformidade regulatória.
         </p>
-        <button onClick={() => navigate("/acesso")} className="bg-foreground text-white text-[14px] font-medium px-7 py-3 rounded-lg hover:opacity-90 transition-opacity">
-          Acesse o seu perfil
-        </button>
+        <div className="flex flex-wrap gap-3">
+          <button onClick={() => navigate("/acesso")} className="bg-foreground text-white text-[14px] font-medium px-7 py-3 rounded-lg hover:opacity-90 transition-opacity">
+            Acesse o seu perfil
+          </button>
+          <button onClick={() => document.getElementById("planos")?.scrollIntoView({ behavior: "smooth" })} className="border border-border text-foreground text-[14px] font-medium px-7 py-3 rounded-lg hover:bg-muted transition-colors">
+            Ver planos
+          </button>
+        </div>
       </div>
       <div className="flex justify-center mt-12">
         <img src={heroIllustration} alt="Ilustração BolsaGO - Ciência, Tecnologia, Inovação e Gestão de Projetos" className="w-full max-w-[600px] h-auto" />
