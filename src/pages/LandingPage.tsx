@@ -418,11 +418,11 @@ const ComparisonSection = () => (
            <tr className="border-b border-border">
              <th className="text-left py-4 px-4 font-normal text-muted-foreground w-[260px]">Recursos</th>
              {planHeaders.map((h) => (
-               <th key={h.name} className={`text-center py-4 px-4 font-semibold ${h.highlighted ? "text-primary" : "text-foreground"}`}>
-                 {h.name}
-                 {h.highlighted && <span className="block text-[10px] font-medium text-primary/80">Recomendado</span>}
-                 <span className="font-normal text-muted-foreground text-[11px]">{h.price}</span>
-               </th>
+                <th key={h.name} className={`text-center py-4 px-4 font-semibold ${h.highlighted ? "text-primary" : "text-foreground"}`}>
+                  <span className="block">{h.name}</span>
+                  {h.highlighted && <span className="block text-[10px] font-medium text-primary/80 mt-0.5">Recomendado</span>}
+                  <span className="block font-normal text-muted-foreground text-[11px] mt-1">{h.price}</span>
+                </th>
              ))}
           </tr>
         </thead>
