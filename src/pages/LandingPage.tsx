@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Check, X, Star, Zap, Building2, Landmark, Shield, ShieldCheck, Lock, Eye, ClipboardList, FileSearch, BarChart3, FileText, LayoutDashboard, FileCheck, Wallet, FileBarChart, Target, Layers, Users, MessageCircle, Mail, Globe, Instagram, Linkedin, HelpCircle, ChevronUp } from "lucide-react";
+import { Check, X, Star, Zap, Building2, Landmark, Shield, ShieldCheck, Lock, Eye, ClipboardList, FileSearch, BarChart3, FileText, LayoutDashboard, FileCheck, Wallet, FileBarChart, Target, Layers, Users, MessageCircle, Mail, Globe, Instagram, Linkedin, HelpCircle, ChevronUp, GraduationCap, FlaskConical, HeartHandshake, Network } from "lucide-react";
 import heroIllustration from "@/assets/hero-illustration.png";
 import logoInnovago from "@/assets/logo-innovago.png";
 
@@ -69,6 +69,76 @@ const HeroSection = () => {
     </Section>
   );
 };
+
+/* ───────── Benefícios principais ───────── */
+const benefits = [
+  "Gestão completa de bolsistas e projetos",
+  "Relatórios mensais com rastreabilidade",
+  "Liberação e controle de pagamentos",
+  "Dashboards estratégicos e KPIs institucionais",
+  "Conformidade regulatória e trilha de auditoria",
+];
+
+const BenefitsSection = () => (
+  <Section className="py-[100px]" bg="bg-muted/40">
+    <div className="text-center mb-12">
+      <p className="text-[13px] font-semibold text-primary tracking-wider uppercase mb-4">Benefícios</p>
+      <h2 className="text-[28px] sm:text-[34px] font-bold text-foreground mb-4">Por que escolher a Plataforma BolsaGO?</h2>
+    </div>
+    <div className="max-w-[640px] mx-auto space-y-4">
+      {benefits.map((b) => (
+        <div key={b} className="flex items-start gap-3 bg-white rounded-xl border border-border p-5 hover:shadow-md transition-shadow">
+          <Check className="w-5 h-5 text-primary mt-0.5 shrink-0" />
+          <span className="text-[15px] text-foreground font-medium">{b}</span>
+        </div>
+      ))}
+    </div>
+  </Section>
+);
+
+/* ───────── Para quem é ───────── */
+const audiences = [
+  { icon: GraduationCap, title: "Universidades e centros de pesquisa", desc: "Gestão centralizada de bolsistas, relatórios e projetos acadêmicos." },
+  { icon: FlaskConical, title: "Empresas com projetos de PD&I", desc: "Comprovação estruturada para incentivos fiscais e conformidade regulatória." },
+  { icon: HeartHandshake, title: "Fundações e institutos", desc: "Controle financeiro e operacional de programas de fomento à pesquisa." },
+  { icon: Network, title: "Redes de inovação", desc: "Visão consolidada de múltiplos projetos e organizações parceiras." },
+];
+
+const AudienceSection = () => (
+  <Section className="py-[100px]">
+    <div className="text-center mb-14">
+      <p className="text-[13px] font-semibold text-primary tracking-wider uppercase mb-4">Para quem é</p>
+      <h2 className="text-[28px] sm:text-[34px] font-bold text-foreground mb-4">Uma solução para diferentes perfis institucionais</h2>
+    </div>
+    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      {audiences.map((a) => (
+        <div key={a.title} className="bg-white rounded-xl border border-border p-6 hover:shadow-md transition-shadow text-center">
+          <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mx-auto mb-5">
+            <a.icon className="w-6 h-6 text-foreground" />
+          </div>
+          <h3 className="text-[15px] font-semibold text-foreground mb-2">{a.title}</h3>
+          <p className="text-[13px] text-muted-foreground leading-relaxed">{a.desc}</p>
+        </div>
+      ))}
+    </div>
+  </Section>
+);
+
+/* ───────── CTA intermediário ───────── */
+const MidCTASection = () => (
+  <Section className="py-[60px]" bg="bg-foreground">
+    <div className="text-center">
+      <h2 className="text-[24px] sm:text-[28px] font-bold text-white mb-4">Quer ver a plataforma em ação?</h2>
+      <p className="text-[15px] text-white/70 mb-8 max-w-[480px] mx-auto">Agende uma demonstração personalizada e descubra como o BolsaGO pode transformar a gestão de PD&I da sua instituição.</p>
+      <button
+        onClick={() => document.getElementById("contato")?.scrollIntoView({ behavior: "smooth" })}
+        className="bg-white text-foreground text-[14px] font-medium px-8 py-3 rounded-lg hover:bg-white/90 transition-colors"
+      >
+        Solicitar demonstração
+      </button>
+    </div>
+  </Section>
+);
 
 /* ───────── Desafios ───────── */
 const challenges = [
@@ -506,6 +576,9 @@ const LandingPage = () => {
     <div className="min-h-screen bg-white">
       <Navbar />
       <HeroSection />
+      <BenefitsSection />
+      <AudienceSection />
+      <MidCTASection />
       <ChallengesSection />
       <LeiBemSection />
       <ApproachSection />
