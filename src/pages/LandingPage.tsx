@@ -386,28 +386,19 @@ type CellValue = boolean | string;
 const compRows: { label: string; values: CellValue[] }[] = [
   { label: "Projetos Temáticos", values: ["Até 1", "Até 3", "Até 20", "Ilimitados"] },
   { label: "Subprojetos", values: ["Até 5", "Até 20", "Até 400", "Ilimitados"] },
-  { label: "Dashboards Básicos", values: [true, true, true, true] },
-  { label: "Dashboards Avançados", values: [false, true, true, true] },
-  { label: "Dashboards Estratégicos", values: [false, false, true, true] },
-  { label: "Dashboards Personalizados", values: [false, false, false, true] },
-  { label: "Gestão de Bolsistas", values: [true, true, true, true] },
-  { label: "Relatórios Mensais", values: [true, true, true, true] },
+  { label: "Dashboards", values: ["Básicos", "Avançados", "Estratégicos", "Personalizados"] },
+  { label: "KPIs", values: [false, false, "Institucionais", "Sob medida"] },
   { label: "Avaliação de Relatórios", values: [false, true, true, true] },
-  { label: "Liberação de Pagamento", values: [false, true, true, true] },
-  { label: "Histórico Financeiro", values: [false, true, true, true] },
-  { label: "KPIs Institucionais", values: [false, false, true, true] },
-  { label: "KPIs Sob Medida", values: [false, false, false, true] },
-  { label: "Gestão Financeira Avançada", values: [false, false, true, true] },
+  { label: "Liberação de Pagamentos", values: [false, true, true, true] },
   { label: "Relatórios Consolidados", values: [false, false, true, true] },
-  { label: "Governança Institucional", values: [false, false, false, true] },
-  { label: "Integrações Customizadas", values: [false, false, false, true] },
-  { label: "Suporte", values: ["Padrão", "Prioritário", "Dedicado", "Customizado"] },
+  { label: "Integrações", values: [false, false, false, "Customizadas"] },
+  { label: "Suporte", values: ["Padrão", "Prioritário", "Dedicado", "24/7 Customizado"] },
 ];
 const planHeaders = [
-  { name: "Sis Starter", price: "R$ 500/mês" },
-  { name: "Sis Pro", price: "R$ 800/mês" },
-  { name: "Sis Enterprise", price: "R$ 1.500/mês" },
-  { name: "Sis Institucional", price: "Sob consulta" },
+  { name: "GO Starter", price: "R$ 500/mês", highlighted: false },
+  { name: "GO Pro", price: "R$ 800/mês", highlighted: true },
+  { name: "GO Enterprise", price: "R$ 1.500/mês", highlighted: false },
+  { name: "GO Institucional", price: "Sob consulta", highlighted: false },
 ];
 
 const ComparisonSection = () => (
@@ -419,13 +410,15 @@ const ComparisonSection = () => (
     <div className="overflow-x-auto">
       <table className="w-full text-[13px] border-collapse min-w-[700px]">
         <thead>
-          <tr className="border-b border-border">
-            <th className="text-left py-4 px-4 font-normal text-muted-foreground w-[260px]">Recursos</th>
-            {planHeaders.map((h) => (
-              <th key={h.name} className="text-center py-4 px-4 font-semibold text-foreground">
-                {h.name}<br /><span className="font-normal text-muted-foreground text-[11px]">{h.price}</span>
-              </th>
-            ))}
+           <tr className="border-b border-border">
+             <th className="text-left py-4 px-4 font-normal text-muted-foreground w-[260px]">Recursos</th>
+             {planHeaders.map((h) => (
+               <th key={h.name} className={`text-center py-4 px-4 font-semibold ${h.highlighted ? "text-primary" : "text-foreground"}`}>
+                 {h.name}
+                 {h.highlighted && <span className="block text-[10px] font-medium text-primary/80">Recomendado</span>}
+                 <span className="font-normal text-muted-foreground text-[11px]">{h.price}</span>
+               </th>
+             ))}
           </tr>
         </thead>
         <tbody>
