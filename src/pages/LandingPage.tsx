@@ -278,11 +278,16 @@ const PlatformSection = () => (
 );
 
 /* ───────── A Plataforma (features) ───────── */
+import screenDashboardEstrategico from "@/assets/screen-dashboard-estrategico.png";
+import screenDashboardExecutivo from "@/assets/screen-dashboard-executivo.png";
+import screenOperacaoBolsas from "@/assets/screen-operacao-bolsas.png";
+import screenGestaoFinanceira from "@/assets/screen-gestao-financeira.png";
+
 const features = [
-  { icon: LayoutDashboard, title: "Dashboards", desc: "Visão consolidada de projetos, entregas e indicadores de desempenho." },
-  { icon: FileCheck, title: "Avaliação de Relatórios", desc: "Fluxos de revisão e aprovação com histórico completo." },
-  { icon: Wallet, title: "Gestão Financeira", desc: "Acompanhamento de bolsas, pagamentos e histórico de execução." },
-  { icon: FileBarChart, title: "Relatórios", desc: "Exportação de dados para prestação de contas e auditorias." },
+  { image: screenDashboardEstrategico, title: "Dashboards", desc: "Visão consolidada de projetos, entregas e indicadores de desempenho." },
+  { image: screenOperacaoBolsas, title: "Avaliação de Relatórios", desc: "Fluxos de revisão e aprovação com histórico completo." },
+  { image: screenGestaoFinanceira, title: "Gestão Financeira", desc: "Acompanhamento de bolsas, pagamentos e histórico de execução." },
+  { image: screenDashboardExecutivo, title: "Relatórios", desc: "Exportação de dados para prestação de contas e auditorias." },
 ];
 
 const FeaturesSection = () => (
@@ -296,9 +301,9 @@ const FeaturesSection = () => (
     </div>
     <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
       {features.map((f) => (
-        <div key={f.title} className="bg-white rounded-xl border border-border p-6 hover:shadow-md transition-shadow">
-          <div className="w-11 h-11 rounded-lg bg-foreground flex items-center justify-center mb-5">
-            <f.icon className="w-5 h-5 text-white" />
+        <div key={f.title} className="bg-white rounded-xl border border-border p-6 hover:shadow-md transition-shadow group">
+          <div className="w-full aspect-[16/10] rounded-lg overflow-hidden mb-5 border border-border/50 bg-muted/30">
+            <img src={f.image} alt={f.title} className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300" />
           </div>
           <h3 className="text-[15px] font-semibold text-foreground mb-2">{f.title}</h3>
           <p className="text-[13px] text-muted-foreground leading-relaxed">{f.desc}</p>
