@@ -322,7 +322,7 @@ const plans = [
     cta: "Contratar",
   },
   {
-    name: "GO Pro", icon: Zap, subtitle: "Para instituições em crescimento", price: "R$ 800", period: "/mês", highlighted: true,
+    name: "GO Pro", icon: Zap, subtitle: "Para instituições em crescimento", price: "R$ 1.000", period: "/mês", highlighted: true,
     items: ["Até 3 projetos temáticos", "Até 20 subprojetos", "Dashboards avançados", "Gestão completa de bolsistas", "Avaliação de relatórios", "Liberação de pagamento", "Histórico financeiro", "Suporte prioritário"],
     disabledItems: [],
     cta: "Contratar",
@@ -401,7 +401,7 @@ const compRows: { label: string; values: CellValue[] }[] = [
 ];
 const planHeaders = [
   { name: "GO Starter", price: "R$ 500/mês", highlighted: false },
-  { name: "GO Pro", price: "R$ 800/mês", highlighted: true },
+  { name: "GO Pro", price: "R$ 1.000/mês", highlighted: true },
   { name: "GO Enterprise", price: "R$ 1.500/mês", highlighted: false },
   { name: "GO Institucional", price: "Sob consulta", highlighted: false },
 ];
