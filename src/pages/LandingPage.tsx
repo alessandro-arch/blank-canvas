@@ -475,16 +475,19 @@ const SecuritySection = () => (
 const CTASection = () => (
   <section id="contato" className="bg-foreground py-[80px]">
     <div className="max-w-[1200px] mx-auto px-6 text-center">
-      <h2 className="text-[30px] font-bold text-white mb-4">Pronto para transformar sua gestão de PD&I?</h2>
-      <p className="text-[15px] text-white/70 mb-8 max-w-[520px] mx-auto">
-        Converse com nossos especialistas e descubra como o BolsaGO pode apoiar sua instituição.
+      <h2 className="text-[26px] sm:text-[30px] font-bold text-white mb-4">Pronto para transformar a gestão de bolsas e projetos da sua instituição?</h2>
+      <p className="text-[15px] text-white/70 mb-8 max-w-[560px] mx-auto">
+        Com a Plataforma BolsaGO, sua organização ganha transparência, eficiência e inteligência na gestão de PD&I.
       </p>
       <div className="flex items-center justify-center gap-4 flex-wrap">
-        <button className="bg-white text-foreground text-[14px] font-medium px-7 py-3 rounded-lg hover:opacity-90 transition-opacity">
-          Solicitar Demonstração
+        <button
+          onClick={() => document.getElementById("planos")?.scrollIntoView({ behavior: "smooth" })}
+          className="bg-white text-foreground text-[14px] font-medium px-7 py-3 rounded-lg hover:opacity-90 transition-opacity"
+        >
+          Ver planos
         </button>
         <button className="border border-white/30 text-white text-[14px] font-medium px-7 py-3 rounded-lg hover:bg-white/10 transition-colors flex items-center gap-2">
-          <MessageCircle className="w-4 h-4" /> Falar no WhatsApp
+          <MessageCircle className="w-4 h-4" /> Solicitar demonstração
         </button>
       </div>
     </div>
