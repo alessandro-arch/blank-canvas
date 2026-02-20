@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PdfReadyDialog } from "@/components/ui/PdfReadyDialog";
+
 import {
   Select,
   SelectContent,
@@ -116,9 +116,6 @@ export default function PdfReports() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [monthFilter, setMonthFilter] = useState<string>("");
-  const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
-  const [pdfDialogStatus, setPdfDialogStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [indexing, setIndexing] = useState(false);
 
   // ── 1. Fetch pdf_logs (DB) ──────────────────────────────────────
@@ -253,14 +250,6 @@ export default function PdfReports() {
   };
 
   const handleOpen = async (filePath: string) => {
-    if (isMobile) {
-      setPdfDialogOpen(true);
-      setPdfDialogStatus("loading");
-      const url = await getSignedUrl(filePath);
-      if (url) { setPdfUrl(url); setPdfDialogStatus("ready"); }
-      else { setPdfDialogStatus("error"); }
-      return;
-    }
     const url = await getSignedUrl(filePath);
     if (url) {
       const opened = window.open(url, "_blank", "noopener,noreferrer");
@@ -542,12 +531,6 @@ export default function PdfReports() {
         </main>
       </div>
 
-      <PdfReadyDialog
-        open={pdfDialogOpen}
-        onOpenChange={(open) => { setPdfDialogOpen(open); if (!open) setPdfUrl(null); }}
-        signedUrl={pdfUrl}
-        status={pdfDialogStatus}
-      />
     </div>
   );
 }

@@ -46,7 +46,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { tracedInvokeWithPolling, friendlyError } from '@/lib/logger';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { SubprojectMobileCard } from './SubprojectMobileCard';
-import { PdfReadyDialog } from '@/components/ui/PdfReadyDialog';
+
 
 interface SubprojectsTableProps {
   subprojects: SubprojectWithScholar[];
@@ -75,11 +75,6 @@ export function SubprojectsTable({
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [generatingPdfFor, setGeneratingPdfFor] = useState<string | null>(null);
-  const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
-  const [pdfSignedUrl, setPdfSignedUrl] = useState<string | null>(null);
-  const [pdfDialogStatus, setPdfDialogStatus] = useState<"loading" | "ready" | "error">("ready");
-  const [pdfDialogError, setPdfDialogError] = useState<string | undefined>();
-  const [pdfRetryProject, setPdfRetryProject] = useState<SubprojectWithScholar | null>(null);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -164,16 +159,8 @@ export function SubprojectsTable({
     if (generatingPdfFor) return;
     setGeneratingPdfFor(project.id);
 
-    if (isMobile) {
-      setPdfSignedUrl(null);
-      setPdfDialogStatus("loading");
-      setPdfDialogError(undefined);
-      setPdfDialogOpen(true);
-      setPdfRetryProject(project);
-    }
-
-    const toastId = !isMobile ? toast.loading('Gerando relatório PDF...') : undefined;
-    const newWindow = !isMobile ? window.open('about:blank', '_blank') : null;
+    const toastId = toast.loading('Gerando relatório PDF...');
+    const newWindow = window.open('about:blank', '_blank');
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -185,26 +172,17 @@ export function SubprojectsTable({
         'SubprojectsTable',
       );
 
-      if (isMobile) {
-        setPdfSignedUrl(data.signedUrl);
-        setPdfDialogStatus("ready");
+      if (newWindow) {
+        newWindow.location.href = data.signedUrl;
       } else {
-        if (newWindow) {
-          newWindow.location.href = data.signedUrl;
-        } else {
-          toast.error('Permita pop-ups no navegador para visualizar o arquivo');
-        }
-        if (toastId) toast.success('Relatório gerado com sucesso', { id: toastId });
+        const opened = window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+        if (!opened) window.location.href = data.signedUrl;
       }
+      toast.success('Relatório gerado com sucesso', { id: toastId });
     } catch (err: any) {
       console.error('PDF generation error:', err);
       newWindow?.close();
-      if (isMobile) {
-        setPdfDialogStatus("error");
-        setPdfDialogError(friendlyError(err, 'Erro ao gerar relatório PDF'));
-      } else {
-        toast.error(friendlyError(err, 'Erro ao gerar relatório PDF'), { id: toastId });
-      }
+      toast.error(friendlyError(err, 'Erro ao gerar relatório PDF'), { id: toastId });
     } finally {
       setGeneratingPdfFor(null);
     }
@@ -428,14 +406,6 @@ export function SubprojectsTable({
         </>
       )}
 
-      <PdfReadyDialog
-        open={pdfDialogOpen}
-        onOpenChange={setPdfDialogOpen}
-        signedUrl={pdfSignedUrl}
-        status={pdfDialogStatus}
-        errorMessage={pdfDialogError}
-        onRetry={pdfRetryProject ? () => handleGeneratePdf(pdfRetryProject) : undefined}
-      />
     </>
   );
 }
