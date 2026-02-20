@@ -319,7 +319,6 @@ export default function ThematicProjectDetail() {
     setGeneratingPdf(true);
 
     const toastId = toast.loading('Gerando relatório consolidado...');
-    const newWindow = window.open('about:blank', '_blank');
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -331,16 +330,16 @@ export default function ThematicProjectDetail() {
         'ThematicProjectDetail',
       );
 
-      if (newWindow) {
-        newWindow.location.href = data.signedUrl;
-      } else {
-        const opened = window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
-        if (!opened) window.location.href = data.signedUrl;
-      }
-      toast.success('Relatório consolidado gerado com sucesso', { id: toastId });
+      toast.dismiss(toastId);
+      toast('Relatório consolidado pronto!', {
+        duration: 15000,
+        action: {
+          label: 'Abrir PDF',
+          onClick: () => { window.open(data.signedUrl, '_blank', 'noopener,noreferrer'); },
+        },
+      });
     } catch (err: any) {
       console.error('Thematic PDF error:', err);
-      newWindow?.close();
       toast.error(friendlyError(err, 'Erro ao gerar relatório PDF'), { id: toastId });
     } finally {
       setGeneratingPdf(false);
@@ -352,7 +351,6 @@ export default function ThematicProjectDetail() {
     setGeneratingExecPdf(true);
 
     const toastId = toast.loading('Gerando relatório executivo...');
-    const newWindow = window.open('about:blank', '_blank');
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -364,16 +362,16 @@ export default function ThematicProjectDetail() {
         'ThematicProjectDetail',
       );
 
-      if (newWindow) {
-        newWindow.location.href = data.signedUrl;
-      } else {
-        const opened = window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
-        if (!opened) window.location.href = data.signedUrl;
-      }
-      toast.success('Relatório executivo gerado com sucesso', { id: toastId });
+      toast.dismiss(toastId);
+      toast('Relatório executivo pronto!', {
+        duration: 15000,
+        action: {
+          label: 'Abrir PDF',
+          onClick: () => { window.open(data.signedUrl, '_blank', 'noopener,noreferrer'); },
+        },
+      });
     } catch (err: any) {
       console.error('Executive PDF error:', err);
-      newWindow?.close();
       toast.error(friendlyError(err, 'Erro ao gerar relatório executivo'), { id: toastId });
     } finally {
       setGeneratingExecPdf(false);

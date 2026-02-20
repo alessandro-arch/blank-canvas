@@ -79,11 +79,16 @@ export function ProjectDocumentsSection({
 
       if (error) throw error;
 
-      const newWindow = window.open('about:blank', '_blank');
-      if (newWindow) {
-        newWindow.location.href = data.signedUrl;
-      } else {
-        toast.error('Permita pop-ups para visualizar o documento');
+      // Use direct window.open — if blocked, show toast with link
+      const opened = window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+      if (!opened) {
+        toast('Documento pronto!', {
+          duration: 15000,
+          action: {
+            label: 'Abrir',
+            onClick: () => { window.open(data.signedUrl, '_blank', 'noopener,noreferrer'); },
+          },
+        });
       }
     } catch (err) {
       console.error(err);
