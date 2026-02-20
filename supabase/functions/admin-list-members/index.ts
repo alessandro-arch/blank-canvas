@@ -1,25 +1,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
-const ALLOWED_ORIGINS = [
-  "https://sisconnecta.lovable.app",
-  "https://www.innovago.app",
-  "https://bolsago.innovago.app",
-  "https://boundless-start-art.lovable.app",
-  "https://id-preview--2b9d72d4-676d-41a6-bf6b-707f4c8b4527.lovable.app",
-  "https://id-preview--48549f0c-244e-46f3-bcfd-486dcaec8bc7.lovable.app",
-];
-
-function getCorsHeaders(req: Request) {
-  const origin = req.headers.get("origin") || "";
-  return {
-    "Access-Control-Allow-Origin": ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0],
-    "Access-Control-Allow-Headers":
-      "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-  };
-}
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-request-id, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
 
 Deno.serve(async (req) => {
-  const corsHeaders = getCorsHeaders(req);
+  
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }

@@ -1,19 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const ALLOWED_ORIGINS = [
-  "https://sisconnecta.lovable.app",
-  "https://www.innovago.app",
-  "https://id-preview--2b9d72d4-676d-41a6-bf6b-707f4c8b4527.lovable.app",
-];
-
-function getCorsHeaders(req: Request) {
-  const origin = req.headers.get("origin") || "";
-  return {
-    "Access-Control-Allow-Origin": ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0],
-    "Access-Control-Allow-Headers":
-      "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-  };
-}
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-request-id, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
 
 interface AssignScholarRequest {
   scholar_id: string;
@@ -27,7 +18,7 @@ function isValidUUID(str: string): boolean {
 }
 
 Deno.serve(async (req) => {
-  const corsHeaders = getCorsHeaders(req);
+  
 
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -334,7 +325,7 @@ Deno.serve(async (req) => {
     console.error('[ASSIGN] Unexpected error:', error);
     return new Response(
       JSON.stringify({ error: 'Erro interno do servidor. Tente novamente.', code: 'INTERNAL_ERROR' }),
-      { status: 500, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
