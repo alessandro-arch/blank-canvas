@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Check, X, Star, Zap, Building2, Landmark, Shield, ShieldCheck, Lock, Eye, ClipboardList, FileSearch, BarChart3, FileText, LayoutDashboard, FileCheck, Wallet, FileBarChart, Target, Layers, Users, MessageCircle, Mail, Globe, Instagram, Linkedin, HelpCircle, ChevronUp, GraduationCap, FlaskConical, HeartHandshake, Network } from "lucide-react";
 import heroIllustration from "@/assets/hero-illustration.png";
 import logoInnovago from "@/assets/logo-innovago.png";
+import logoBolsago from "@/assets/logo-bolsago.jpeg";
 
 /* ───────── Navbar ───────── */
 const Navbar = () => {
@@ -21,7 +22,7 @@ const Navbar = () => {
   return (
     <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "bg-white/95 backdrop-blur-sm shadow-sm" : "bg-white"}`}>
       <div className="max-w-[1200px] mx-auto flex items-center justify-between px-6 h-[64px]">
-        <span className="text-[20px] font-bold text-foreground tracking-tight">BolsaGO</span>
+        <img src={logoBolsago} alt="BolsaGO" className="h-10 object-contain" />
         <div className="hidden md:flex items-center gap-8">
           <button onClick={() => scrollTo("planos")} className="text-[14px] text-muted-foreground hover:text-foreground transition-colors">Planos</button>
           <button onClick={() => scrollTo("comparativo")} className="text-[14px] text-muted-foreground hover:text-foreground transition-colors">Comparativo</button>
