@@ -23,8 +23,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import logoInnovaGO from "@/assets/logo-innovago.png";
-import logoInnovaGOWhite from "@/assets/logo-innovago-white.png";
+import logoBolsago from "@/assets/logo-bolsago-new.jpeg";
 import { useState, useEffect } from "react";
 
 const navLinks = [
@@ -106,7 +105,7 @@ export default function Access() {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <span className="text-xl font-semibold text-foreground tracking-tight">InnovaGO</span>
+            <img src={logoBolsago} alt="BolsaGO - Powered by InnovaGO" className="h-[44px] w-auto object-contain mix-blend-multiply" />
 
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-8">
