@@ -160,7 +160,6 @@ export function SubprojectsTable({
     setGeneratingPdfFor(project.id);
 
     const toastId = toast.loading('Gerando relatório PDF...');
-    const newWindow = window.open('about:blank', '_blank');
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -172,16 +171,16 @@ export function SubprojectsTable({
         'SubprojectsTable',
       );
 
-      if (newWindow) {
-        newWindow.location.href = data.signedUrl;
-      } else {
-        const opened = window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
-        if (!opened) window.location.href = data.signedUrl;
-      }
-      toast.success('Relatório gerado com sucesso', { id: toastId });
+      toast.dismiss(toastId);
+      toast('Relatório pronto!', {
+        duration: 15000,
+        action: {
+          label: 'Abrir PDF',
+          onClick: () => { window.open(data.signedUrl, '_blank', 'noopener,noreferrer'); },
+        },
+      });
     } catch (err: any) {
       console.error('PDF generation error:', err);
-      newWindow?.close();
       toast.error(friendlyError(err, 'Erro ao gerar relatório PDF'), { id: toastId });
     } finally {
       setGeneratingPdfFor(null);
