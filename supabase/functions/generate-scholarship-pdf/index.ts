@@ -3,25 +3,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { PDFDocument, rgb, StandardFonts } from "https://esm.sh/pdf-lib@1.17.1";
 import { renderRelatorioBolsaHtml, type RelatorioBolsaData, type EventoProximo, type DocumentoAnexo, type RelatorioItem, type PagamentoItem } from "./template.ts";
 
-const ALLOWED_ORIGINS = [
-  "https://sisconnecta.lovable.app",
-  "https://www.innovago.app",
-  "https://bolsago.innovago.app",
-  "https://boundless-start-art.lovable.app",
-  "https://id-preview--2b9d72d4-676d-41a6-bf6b-707f4c8b4527.lovable.app",
-  "https://id-preview--48549f0c-244e-46f3-bcfd-486dcaec8bc7.lovable.app",
-];
-
-function getCorsHeadersForReq(req: Request) {
-  const origin = req.headers.get("origin") || "";
-  return {
-    "Access-Control-Allow-Origin": ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0],
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers":
-      "authorization, x-client-info, apikey, content-type, x-request-id, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-    "Access-Control-Max-Age": "86400",
-  };
-}
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-request-id, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
 
 function jsonResponse(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -31,7 +18,7 @@ function jsonResponse(body: Record<string, unknown>, status = 200) {
 }
 
 serve(async (req) => {
-  const corsHeaders = getCorsHeadersForReq(req);
+  
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
