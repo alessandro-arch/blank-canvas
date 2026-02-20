@@ -25,10 +25,30 @@ function generateRandomPassword(): string {
   for (let i = 0; i < 14; i++) {
     password += chars[array[i] % chars.length];
   }
-  // Ensure at least one special char and one digit
   password += specialChars[array[14] % specialChars.length];
   password += String(array[15] % 10);
   return password;
+}
+
+// CPF algorithm validation (modulo 11)
+function validateCPF(cpf: string): boolean {
+  const clean = cpf.replace(/\D/g, "");
+  if (clean.length !== 11) return false;
+  // Reject all-same-digit patterns
+  if (/^(\d)\1{10}$/.test(clean)) return false;
+  // Validate first check digit
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += parseInt(clean[i]) * (10 - i);
+  let rem = (sum * 10) % 11;
+  if (rem >= 10) rem = 0;
+  if (rem !== parseInt(clean[9])) return false;
+  // Validate second check digit
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += parseInt(clean[i]) * (11 - i);
+  rem = (sum * 10) % 11;
+  if (rem >= 10) rem = 0;
+  if (rem !== parseInt(clean[10])) return false;
+  return true;
 }
 
 Deno.serve(async (req) => {
@@ -189,13 +209,12 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Validate CPF
-        if (!user.cpf || user.cpf.replace(/\D/g, "").length < 11) {
+        // Validate CPF with algorithm check
+        const cpfClean = (user.cpf || "").replace(/\D/g, "");
+        if (!validateCPF(cpfClean)) {
           results.failed.push({ email: user.email, error: "CPF inválido" });
           continue;
         }
-
-        const cpfClean = user.cpf.replace(/\D/g, "");
         // Generate cryptographically random password instead of predictable pattern
         const defaultPassword = generateRandomPassword();
 

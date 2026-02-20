@@ -175,7 +175,7 @@ Deno.serve(async (req) => {
     if (startDateObj < projectStart || endDateObj > projectEnd) {
       return new Response(
         JSON.stringify({ 
-          error: `O período deve estar dentro do período do subprojeto (${project.start_date} a ${project.end_date}).`, 
+          error: 'O período deve estar dentro do período do subprojeto.', 
           code: 'DATE_OUT_OF_PROJECT_RANGE' 
         }),
         { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -218,7 +218,7 @@ Deno.serve(async (req) => {
       console.warn(`[ASSIGN] Exclusivity: scholar ${scholar_id} already has active enrollment`);
       return new Response(
         JSON.stringify({ 
-          error: `Este bolsista já possui um subprojeto ativo${existingProject ? ` (${existingProject.code})` : ''}.`, 
+          error: 'Este bolsista já possui um subprojeto ativo.', 
           code: 'SCHOLAR_HAS_ACTIVE_ENROLLMENT' 
         }),
         { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -293,10 +293,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Create audit log
+    // Create audit log (no PII for data minimization)
     await supabaseAdmin.from('audit_logs').insert({
       user_id: user.id,
-      user_email: user.email,
       action: 'assign_scholar_to_project',
       entity_type: 'enrollment',
       entity_id: enrollment.id,
@@ -310,7 +309,6 @@ Deno.serve(async (req) => {
         end_date,
         total_installments: totalInstallments,
       },
-      user_agent: req.headers.get('user-agent'),
     });
 
     console.log(`[ASSIGN] Success: scholar ${scholar_id} assigned to project ${project_id}`);
