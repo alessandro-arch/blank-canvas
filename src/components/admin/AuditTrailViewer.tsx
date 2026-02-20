@@ -20,14 +20,12 @@ import type { Json } from "@/integrations/supabase/types";
 interface AuditLog {
   id: string;
   user_id: string;
-  user_email: string | null;
   action: string;
   entity_type: string;
   entity_id: string | null;
   details: Json | null;
   previous_value: Json | null;
   new_value: Json | null;
-  user_agent: string | null;
   created_at: string;
 }
 
@@ -82,7 +80,6 @@ export function AuditTrailViewer() {
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
   
   // Filters
-  const [searchEmail, setSearchEmail] = useState("");
   const [filterAction, setFilterAction] = useState<string>("all");
   const [filterEntity, setFilterEntity] = useState<string>("all");
   const [startDate, setStartDate] = useState("");
@@ -93,13 +90,10 @@ export function AuditTrailViewer() {
     try {
       let query = supabase
         .from("audit_logs")
-        .select("*")
+        .select("id, user_id, action, entity_type, entity_id, details, previous_value, new_value, created_at")
         .order("created_at", { ascending: false })
         .limit(100);
 
-      if (searchEmail) {
-        query = query.ilike("user_email", `%${searchEmail}%`);
-      }
       if (filterAction && filterAction !== "all") {
         query = query.eq("action", filterAction);
       }
@@ -139,7 +133,6 @@ export function AuditTrailViewer() {
   };
 
   const handleClearFilters = () => {
-    setSearchEmail("");
     setFilterAction("all");
     setFilterEntity("all");
     setStartDate("");
@@ -180,20 +173,7 @@ export function AuditTrailViewer() {
               <Filter className="w-4 h-4" />
               Filtros
             </div>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-              <div className="space-y-2">
-                <Label className="text-xs">Usuário (e-mail)</Label>
-                <div className="relative">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar por e-mail..."
-                    value={searchEmail}
-                    onChange={(e) => setSearchEmail(e.target.value)}
-                    className="pl-8"
-                  />
-                </div>
-              </div>
-
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <div className="space-y-2">
                 <Label className="text-xs">Tipo de Ação</Label>
                 <Select value={filterAction} onValueChange={setFilterAction}>
@@ -290,7 +270,7 @@ export function AuditTrailViewer() {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <User className="w-3 h-3 text-muted-foreground" />
-                          <span className="text-sm">{log.user_email || "—"}</span>
+                          <span className="text-xs font-mono text-muted-foreground">{log.user_id.slice(0, 8)}...</span>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -346,8 +326,8 @@ export function AuditTrailViewer() {
                     </p>
                   </div>
                   <div>
-                    <Label className="text-xs text-muted-foreground">Usuário</Label>
-                    <p className="font-medium">{selectedLog.user_email || "—"}</p>
+                    <Label className="text-xs text-muted-foreground">ID do Usuário</Label>
+                    <p className="font-mono text-xs">{selectedLog.user_id}</p>
                   </div>
                   <div>
                     <Label className="text-xs text-muted-foreground">Ação</Label>
@@ -404,15 +384,6 @@ export function AuditTrailViewer() {
                   </div>
                 )}
 
-                {/* User Agent */}
-                {selectedLog.user_agent && (
-                  <div>
-                    <Label className="text-xs text-muted-foreground mb-2 block">User Agent</Label>
-                    <p className="text-xs text-muted-foreground bg-muted p-2 rounded">
-                      {selectedLog.user_agent}
-                    </p>
-                  </div>
-                )}
               </div>
             </ScrollArea>
           )}

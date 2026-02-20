@@ -78,7 +78,6 @@ export function useAuditLog() {
         p_details: (details || {}) as Json,
         p_previous_value: previousValue || null,
         p_new_value: newValue || null,
-        p_user_agent: navigator.userAgent,
       });
 
       if (error) {
