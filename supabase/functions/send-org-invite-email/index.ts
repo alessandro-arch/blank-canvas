@@ -134,7 +134,8 @@ Deno.serve(async (req) => {
         await supabaseAdmin.from('organization_invites')
           .update({ send_error: 'APP_URL nao configurado.' })
           .eq('id', inviteId);
-        return jsonRes({ error: 'APP_URL nao configurado. Defina o secret APP_URL = https://bolsago.innovago.app' }, 500);
+        console.error('APP_URL not configured. Set the APP_URL secret.');
+        return jsonRes({ error: 'Configuração do servidor incompleta.' }, 500);
       }
     }
 
@@ -223,8 +224,7 @@ Clique no botao abaixo para aceitar o convite e criar sua conta (caso ainda nao 
         entity_type: 'organization_invite',
         entity_id: inviteId,
         organization_id: invite.organization_id,
-        details: { email: invite.invited_email, role: invite.role, attempt: newAttempts },
-        user_email: user.email,
+        details: { role: invite.role, attempt: newAttempts },
       });
 
       return jsonRes({ error: 'Falha ao enviar e-mail.' }, 500);
@@ -247,12 +247,10 @@ Clique no botao abaixo para aceitar o convite e criar sua conta (caso ainda nao 
       entity_id: inviteId,
       organization_id: invite.organization_id,
       details: {
-        email: invite.invited_email,
         role: invite.role,
         provider_id: emailResult?.id || null,
         attempt: newAttempts,
       },
-      user_email: user.email,
     });
 
     return jsonRes({ success: true, message_id: emailResult?.id }, 200);
