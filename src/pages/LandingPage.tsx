@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Check, X, Star, Zap, Building2, Landmark, Shield, ShieldCheck, Lock, Eye, ClipboardList, FileSearch, BarChart3, FileText, LayoutDashboard, FileCheck, Wallet, FileBarChart, Target, Layers, Users, MessageCircle, Mail, Globe, Instagram, Linkedin, HelpCircle, ChevronUp, GraduationCap, FlaskConical, HeartHandshake, Network } from "lucide-react";
 import heroIllustration from "@/assets/hero-illustration.png";
 import logoInnovago from "@/assets/logo-innovago.png";
-import logoBolsago from "@/assets/logo-bolsago.jpeg";
+import logoBolsago from "@/assets/logo-bolsago.png";
 
 /* ───────── Navbar ───────── */
 const Navbar = () => {
