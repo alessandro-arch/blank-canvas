@@ -6,7 +6,7 @@ import { calcularRiscoFinanceiro } from '@/lib/financial-risk';
 import { tracedInvokeWithPolling, friendlyError } from '@/lib/logger';
 import type { RiskResult } from '@/lib/financial-risk';
 import { useOrganizationContext } from '@/contexts/OrganizationContext';
-import { PdfReadyDialog } from '@/components/ui/PdfReadyDialog';
+
 import { Header } from '@/components/layout/Header';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Footer } from '@/components/layout/Footer';
@@ -75,10 +75,6 @@ export default function FinancialManagement() {
   const [selectedSponsor, setSelectedSponsor] = useState<string>('all');
   const [selectedPeriod, setSelectedPeriod] = useState<string>('all');
   const [generatingPdf, setGeneratingPdf] = useState(false);
-  const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
-  const [pdfSignedUrl, setPdfSignedUrl] = useState<string | null>(null);
-  const [pdfDialogStatus, setPdfDialogStatus] = useState<"loading" | "ready" | "error">("ready");
-  const [pdfDialogError, setPdfDialogError] = useState<string | undefined>();
 
   // ── Data fetching (scoped to current organization) ──
 
@@ -290,7 +286,6 @@ export default function FinancialManagement() {
   const isLoading = loadingProjects;
 
   const handleExportExecutivePdf = async () => {
-    // Need a specific project to generate the executive PDF
     const targetProjectId = selectedProjectId !== 'all' ? selectedProjectId : filteredProjects?.[0]?.id;
     if (generatingPdf || !targetProjectId) {
       toast.error('Selecione um projeto temático para gerar o relatório executivo.');
@@ -298,15 +293,8 @@ export default function FinancialManagement() {
     }
     setGeneratingPdf(true);
 
-    if (isMobile) {
-      setPdfSignedUrl(null);
-      setPdfDialogStatus("loading");
-      setPdfDialogError(undefined);
-      setPdfDialogOpen(true);
-    }
-
-    const toastId = !isMobile ? toast.loading('Gerando relatório executivo...') : undefined;
-    const newWindow = !isMobile ? window.open('about:blank', '_blank') : null;
+    const toastId = toast.loading('Gerando relatório executivo...');
+    const newWindow = window.open('about:blank', '_blank');
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -318,24 +306,17 @@ export default function FinancialManagement() {
         'FinancialManagement',
       );
 
-      if (isMobile) {
-        setPdfSignedUrl(data.signedUrl);
-        setPdfDialogStatus("ready");
-      } else if (newWindow) {
+      if (newWindow) {
         newWindow.location.href = data.signedUrl;
       } else {
-        toast.error('Permita pop-ups no navegador para visualizar o arquivo');
+        const opened = window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+        if (!opened) window.location.href = data.signedUrl;
       }
-      if (toastId) toast.success('Relatório executivo gerado com sucesso', { id: toastId });
+      toast.success('Relatório executivo gerado com sucesso', { id: toastId });
     } catch (err: any) {
       console.error('Executive PDF error:', err);
       newWindow?.close();
-      if (isMobile) {
-        setPdfDialogStatus("error");
-        setPdfDialogError(friendlyError(err, 'Erro ao gerar relatório executivo'));
-      } else {
-        toast.error(friendlyError(err, 'Erro ao gerar relatório executivo'), { id: toastId });
-      }
+      toast.error(friendlyError(err, 'Erro ao gerar relatório executivo'), { id: toastId });
     } finally {
       setGeneratingPdf(false);
     }
@@ -740,15 +721,6 @@ export default function FinancialManagement() {
 
       <Footer />
 
-      <PdfReadyDialog
-        open={pdfDialogOpen}
-        onOpenChange={setPdfDialogOpen}
-        signedUrl={pdfSignedUrl}
-        title="Relatório Executivo pronto"
-        status={pdfDialogStatus}
-        errorMessage={pdfDialogError}
-        onRetry={handleExportExecutivePdf}
-      />
     </div>
   );
 }
