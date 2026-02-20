@@ -21,8 +21,8 @@ const Navbar = () => {
 
   return (
     <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "bg-white/95 backdrop-blur-sm shadow-sm" : "bg-white"}`}>
-      <div className="max-w-[1200px] mx-auto flex items-center justify-between px-6 h-[80px]">
-        <img src={logoBolsago} alt="BolsaGO - Powered by InnovaGO" className="h-[68px] w-auto object-contain" />
+      <div className="max-w-[1200px] mx-auto flex items-center justify-between px-6 h-[96px]">
+        <img src={logoBolsago} alt="BolsaGO - Powered by InnovaGO" className="h-[84px] w-auto object-contain" />
         <div className="hidden md:flex items-center gap-8">
           <button onClick={() => scrollTo("planos")} className="text-[14px] text-muted-foreground hover:text-foreground transition-colors">Planos</button>
           <button onClick={() => scrollTo("comparativo")} className="text-[14px] text-muted-foreground hover:text-foreground transition-colors">Comparativo</button>
@@ -46,7 +46,7 @@ const Section = ({ children, className = "", id, bg = "bg-white" }: { children: 
 const HeroSection = () => {
   const navigate = useNavigate();
   return (
-    <Section className="pt-[160px] pb-[60px]">
+    <Section className="pt-[176px] pb-[60px]">
       <div className="max-w-[600px]">
         <p className="text-[13px] font-semibold text-primary tracking-wider uppercase mb-4">Uma solução InnovaGO</p>
         <h1 className="text-[36px] sm:text-[42px] leading-[1.15] font-bold text-foreground mb-5">
