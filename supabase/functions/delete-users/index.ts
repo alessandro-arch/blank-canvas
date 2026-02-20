@@ -196,14 +196,15 @@ Deno.serve(async (req) => {
 
         if (authDeleteError) {
           console.error("Error deleting auth user", targetUserId, authDeleteError);
-          results.failed.push({ id: targetUserId, error: authDeleteError.message });
+          results.failed.push({ id: targetUserId, error: "Falha ao excluir usuário" });
         } else {
           console.log("Successfully deleted user:", targetUserId);
           results.success.push(targetUserId);
         }
       } catch (err) {
         console.error("Unexpected error deleting user", targetUserId, err);
-        results.failed.push({ id: targetUserId, error: String(err) });
+        console.error("Unexpected error deleting user", targetUserId, err);
+        results.failed.push({ id: targetUserId, error: "Erro inesperado ao excluir usuário" });
       }
     }
 

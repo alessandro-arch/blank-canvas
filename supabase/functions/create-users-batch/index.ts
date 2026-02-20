@@ -132,13 +132,15 @@ Deno.serve(async (req) => {
           );
 
           if (updateError) {
-            resetResults.failed.push({ email: user.email, error: updateError.message });
+            console.error(`Password update error for ${user.email}:`, updateError.message);
+            resetResults.failed.push({ email: user.email, error: "Falha ao redefinir senha" });
           } else {
             resetResults.success.push({ email: user.email });
             console.log(`Password reset for: ${user.email}`);
           }
         } catch (err) {
-          resetResults.failed.push({ email: user.email, error: String(err) });
+          console.error(`Unexpected error resetting password for ${user.email}:`, err);
+          resetResults.failed.push({ email: user.email, error: "Erro inesperado" });
         }
       }
 
@@ -213,7 +215,7 @@ Deno.serve(async (req) => {
 
         if (authError) {
           console.error(`Error creating user ${user.email}:`, authError);
-          results.failed.push({ email: user.email, error: authError.message });
+          results.failed.push({ email: user.email, error: "Falha ao criar usuário" });
           continue;
         }
 
@@ -259,7 +261,7 @@ Deno.serve(async (req) => {
         console.log(`Successfully created user: ${user.email}`);
       } catch (err) {
         console.error(`Unexpected error for ${user.email}:`, err);
-        results.failed.push({ email: user.email, error: String(err) });
+        results.failed.push({ email: user.email, error: "Erro inesperado ao criar usuário" });
       }
     }
 

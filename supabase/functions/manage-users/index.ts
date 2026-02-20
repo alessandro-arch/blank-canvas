@@ -164,7 +164,7 @@ Deno.serve(async (req) => {
 
           if (profileError) {
             console.error(`Error updating profile for ${targetUserId}:`, profileError);
-            results.failed.push({ id: targetUserId, error: profileError.message, code: "update_failed" });
+            results.failed.push({ id: targetUserId, error: "Falha ao atualizar perfil do usuário.", code: "update_failed" });
             continue;
           }
 
@@ -185,7 +185,8 @@ Deno.serve(async (req) => {
           results.success.push(targetUserId);
         } catch (err) {
           console.error(`Unexpected error ${action}ing user ${targetUserId}:`, err);
-          results.failed.push({ id: targetUserId, error: String(err), code: "server_error" });
+          console.error(`Unexpected error ${action}ing user ${targetUserId}:`, err);
+          results.failed.push({ id: targetUserId, error: "Erro inesperado ao processar usuário.", code: "server_error" });
         }
       }
 
@@ -271,7 +272,7 @@ Deno.serve(async (req) => {
 
           if (authDeleteError) {
             console.error("Error deleting auth user", targetUserId, authDeleteError);
-            results.failed.push({ id: targetUserId, error: authDeleteError.message, code: "auth_delete_failed" });
+            results.failed.push({ id: targetUserId, error: "Falha ao excluir usuário.", code: "auth_delete_failed" });
           } else {
             console.log("Successfully deleted user:", targetUserId);
             results.success.push(targetUserId);
