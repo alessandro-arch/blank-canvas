@@ -105,7 +105,9 @@ export default function Access() {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <img src={logoBolsago} alt="BolsaGO - Powered by InnovaGO" className="h-[44px] w-auto object-contain mix-blend-multiply" />
+            <Link to="/">
+              <img src={logoBolsago} alt="BolsaGO - Powered by InnovaGO" className="h-[44px] w-auto object-contain mix-blend-multiply" />
+            </Link>
 
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-8">
