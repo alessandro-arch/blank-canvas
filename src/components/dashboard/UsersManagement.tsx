@@ -79,6 +79,7 @@ interface UserWithRole {
   created_at: string;
   has_active_enrollment: boolean;
   is_active: boolean;
+  invite_code_used: string | null;
 }
 
 const ROLE_CONFIG: Record<AppRole, { label: string; variant: "default" | "secondary" | "outline"; icon: React.ReactNode }> = {
@@ -98,6 +99,7 @@ export function UsersManagement() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState<FilterType>("all");
+  const [inviteCodeFilter, setInviteCodeFilter] = useState<string>("all");
   
   // Selection state
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
@@ -117,7 +119,7 @@ export function UsersManagement() {
       // Fetch profiles with their roles
       const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
-        .select("id, user_id, full_name, email, avatar_url, created_at, is_active");
+        .select("id, user_id, full_name, email, avatar_url, created_at, is_active, invite_code_used");
 
       if (profilesError) throw profilesError;
 
@@ -149,6 +151,7 @@ export function UsersManagement() {
         created_at: profile.created_at,
         has_active_enrollment: activeEnrollmentUserIds.has(profile.user_id),
         is_active: profile.is_active,
+        invite_code_used: profile.invite_code_used,
       }));
 
       setUsers(usersWithRoles);
@@ -165,13 +168,26 @@ export function UsersManagement() {
     fetchUsers();
   }, []);
 
+  // Unique invite codes for filter
+  const uniqueInviteCodes = Array.from(new Set(users.map(u => u.invite_code_used).filter(Boolean) as string[])).sort();
+
   const filteredUsers = users.filter(user => {
     const matchesSearch = 
       !searchTerm ||
       user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email?.toLowerCase().includes(searchTerm.toLowerCase());
+      user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.invite_code_used?.toLowerCase().includes(searchTerm.toLowerCase());
 
     if (!matchesSearch) return false;
+
+    // Invite code filter
+    if (inviteCodeFilter !== "all") {
+      if (inviteCodeFilter === "none") {
+        if (user.invite_code_used) return false;
+      } else {
+        if (user.invite_code_used !== inviteCodeFilter) return false;
+      }
+    }
 
     if (roleFilter === "all") return true;
     if (roleFilter === "inactive") return !user.is_active;
@@ -576,6 +592,18 @@ export function UsersManagement() {
                 <SelectItem value="inactive">Desativados</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={inviteCodeFilter} onValueChange={setInviteCodeFilter}>
+              <SelectTrigger className="w-56">
+                <SelectValue placeholder="Código de convite" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os códigos</SelectItem>
+                <SelectItem value="none">Sem código</SelectItem>
+                {uniqueInviteCodes.map(code => (
+                  <SelectItem key={code} value={code}>{code}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Table */}
@@ -609,6 +637,7 @@ export function UsersManagement() {
                     <TableHead>Usuário</TableHead>
                     
                     <TableHead>Email</TableHead>
+                    <TableHead>Código Convite</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Cadastro</TableHead>
                     <TableHead className="w-12"></TableHead>
@@ -658,6 +687,13 @@ export function UsersManagement() {
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {user.email || "-"}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {user.invite_code_used ? (
+                            <Badge variant="outline" className="font-mono text-xs">{user.invite_code_used}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground/50">-</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Badge 
