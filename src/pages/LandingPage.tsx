@@ -20,7 +20,7 @@ const Navbar = () => {
   };
 
   return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "bg-white/95 backdrop-blur-sm shadow-sm" : "bg-white"}`}>
+    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "bg-white shadow-sm" : "bg-white"}`}>
       <div className="max-w-[1200px] mx-auto flex items-center justify-between px-6 h-[96px]">
         <img src={logoBolsago} alt="BolsaGO - Powered by InnovaGO" className="h-[44px] w-auto object-contain mix-blend-multiply" />
         <div className="hidden md:flex items-center gap-8">
