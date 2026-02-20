@@ -22,15 +22,19 @@ function getCorsHeadersForReq(req: Request) {
   };
 }
 
+// corsHeaders is injected per-request inside serve(); see below
+let _currentCorsHeaders: Record<string, string> = {};
+
 function jsonResponse(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ..._currentCorsHeaders, "Content-Type": "application/json" },
   });
 }
 
 serve(async (req) => {
   const corsHeaders = getCorsHeadersForReq(req);
+  _currentCorsHeaders = corsHeaders;
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
