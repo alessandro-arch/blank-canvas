@@ -13,6 +13,8 @@ import {
   AlertTriangle,
   Send,
   Download,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -69,6 +71,7 @@ interface ScholarReportRowProps {
   onReview: (report: ReportRecord, scholar: ScholarRow) => void;
   onReplaceFile: (report: ReportRecord, scholar: ScholarRow) => void;
   onSendReminder: (scholar: ScholarRow) => void;
+  onRequestDigitalResubmit?: (report: ReportRecord, scholar: ScholarRow) => void;
 }
 
 const statusConfig: Record<string, { label: string; icon: typeof Clock; className: string }> = {
@@ -119,6 +122,7 @@ export function ScholarReportRow({
   onReview,
   onReplaceFile,
   onSendReminder,
+  onRequestDigitalResubmit,
 }: ScholarReportRowProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -338,6 +342,17 @@ export function ScholarReportRow({
                                   <FileUp className="w-3 h-3" />
                                   Substituir
                                 </Button>
+                                {onRequestDigitalResubmit && r.status !== "approved" && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="gap-1 text-xs h-7 px-2 border-warning/30 text-warning hover:bg-warning/10"
+                                    onClick={() => onRequestDigitalResubmit(r, scholar)}
+                                  >
+                                    <RefreshCw className="w-3 h-3" />
+                                    Reenvio digital
+                                  </Button>
+                                )}
                               </div>
                             </TableCell>
                           </TableRow>

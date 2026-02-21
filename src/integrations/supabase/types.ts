@@ -1287,8 +1287,12 @@ export type Database = {
           file_url: string
           id: string
           installment_number: number
+          monthly_report_id: string | null
           observations: string | null
           old_file_url: string | null
+          reenvio_solicitado: boolean
+          reenvio_solicitado_at: string | null
+          reenvio_solicitado_by: string | null
           reference_month: string
           replace_reason: string | null
           replaced_at: string | null
@@ -1308,8 +1312,12 @@ export type Database = {
           file_url: string
           id?: string
           installment_number: number
+          monthly_report_id?: string | null
           observations?: string | null
           old_file_url?: string | null
+          reenvio_solicitado?: boolean
+          reenvio_solicitado_at?: string | null
+          reenvio_solicitado_by?: string | null
           reference_month: string
           replace_reason?: string | null
           replaced_at?: string | null
@@ -1329,8 +1337,12 @@ export type Database = {
           file_url?: string
           id?: string
           installment_number?: number
+          monthly_report_id?: string | null
           observations?: string | null
           old_file_url?: string | null
+          reenvio_solicitado?: boolean
+          reenvio_solicitado_at?: string | null
+          reenvio_solicitado_by?: string | null
           reference_month?: string
           replace_reason?: string | null
           replaced_at?: string | null
@@ -1343,7 +1355,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "reports_monthly_report_id_fkey"
+            columns: ["monthly_report_id"]
+            isOneToOne: false
+            referencedRelation: "monthly_reports"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       thematic_projects: {
         Row: {

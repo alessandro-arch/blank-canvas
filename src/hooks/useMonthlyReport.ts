@@ -211,6 +211,32 @@ export function useMonthlyReport({ projectId, year, month }: UseMonthlyReportPar
         }
       }
 
+      // Link pending legacy reports (reenvio_solicitado) to this new digital report
+      try {
+        const refMonth = `${currentReport.period_year}-${String(currentReport.period_month).padStart(2, "0")}`;
+        const { data: legacyReports } = await supabase
+          .from("reports")
+          .select("id")
+          .eq("user_id", user!.id)
+          .eq("reenvio_solicitado", true)
+          .is("monthly_report_id", null)
+          .eq("reference_month", refMonth);
+
+        if (legacyReports && legacyReports.length > 0) {
+          const ids = legacyReports.map(r => r.id);
+          await supabase
+            .from("reports")
+            .update({
+              monthly_report_id: currentReport.id,
+              status: "replaced_by_digital",
+            })
+            .in("id", ids);
+          console.log(`[MonthlyReport] Linked ${ids.length} legacy report(s) to digital report ${currentReport.id}`);
+        }
+      } catch (linkErr) {
+        console.warn("[MonthlyReport] Failed to link legacy reports:", linkErr);
+      }
+
       // Refresh to get updated state
       await fetchOrCreateDraft();
     } catch (err: unknown) {
@@ -219,7 +245,7 @@ export function useMonthlyReport({ projectId, year, month }: UseMonthlyReportPar
     } finally {
       setSubmitting(false);
     }
-  }, [saveDraft, fetchOrCreateDraft]);
+  }, [saveDraft, fetchOrCreateDraft, user]);
 
   // Reopen report (after return)
   const reopenReport = useCallback(async () => {
