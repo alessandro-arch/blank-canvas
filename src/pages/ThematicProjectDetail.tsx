@@ -43,7 +43,8 @@ import {
   UserX,
   Building2,
   FileText,
-  Loader2
+  Loader2,
+  Ban
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { MasterProjectCard } from '@/components/projects/MasterProjectCard';
@@ -53,6 +54,8 @@ import { CreateProjectDialog } from '@/components/projects/CreateProjectDialog';
 import { ArchiveProjectDialog } from '@/components/projects/ArchiveProjectDialog';
 import { DeleteProjectDialog } from '@/components/projects/DeleteProjectDialog';
 import { AssignScholarToProjectDialog } from '@/components/projects/AssignScholarToProjectDialog';
+import { CancelScholarshipDialog } from '@/components/projects/CancelScholarshipDialog';
+import { ReplaceScholarDialog } from '@/components/projects/ReplaceScholarDialog';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { differenceInMonths } from 'date-fns';
@@ -103,6 +106,10 @@ interface SubprojectWithScholar {
   updated_at: string;
   scholar_name: string | null;
   enrollment_status: string | null;
+  enrollment_id: string | null;
+  enrollment_total_installments: number | null;
+  enrollment_paid_installments: number | null;
+  enrollment_replaced_by: string | null;
 }
 
 type StatusFilter = 'all' | 'active' | 'archived';
@@ -123,6 +130,8 @@ export default function ThematicProjectDetail() {
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [cancelScholarshipOpen, setCancelScholarshipOpen] = useState(false);
+  const [replaceScholarOpen, setReplaceScholarOpen] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [generatingExecPdf, setGeneratingExecPdf] = useState(false);
   const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
@@ -205,11 +214,12 @@ export default function ThematicProjectDetail() {
         return [];
       }
 
+      // Fetch ALL enrollments (not just active) to support cancel/replace flows
       const { data: enrollments, error: enrollmentsError } = await supabase
         .from('enrollments')
-        .select('project_id, user_id, status')
+        .select('id, project_id, user_id, status, total_installments, replaced_by_enrollment_id')
         .in('project_id', projectIds)
-        .eq('status', 'active');
+        .order('created_at', { ascending: false });
 
       if (enrollmentsError) throw enrollmentsError;
 
@@ -231,22 +241,57 @@ export default function ThematicProjectDetail() {
         }, {} as Record<string, string>);
       }
 
-      // Map enrollments to projects
-      const enrollmentMap = (enrollments || []).reduce((acc, e) => {
-        if (!acc[e.project_id]) {
-          acc[e.project_id] = {
+      // Count paid installments per enrollment
+      const enrollmentIds = enrollments?.map(e => e.id) || [];
+      let paidCountMap: Record<string, number> = {};
+      if (enrollmentIds.length > 0) {
+        const { data: payments, error: paymentsError } = await supabase
+          .from('payments')
+          .select('enrollment_id')
+          .in('enrollment_id', enrollmentIds)
+          .eq('status', 'paid');
+
+        if (!paymentsError && payments) {
+          paidCountMap = payments.reduce((acc, p) => {
+            acc[p.enrollment_id] = (acc[p.enrollment_id] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>);
+        }
+      }
+
+      // For each project, prefer active enrollment, fallback to most recent cancelled
+      const enrollmentMap: Record<string, {
+        enrollment_id: string;
+        scholar_name: string | null;
+        enrollment_status: string;
+        total_installments: number;
+        paid_installments: number;
+        replaced_by: string | null;
+      }> = {};
+
+      for (const e of (enrollments || [])) {
+        // Prefer active over cancelled
+        if (!enrollmentMap[e.project_id] || e.status === 'active') {
+          enrollmentMap[e.project_id] = {
+            enrollment_id: e.id,
             scholar_name: profilesMap[e.user_id] || null,
             enrollment_status: e.status,
+            total_installments: e.total_installments,
+            paid_installments: paidCountMap[e.id] || 0,
+            replaced_by: e.replaced_by_enrollment_id,
           };
         }
-        return acc;
-      }, {} as Record<string, { scholar_name: string | null; enrollment_status: string | null }>);
+      }
 
       // Combine projects with scholar info
       return (projectsData || []).map(project => ({
         ...project,
         scholar_name: enrollmentMap[project.id]?.scholar_name || null,
         enrollment_status: enrollmentMap[project.id]?.enrollment_status || null,
+        enrollment_id: enrollmentMap[project.id]?.enrollment_id || null,
+        enrollment_total_installments: enrollmentMap[project.id]?.total_installments || null,
+        enrollment_paid_installments: enrollmentMap[project.id]?.paid_installments || null,
+        enrollment_replaced_by: enrollmentMap[project.id]?.replaced_by || null,
       })) as SubprojectWithScholar[];
     },
     enabled: !!id
@@ -257,7 +302,8 @@ export default function ThematicProjectDetail() {
     return (
       project.code.toLowerCase().includes(searchLower) ||
       project.title.toLowerCase().includes(searchLower) ||
-      project.orientador.toLowerCase().includes(searchLower)
+      project.orientador.toLowerCase().includes(searchLower) ||
+      (project.scholar_name && project.scholar_name.toLowerCase().includes(searchLower))
     );
   });
 
@@ -311,6 +357,16 @@ export default function ThematicProjectDetail() {
   const handleAssignScholar = (project: SubprojectWithScholar) => {
     setSelectedProject(project);
     setAssignDialogOpen(true);
+  };
+
+  const handleCancelScholarship = (project: SubprojectWithScholar) => {
+    setSelectedProject(project);
+    setCancelScholarshipOpen(true);
+  };
+
+  const handleReplaceScholar = (project: SubprojectWithScholar) => {
+    setSelectedProject(project);
+    setReplaceScholarOpen(true);
   };
 
   const handleProjectUpdated = () => {
@@ -727,7 +783,17 @@ export default function ThematicProjectDetail() {
                             <TableCell>{project.orientador}</TableCell>
                             <TableCell>
                               {project.scholar_name ? (
-                                <span className="font-medium">{project.scholar_name}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className={`font-medium ${project.enrollment_status === 'cancelled' ? 'line-through text-muted-foreground' : ''}`}>
+                                    {project.scholar_name}
+                                  </span>
+                                  {project.enrollment_status === 'cancelled' && (
+                                    <Badge variant="destructive" className="text-xs">Cancelado</Badge>
+                                  )}
+                                  {project.enrollment_replaced_by && (
+                                    <Badge variant="outline" className="text-xs">Substituído</Badge>
+                                  )}
+                                </div>
                               ) : (
                                 <div className="flex items-center gap-2">
                                   <span className="text-muted-foreground">Não atribuído</span>
@@ -771,6 +837,30 @@ export default function ThematicProjectDetail() {
                                     size="icon"
                                     onClick={() => handleAssignScholar(project)}
                                     title="Atribuir Bolsista"
+                                    className="text-primary hover:text-primary"
+                                  >
+                                    <UserPlus className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {/* Cancel scholarship: only if active enrollment exists */}
+                                {project.enrollment_id && project.enrollment_status === 'active' && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleCancelScholarship(project)}
+                                    title="Cancelar Bolsa"
+                                    className="text-destructive hover:text-destructive"
+                                  >
+                                    <Ban className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {/* Replace scholar: only if cancelled and not yet replaced */}
+                                {project.enrollment_id && project.enrollment_status === 'cancelled' && !project.enrollment_replaced_by && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleReplaceScholar(project)}
+                                    title="Indicar Substituto"
                                     className="text-primary hover:text-primary"
                                   >
                                     <UserPlus className="h-4 w-4" />
@@ -869,6 +959,39 @@ export default function ThematicProjectDetail() {
             onOpenChange={setAssignDialogOpen}
             onSuccess={handleProjectUpdated}
           />
+
+          {/* Cancel Scholarship Dialog */}
+          {selectedProject?.enrollment_id && (
+            <CancelScholarshipDialog
+              open={cancelScholarshipOpen}
+              onOpenChange={setCancelScholarshipOpen}
+              enrollmentId={selectedProject.enrollment_id}
+              scholarName={selectedProject.scholar_name || 'Bolsista'}
+              projectCode={selectedProject.code}
+              projectTitle={selectedProject.title}
+              totalInstallments={selectedProject.enrollment_total_installments || 0}
+              paidInstallments={selectedProject.enrollment_paid_installments || 0}
+              monthlyAmount={selectedProject.valor_mensal}
+              onSuccess={handleProjectUpdated}
+            />
+          )}
+
+          {/* Replace Scholar Dialog */}
+          {selectedProject?.enrollment_id && (
+            <ReplaceScholarDialog
+              open={replaceScholarOpen}
+              onOpenChange={setReplaceScholarOpen}
+              enrollmentId={selectedProject.enrollment_id}
+              previousScholarName={selectedProject.scholar_name || 'Bolsista'}
+              projectCode={selectedProject.code}
+              projectTitle={selectedProject.title}
+              totalInstallments={selectedProject.enrollment_total_installments || 0}
+              paidInstallments={selectedProject.enrollment_paid_installments || 0}
+              monthlyAmount={selectedProject.valor_mensal}
+              projectEndDate={selectedProject.end_date}
+              onSuccess={handleProjectUpdated}
+            />
+          )}
         </>
       )}
 
