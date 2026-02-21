@@ -266,14 +266,14 @@ export default function ScholarReports() {
     // Draft/returned digital → edit
     if (report.source === "digital" && (report.status === "draft" || report.status === "returned")) {
       actions.push(
-        <Link key="edit" to="/bolsista/painel">
+        <a key="edit" href="/bolsista/painel#relatorio-mensal">
           <Button size="sm" variant="outline" className="gap-1.5">
             <Edit className="w-4 h-4" />
             <span className="hidden sm:inline">
               {report.status === "returned" ? "Corrigir" : "Editar"}
             </span>
           </Button>
-        </Link>
+        </a>
       );
     }
 
