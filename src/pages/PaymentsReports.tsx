@@ -92,7 +92,7 @@ const PaymentsReports = () => {
 
           {/* Monthly Report Form */}
           {(loading || hasEnrollment) && (
-            <div className="animate-fade-in mb-6" style={{ animationDelay: "50ms" }}>
+            <div id="relatorio-mensal" className="animate-fade-in mb-6" style={{ animationDelay: "50ms" }}>
               <MonthlyReportSection projectId={enrollment?.project_id || null} />
             </div>
           )}
