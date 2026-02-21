@@ -58,7 +58,7 @@ import { cn } from "@/lib/utils";
 import { MonthlyReportStatusBadge } from "@/components/scholar/monthly-report/MonthlyReportStatusBadge";
 import { MonthlyReportAIPanel } from "@/components/dashboard/MonthlyReportAIPanel";
 import type { MonthlyReportStatus } from "@/hooks/useMonthlyReport";
-import { PdfViewerDialog } from "@/components/ui/PdfViewerDialog";
+
 
 interface MonthlyReportRow {
   id: string;
@@ -107,9 +107,6 @@ export function MonthlyReportsReviewManagement() {
 
   // PDF loading
   const [pdfLoading, setPdfLoading] = useState(false);
-  const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
-  const [pdfViewerUrl, setPdfViewerUrl] = useState<string | null>(null);
-  const [pdfViewerTitle, setPdfViewerTitle] = useState("");
 
   // Fields dialog
   const [fieldsDialogOpen, setFieldsDialogOpen] = useState(false);
@@ -295,16 +292,18 @@ export function MonthlyReportsReviewManagement() {
 
       if (error) throw error;
 
+      let url: string | null = null;
       if (data?.signedUrl) {
-        setPdfViewerUrl(data.signedUrl);
+        url = data.signedUrl;
       } else if (data instanceof Blob) {
-        setPdfViewerUrl(URL.createObjectURL(data));
+        url = URL.createObjectURL(data);
+      }
+
+      if (url) {
+        window.open(url, "_blank", "noopener,noreferrer");
       } else {
         toast.error("PDF não encontrado para este relatório");
-        return;
       }
-      setPdfViewerTitle("Relatório Mensal");
-      setPdfViewerOpen(true);
     } catch {
       toast.error("Erro ao abrir PDF");
     } finally {
@@ -824,12 +823,6 @@ export function MonthlyReportsReviewManagement() {
         </DialogContent>
       </Dialog>
     </Card>
-    <PdfViewerDialog
-      open={pdfViewerOpen}
-      onOpenChange={setPdfViewerOpen}
-      title={pdfViewerTitle}
-      pdfUrl={pdfViewerUrl}
-    />
 
     {/* Fields Dialog */}
     <Dialog open={fieldsDialogOpen} onOpenChange={setFieldsDialogOpen}>
