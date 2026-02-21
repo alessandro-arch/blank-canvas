@@ -53,7 +53,7 @@ interface EditProjectDialogProps {
 
 const formSchema = z.object({
   title: z.string().min(1, 'Título é obrigatório'),
-  orientador: z.string().min(1, 'Orientador é obrigatório'),
+  orientador: z.string().min(1, 'Bolsista é obrigatório'),
   modalidade_bolsa: z.string().min(1, 'Modalidade da bolsa é obrigatória'),
   valor_mensal: z.coerce.number().positive('Valor deve ser positivo'),
   start_date: z.string().min(1, 'Data de início é obrigatória'),
@@ -212,7 +212,7 @@ export function EditProjectDialog({
                 name="orientador"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Orientador</FormLabel>
+                    <FormLabel>Bolsista</FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>
@@ -226,7 +226,7 @@ export function EditProjectDialog({
                 name="coordenador_tecnico_icca"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Coordenador Técnico (opcional)</FormLabel>
+                    <FormLabel>Orientador (opcional)</FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>
