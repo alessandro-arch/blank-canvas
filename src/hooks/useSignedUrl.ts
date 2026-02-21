@@ -14,7 +14,7 @@ interface UseSignedUrlReturn {
 export function useSignedUrl(): UseSignedUrlReturn {
   const [loading, setLoading] = useState(false);
 
-  const getSignedUrl = useCallback(async (filePath: string, expiresIn: number = 600): Promise<string | null> => {
+  const getSignedUrl = useCallback(async (filePath: string, expiresIn: number = 300): Promise<string | null> => {
     if (!filePath) {
       return null;
     }
@@ -53,36 +53,29 @@ export function useSignedUrl(): UseSignedUrlReturn {
  * On mobile, avoids the pre-opened blank window pattern (blocked by Safari/Chrome)
  * and falls back to navigating in the same tab.
  */
-export async function openReportPdf(filePath: string): Promise<void> {
+export async function openReportPdf(filePath: string): Promise<string | null> {
   if (!filePath) {
     toast.error("Arquivo não encontrado");
-    return;
+    return null;
   }
 
   try {
     const { data, error } = await supabase.storage
       .from("reports")
-      .createSignedUrl(filePath, 600); // 10 minutes
+      .createSignedUrl(filePath, 300); // 5 minutes
 
     if (error) {
       console.error("Error creating signed URL:", error);
       const isNotFound = (error as any)?.statusCode === "404" || error.message?.includes("not found");
       toast.error(isNotFound ? "Arquivo PDF não encontrado no storage" : "Erro ao gerar link de acesso ao arquivo");
-      return;
+      return null;
     }
 
-    if (data?.signedUrl) {
-      // Try opening in new tab; if blocked (mobile), fall back to same-tab navigation
-      const opened = window.open(data.signedUrl, "_blank", "noopener,noreferrer");
-      if (!opened) {
-        window.location.href = data.signedUrl;
-      }
-    } else {
-      toast.error("Link de acesso não disponível");
-    }
+    return data?.signedUrl || null;
   } catch (err) {
     console.error("Error opening PDF:", err);
     toast.error("Erro ao abrir o arquivo");
+    return null;
   }
 }
 
@@ -98,7 +91,7 @@ export async function downloadReportPdf(filePath: string, fileName?: string): Pr
   try {
     const { data, error } = await supabase.storage
       .from("reports")
-      .createSignedUrl(filePath, 600); // 10 minutes
+      .createSignedUrl(filePath, 300); // 5 minutes
 
     if (error) {
       console.error("Error creating signed URL:", error);
@@ -137,7 +130,7 @@ export async function downloadPaymentReceipt(filePath: string, fileName?: string
   try {
     const { data, error } = await supabase.storage
       .from("payment-receipts")
-      .createSignedUrl(filePath, 600); // 10 minutes
+      .createSignedUrl(filePath, 300); // 5 minutes
 
     if (error) {
       console.error("Error creating signed URL for receipt:", error);

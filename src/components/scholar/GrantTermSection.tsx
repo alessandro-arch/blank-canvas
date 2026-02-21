@@ -8,12 +8,15 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { PdfViewerDialog } from "@/components/ui/PdfViewerDialog";
 
 export function GrantTermSection() {
   const { user } = useAuth();
   const { grantTerm, loading, error } = useGrantTerm(user?.id);
 
   const [viewLoading, setViewLoading] = useState(false);
+  const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 
   const handleView = async () => {
     if (!grantTerm) return;
@@ -21,11 +24,11 @@ export function GrantTermSection() {
     try {
       const { data, error } = await supabase.storage
         .from("grant-terms")
-        .createSignedUrl(grantTerm.fileUrl, 900);
+        .createSignedUrl(grantTerm.fileUrl, 300);
       if (error) throw error;
       if (data?.signedUrl) {
-        const opened = window.open(data.signedUrl, "_blank", "noopener,noreferrer");
-        if (!opened) window.location.href = data.signedUrl;
+        setPdfUrl(data.signedUrl);
+        setPdfViewerOpen(true);
       } else {
         toast.error("Link de acesso não disponível");
       }
@@ -42,7 +45,7 @@ export function GrantTermSection() {
     try {
       const { data, error } = await supabase.storage
         .from("grant-terms")
-        .createSignedUrl(grantTerm.fileUrl, 900);
+        .createSignedUrl(grantTerm.fileUrl, 300);
       if (error) throw error;
       if (data?.signedUrl) {
         const link = document.createElement("a");
@@ -204,6 +207,13 @@ export function GrantTermSection() {
           </Button>
         </div>
       </div>
+
+      <PdfViewerDialog
+        open={pdfViewerOpen}
+        onOpenChange={setPdfViewerOpen}
+        title="Termo de Outorga"
+        pdfUrl={pdfUrl}
+      />
     </div>
   );
 }

@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { FileText, Download, Eye, Loader2, CheckCircle, Clock, AlertCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useScholarPayments } from "@/hooks/useScholarPayments";
 import { openReportPdf, downloadReportPdf } from "@/hooks/useSignedUrl";
+import { PdfViewerDialog } from "@/components/ui/PdfViewerDialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -19,6 +21,18 @@ interface ReportsTabProps {
 
 export function ReportsTab({ searchQuery = "" }: ReportsTabProps) {
   const { data, loading } = useScholarPayments();
+  const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
+  const [pdfViewerUrl, setPdfViewerUrl] = useState<string | null>(null);
+  const [pdfViewerTitle, setPdfViewerTitle] = useState("");
+
+  const handleViewPdf = async (fileUrl: string, title: string) => {
+    const url = await openReportPdf(fileUrl);
+    if (url) {
+      setPdfViewerUrl(url);
+      setPdfViewerTitle(title);
+      setPdfViewerOpen(true);
+    }
+  };
 
   if (loading) {
     return (
@@ -97,7 +111,7 @@ export function ReportsTab({ searchQuery = "" }: ReportsTabProps) {
                 variant="ghost"
                 size="sm"
                 className="gap-1.5 text-primary hover:text-primary"
-                onClick={() => openReportPdf(report.file_url)}
+                onClick={() => handleViewPdf(report.file_url, `Relatório ${report.reference_month}`)}
               >
                 <Eye className="w-4 h-4" />
                 <span className="hidden sm:inline">Visualizar</span>
@@ -115,6 +129,12 @@ export function ReportsTab({ searchQuery = "" }: ReportsTabProps) {
           </div>
         );
       })}
+      <PdfViewerDialog
+        open={pdfViewerOpen}
+        onOpenChange={setPdfViewerOpen}
+        title={pdfViewerTitle}
+        pdfUrl={pdfViewerUrl}
+      />
     </div>
   );
 }

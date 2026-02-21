@@ -57,7 +57,7 @@ import InviteAccept from "./pages/InviteAccept";
 import Settings from "./pages/Settings";
 import PdfReports from "./pages/PdfReports";
 
-const queryClient = new QueryClient({
+export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,

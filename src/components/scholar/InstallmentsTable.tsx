@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { 
   History, 
   FileSearch, 
@@ -40,6 +40,7 @@ import {
 import { cn } from "@/lib/utils";
 import { ReportVersionsDialog, type ReportVersion } from "./ReportVersionsDialog";
 import { openReportPdf, downloadReportPdf, downloadPaymentReceipt } from "@/hooks/useSignedUrl";
+import { PdfViewerDialog } from "@/components/ui/PdfViewerDialog";
 import { Link, useNavigate } from "react-router-dom";
 import type { PaymentWithReport } from "@/hooks/useScholarPayments";
 import { format, parseISO, isBefore } from "date-fns";
@@ -133,6 +134,16 @@ function InstallmentActions({ installment, onRefresh }: InstallmentActionsProps)
   const navigate = useNavigate();
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [versionsOpen, setVersionsOpen] = useState(false);
+  const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+
+  const handleViewPdf = async (fileUrl: string) => {
+    const url = await openReportPdf(fileUrl);
+    if (url) {
+      setPdfUrl(url);
+      setPdfViewerOpen(true);
+    }
+  };
 
   const goToReportForm = () => {
     navigate("/bolsista/pagamentos-relatorios");
@@ -214,7 +225,7 @@ function InstallmentActions({ installment, onRefresh }: InstallmentActionsProps)
                   className="gap-2"
                   onSelect={(e) => {
                     e.preventDefault();
-                    openReportPdf(installment.reportFileUrl!);
+                    handleViewPdf(installment.reportFileUrl!);
                   }}
                 >
                   <Eye className="w-4 h-4" />
@@ -304,6 +315,13 @@ function InstallmentActions({ installment, onRefresh }: InstallmentActionsProps)
             versions={installment.versions || []}
           />
         )}
+
+        <PdfViewerDialog
+          open={pdfViewerOpen}
+          onOpenChange={setPdfViewerOpen}
+          title={`Relatório ${installment.referenceMonth}`}
+          pdfUrl={pdfUrl}
+        />
       </div>
     </TooltipProvider>
   );

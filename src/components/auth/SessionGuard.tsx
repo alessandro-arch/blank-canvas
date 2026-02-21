@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { queryClient } from "@/App";
 import {
   Dialog,
   DialogContent,
@@ -15,7 +16,7 @@ import { Clock, RefreshCw, Wifi, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
-const WARNING_BEFORE_MS = 60 * 1000; // warn 60s before expiry
+const WARNING_BEFORE_MS = 2 * 60 * 1000; // warn 2min before expiry
 const ACTIVITY_EVENTS = ["mousemove", "keydown", "scroll", "touchstart", "click"] as const;
 const THROTTLE_MS = 15_000; // only reset timer every 15s to reduce overhead
 
@@ -33,7 +34,7 @@ export function SessionGuard() {
 
   const [showWarning, setShowWarning] = useState(false);
   const [showNetworkError, setShowNetworkError] = useState(false);
-  const [countdown, setCountdown] = useState(60);
+  const [countdown, setCountdown] = useState(120);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isPublicRoute = PUBLIC_ROUTES.some((r) => location.pathname === r || location.pathname.startsWith("/invite/"));
@@ -55,7 +56,7 @@ export function SessionGuard() {
   }, []);
 
   const startCountdown = useCallback(() => {
-    setCountdown(60);
+    setCountdown(120);
     clearCountdown();
     countdownRef.current = setInterval(() => {
       setCountdown((prev) => {
@@ -120,8 +121,9 @@ export function SessionGuard() {
         // Token refreshed OK – no action needed
       }
       if (event === "SIGNED_OUT") {
-        // If signout wasn't user-initiated and we're on a protected route
-        // the route guards will handle redirect
+        // Clear all cached data and force redirect to login
+        queryClient.clear();
+        navigate("/acesso", { replace: true });
       }
     });
 
