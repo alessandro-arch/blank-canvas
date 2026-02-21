@@ -70,15 +70,53 @@ export type Database = {
           },
         ]
       }
+      bank_access_logs: {
+        Row: {
+          action: string
+          actor_role: string
+          actor_user_id: string
+          created_at: string
+          id: string
+          ip_address: string | null
+          target_user_id: string
+          tenant_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_role: string
+          actor_user_id: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          target_user_id: string
+          tenant_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_role?: string
+          actor_user_id?: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          target_user_id?: string
+          tenant_id?: string | null
+        }
+        Relationships: []
+      }
       bank_accounts: {
         Row: {
           account_number: string
+          account_number_enc: string | null
           account_type: string | null
           agency: string
+          agency_enc: string | null
           bank_code: string
+          bank_code_enc: string | null
           bank_name: string
           created_at: string
+          has_bank_data: boolean
           id: string
+          last4_account: string | null
           locked_for_edit: boolean
           notes_gestor: string | null
           pix_key_encrypted: string | null
@@ -92,12 +130,17 @@ export type Database = {
         }
         Insert: {
           account_number: string
+          account_number_enc?: string | null
           account_type?: string | null
           agency: string
+          agency_enc?: string | null
           bank_code: string
+          bank_code_enc?: string | null
           bank_name: string
           created_at?: string
+          has_bank_data?: boolean
           id?: string
+          last4_account?: string | null
           locked_for_edit?: boolean
           notes_gestor?: string | null
           pix_key_encrypted?: string | null
@@ -111,12 +154,17 @@ export type Database = {
         }
         Update: {
           account_number?: string
+          account_number_enc?: string | null
           account_type?: string | null
           agency?: string
+          agency_enc?: string | null
           bank_code?: string
+          bank_code_enc?: string | null
           bank_name?: string
           created_at?: string
+          has_bank_data?: boolean
           id?: string
+          last4_account?: string | null
           locked_for_edit?: boolean
           notes_gestor?: string | null
           pix_key_encrypted?: string | null
@@ -721,6 +769,7 @@ export type Database = {
           id: string
           locked_at: string | null
           organization_id: string
+          pdf_sha256: string | null
           period_month: number
           period_year: number
           project_id: string
@@ -741,6 +790,7 @@ export type Database = {
           id?: string
           locked_at?: string | null
           organization_id: string
+          pdf_sha256?: string | null
           period_month: number
           period_year: number
           project_id: string
@@ -761,6 +811,7 @@ export type Database = {
           id?: string
           locked_at?: string | null
           organization_id?: string
+          pdf_sha256?: string | null
           period_month?: number
           period_year?: number
           project_id?: string
@@ -1303,6 +1354,39 @@ export type Database = {
           },
         ]
       }
+      report_access_logs: {
+        Row: {
+          accessed_at: string
+          action: string
+          id: string
+          ip_address: string | null
+          organization_id: string | null
+          report_id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          accessed_at?: string
+          action: string
+          id?: string
+          ip_address?: string | null
+          organization_id?: string | null
+          report_id: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          accessed_at?: string
+          action?: string
+          id?: string
+          ip_address?: string | null
+          organization_id?: string | null
+          report_id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       reports: {
         Row: {
           created_at: string
@@ -1522,7 +1606,66 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      bank_accounts_public: {
+        Row: {
+          account_type: string | null
+          bank_name: string | null
+          created_at: string | null
+          has_bank_data: boolean | null
+          id: string | null
+          last4_account: string | null
+          locked_for_edit: boolean | null
+          notes_gestor: string | null
+          pix_key_masked: string | null
+          pix_key_type: string | null
+          updated_at: string | null
+          user_id: string | null
+          validated_at: string | null
+          validated_by: string | null
+          validation_status:
+            | Database["public"]["Enums"]["bank_validation_status"]
+            | null
+        }
+        Insert: {
+          account_type?: string | null
+          bank_name?: string | null
+          created_at?: string | null
+          has_bank_data?: boolean | null
+          id?: string | null
+          last4_account?: string | null
+          locked_for_edit?: boolean | null
+          notes_gestor?: string | null
+          pix_key_masked?: string | null
+          pix_key_type?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          validated_at?: string | null
+          validated_by?: string | null
+          validation_status?:
+            | Database["public"]["Enums"]["bank_validation_status"]
+            | null
+        }
+        Update: {
+          account_type?: string | null
+          bank_name?: string | null
+          created_at?: string | null
+          has_bank_data?: boolean | null
+          id?: string | null
+          last4_account?: string | null
+          locked_for_edit?: boolean | null
+          notes_gestor?: string | null
+          pix_key_masked?: string | null
+          pix_key_type?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          validated_at?: string | null
+          validated_by?: string | null
+          validation_status?:
+            | Database["public"]["Enums"]["bank_validation_status"]
+            | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       accept_org_invite: { Args: { p_token: string }; Returns: Json }
