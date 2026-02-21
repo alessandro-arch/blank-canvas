@@ -37,7 +37,8 @@ export type AuditAction =
   | "report_locked"
   | "report_pdf_generated"
   | "report_approved"
-  | "report_returned";
+  | "report_returned"
+  | "bank_data_read";
 
 export type EntityType = 
   | "user"
