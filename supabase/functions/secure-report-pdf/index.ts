@@ -60,17 +60,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Check authorization
-    const { data: userRole } = await db
+    // Check authorization — user may have multiple roles
+    const { data: userRoles } = await db
       .from("user_roles")
       .select("role")
-      .eq("user_id", user.id)
-      .maybeSingle();
+      .eq("user_id", user.id);
 
-    const role = userRole?.role || "scholar";
-    const isScholar = role === "scholar";
-    const isAdmin = role === "admin";
-    const isManager = role === "manager";
+    const roles = (userRoles || []).map((r: { role: string }) => r.role);
+    const isAdmin = roles.includes("admin");
+    const isManager = roles.includes("manager");
+    const isScholar = !isAdmin && !isManager;
+    const role = isAdmin ? "admin" : isManager ? "manager" : "scholar";
 
     if (isScholar && report.beneficiary_user_id !== user.id) {
       return new Response(JSON.stringify({ error: "Acesso negado" }), {
