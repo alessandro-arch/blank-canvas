@@ -30,7 +30,14 @@ export type AuditAction =
   | "upload_grant_term"
   | "update_grant_term"
   | "update_profile_admin"
-  | "report_file_replaced";
+  | "report_file_replaced"
+  | "report_draft_created"
+  | "report_draft_saved"
+  | "report_submitted"
+  | "report_locked"
+  | "report_pdf_generated"
+  | "report_approved"
+  | "report_returned";
 
 export type EntityType = 
   | "user"
@@ -41,7 +48,8 @@ export type EntityType =
   | "project"
   | "bank_account"
   | "thematic_project"
-  | "grant_term";
+  | "grant_term"
+  | "monthly_report";
 
 interface AuditLogParams {
   action: AuditAction;
