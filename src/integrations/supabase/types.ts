@@ -536,6 +536,50 @@ export type Database = {
           },
         ]
       }
+      monthly_report_ai: {
+        Row: {
+          created_at: string
+          id: string
+          inconsistencies_text: string | null
+          indicators: Json | null
+          merit_opinion_draft: string | null
+          model_version: string | null
+          report_id: string
+          risks_text: string | null
+          summary_text: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          inconsistencies_text?: string | null
+          indicators?: Json | null
+          merit_opinion_draft?: string | null
+          model_version?: string | null
+          report_id: string
+          risks_text?: string | null
+          summary_text?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          inconsistencies_text?: string | null
+          indicators?: Json | null
+          merit_opinion_draft?: string | null
+          model_version?: string | null
+          report_id?: string
+          risks_text?: string | null
+          summary_text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monthly_report_ai_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "monthly_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       monthly_report_documents: {
         Row: {
           generated_at: string

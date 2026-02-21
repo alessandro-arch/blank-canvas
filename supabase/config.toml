@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.generate-monthly-report-pdf]
 verify_jwt = false
+
+[functions.ai-analyze-report]
+verify_jwt = false
