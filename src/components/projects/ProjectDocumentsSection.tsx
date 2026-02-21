@@ -42,7 +42,11 @@ export function ProjectDocumentsSection({
     setUploading(true);
 
     try {
-      const filePath = `tenant/${tenantId}/projetos/${projectId}/${docType}_${Date.now()}_${file.name}`;
+      const sanitizedName = file.name
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9._-]/g, '_')
+        .replace(/_+/g, '_');
+      const filePath = `tenant/${tenantId}/projetos/${projectId}/${docType}_${Date.now()}_${sanitizedName}`;
       
       const { error: uploadError } = await supabase.storage
         .from('documentos-projetos')
