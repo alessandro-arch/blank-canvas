@@ -111,6 +111,11 @@ export function MonthlyReportsReviewManagement() {
   const [pdfViewerUrl, setPdfViewerUrl] = useState<string | null>(null);
   const [pdfViewerTitle, setPdfViewerTitle] = useState("");
 
+  // Fields dialog
+  const [fieldsDialogOpen, setFieldsDialogOpen] = useState(false);
+  const [fieldsPayload, setFieldsPayload] = useState<Record<string, unknown> | null>(null);
+  const [fieldsScholarName, setFieldsScholarName] = useState("");
+
   const toggleExpand = (userId: string) => {
     setExpandedUsers(prev => {
       const next = new Set(prev);
@@ -308,7 +313,7 @@ export function MonthlyReportsReviewManagement() {
   };
 
   // View report fields
-  const handleViewFields = async (reportId: string) => {
+  const handleViewFields = async (reportId: string, scholarName?: string) => {
     try {
       const { data: fields } = await supabase
         .from("monthly_report_fields")
@@ -321,17 +326,9 @@ export function MonthlyReportsReviewManagement() {
         return;
       }
 
-      const p = fields.payload as Record<string, unknown>;
-      const lines = [
-        `📋 Atividades: ${p.atividades_realizadas || "-"}`,
-        `📊 Resultados: ${p.resultados_alcancados || "-"}`,
-        `⚠️ Dificuldades: ${p.dificuldades_encontradas || "-"}`,
-        `🔜 Próximos passos: ${p.proximos_passos || "-"}`,
-        `⏱️ Horas dedicadas: ${p.horas_dedicadas || "-"}`,
-        `📝 Observações: ${p.observacoes || "-"}`,
-      ];
-      // Simple toast for now - could be a dialog
-      toast.info(lines.join("\n"), { duration: 10000 });
+      setFieldsPayload(fields.payload as Record<string, unknown>);
+      setFieldsScholarName(scholarName || "Bolsista");
+      setFieldsDialogOpen(true);
     } catch {
       toast.error("Erro ao carregar campos do relatório");
     }
@@ -630,7 +627,7 @@ export function MonthlyReportsReviewManagement() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8"
-                                onClick={() => handleViewFields(report.id)}
+                                onClick={() => handleViewFields(report.id, scholar.full_name)}
                                 title="Ver campos"
                               >
                                 <FileSearch className="h-4 w-4" />
@@ -706,7 +703,7 @@ export function MonthlyReportsReviewManagement() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => handleViewFields(report.id)}
+                                  onClick={() => handleViewFields(report.id, scholar.full_name)}
                                 >
                                   <FileSearch className="h-4 w-4 mr-2" />
                                   Ver Campos
@@ -772,7 +769,7 @@ export function MonthlyReportsReviewManagement() {
                   variant="outline"
                   size="sm"
                   className="flex-1"
-                  onClick={() => handleViewFields(selectedReport.id)}
+                  onClick={() => handleViewFields(selectedReport.id, selectedScholar?.full_name)}
                 >
                   <FileSearch className="h-4 w-4 mr-2" />
                   Ver Campos
@@ -831,6 +828,53 @@ export function MonthlyReportsReviewManagement() {
       title={pdfViewerTitle}
       pdfUrl={pdfViewerUrl}
     />
+
+    {/* Fields Dialog */}
+    <Dialog open={fieldsDialogOpen} onOpenChange={setFieldsDialogOpen}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileSearch className="h-5 w-5" />
+            Campos do Relatório
+          </DialogTitle>
+          <DialogDescription>
+            Conteúdo preenchido por {fieldsScholarName}
+          </DialogDescription>
+        </DialogHeader>
+
+        {fieldsPayload && (
+          <div className="space-y-4 mt-2">
+            {[
+              { key: "atividades_realizadas", label: "Atividades Realizadas", icon: "📋" },
+              { key: "resultados_alcancados", label: "Resultados Alcançados", icon: "📊" },
+              { key: "dificuldades_encontradas", label: "Dificuldades Encontradas", icon: "⚠️" },
+              { key: "proximos_passos", label: "Próximos Passos", icon: "🔜" },
+              { key: "horas_dedicadas", label: "Horas Dedicadas", icon: "⏱️" },
+              { key: "observacoes", label: "Observações", icon: "📝" },
+            ].map(({ key, label, icon }) => {
+              const value = fieldsPayload[key];
+              if (!value && key !== "atividades_realizadas" && key !== "resultados_alcancados") return null;
+              return (
+                <div key={key} className="space-y-1">
+                  <p className="text-sm font-semibold text-foreground">{icon} {label}</p>
+                  <div className="rounded-md border bg-muted/30 p-3">
+                    <p className="text-sm text-foreground whitespace-pre-wrap">
+                      {String(value || "Não informado")}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setFieldsDialogOpen(false)}>
+            Fechar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     </>
   );
 }
