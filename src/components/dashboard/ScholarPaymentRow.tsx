@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import {
   ChevronDown,
   User,
@@ -21,11 +21,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -102,84 +97,85 @@ export function ScholarPaymentRowComponent({
   const StatusIcon = config.icon;
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+    <Fragment>
       {/* Main Row */}
-      <CollapsibleTrigger asChild>
-        <TableRow className="cursor-pointer hover:bg-muted/50 transition-colors group">
-          {/* Scholar */}
-          <TableCell>
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                <User className="w-4 h-4 text-muted-foreground" />
-              </div>
-              <div className="min-w-0">
-                <p className="font-medium text-sm truncate">{scholar.full_name}</p>
-                <p className="text-xs text-muted-foreground truncate">{scholar.email}</p>
-              </div>
+      <TableRow
+        className="cursor-pointer hover:bg-muted/50 transition-colors group"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        {/* Scholar */}
+        <TableCell>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+              <User className="w-4 h-4 text-muted-foreground" />
             </div>
-          </TableCell>
-
-          {/* Project */}
-          <TableCell>
-            <div>
-              <Badge variant="outline" className="text-xs mb-0.5">{scholar.project_code}</Badge>
-              <p className="text-xs text-muted-foreground truncate max-w-[200px]">{scholar.thematic_project_title}</p>
+            <div className="min-w-0">
+              <p className="font-medium text-sm truncate">{scholar.full_name}</p>
+              <p className="text-xs text-muted-foreground truncate">{scholar.email}</p>
             </div>
-          </TableCell>
+          </div>
+        </TableCell>
 
-          {/* Amount */}
-          <TableCell>
-            {payment ? (
-              <span className="font-semibold text-sm">{formatCurrency(payment.amount)}</span>
-            ) : (
-              <span className="text-xs text-muted-foreground">—</span>
-            )}
-          </TableCell>
+        {/* Project */}
+        <TableCell>
+          <div>
+            <Badge variant="outline" className="text-xs mb-0.5">{scholar.project_code}</Badge>
+            <p className="text-xs text-muted-foreground truncate max-w-[200px]">{scholar.thematic_project_title}</p>
+          </div>
+        </TableCell>
 
-          {/* Status badge */}
-          <TableCell>
-            <span className={cn(
-              "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border",
-              config.className
-            )}>
-              <StatusIcon className="w-3 h-3" />
-              {config.label}
+        {/* Amount */}
+        <TableCell>
+          {payment ? (
+            <span className="font-semibold text-sm">{formatCurrency(payment.amount)}</span>
+          ) : (
+            <span className="text-xs text-muted-foreground">—</span>
+          )}
+        </TableCell>
+
+        {/* Status badge */}
+        <TableCell>
+          <span className={cn(
+            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border",
+            config.className
+          )}>
+            <StatusIcon className="w-3 h-3" />
+            {config.label}
+          </span>
+        </TableCell>
+
+        {/* Paid date */}
+        <TableCell>
+          {payment?.paid_at ? (
+            <span className="text-xs text-muted-foreground flex items-center gap-1">
+              <Calendar className="w-3 h-3" />
+              {format(parseISO(payment.paid_at), "dd/MM/yyyy")}
             </span>
-          </TableCell>
+          ) : (
+            <span className="text-xs text-muted-foreground">—</span>
+          )}
+        </TableCell>
 
-          {/* Paid date */}
-          <TableCell>
-            {payment?.paid_at ? (
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <Calendar className="w-3 h-3" />
-                {format(parseISO(payment.paid_at), "dd/MM/yyyy")}
-              </span>
-            ) : (
-              <span className="text-xs text-muted-foreground">—</span>
-            )}
-          </TableCell>
-
-          {/* Actions */}
-          <TableCell>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="gap-1 text-xs"
-                onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
-              >
-                <ChevronDown className={cn("w-4 h-4 transition-transform", isOpen && "rotate-180")} />
-                Histórico
-              </Button>
-            </div>
-          </TableCell>
-        </TableRow>
-      </CollapsibleTrigger>
+        {/* Actions */}
+        <TableCell>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1 text-xs"
+              onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
+            >
+              <ChevronDown className={cn("w-4 h-4 transition-transform", isOpen && "rotate-180")} />
+              Histórico
+            </Button>
+          </div>
+        </TableCell>
+      </TableRow>
 
       {/* Expanded History Panel */}
-      <CollapsibleContent asChild>
-        <tr>
-          <td colSpan={6} className="p-0">
+      {isOpen && (
+        <TableRow>
+          <TableCell colSpan={6} className="p-0">
             <div className="bg-muted/30 border-t border-b px-6 py-4 space-y-4">
               {/* Header */}
               <div className="flex items-center justify-between">
@@ -302,9 +298,9 @@ export function ScholarPaymentRowComponent({
                 </div>
               )}
             </div>
-          </td>
-        </tr>
-      </CollapsibleContent>
-    </Collapsible>
+          </TableCell>
+        </TableRow>
+      )}
+    </Fragment>
   );
 }
