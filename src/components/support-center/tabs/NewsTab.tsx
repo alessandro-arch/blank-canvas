@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import DOMPurify from "dompurify";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -105,7 +106,10 @@ export function NewsTab() {
                 [&_hr]:my-4 [&_hr]:border-border
                 [&_strong]:font-semibold
                 [&_em]:italic"
-              dangerouslySetInnerHTML={{ __html: selected.content }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(selected.content, {
+                ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'p', 'strong', 'em', 'u', 'a', 'ul', 'ol', 'li', 'blockquote', 'img', 'hr', 'br', 'span', 'div'],
+                ALLOWED_ATTR: ['href', 'src', 'alt', 'class', 'target', 'rel']
+              }) }}
             />
           </div>
         </ScrollArea>
