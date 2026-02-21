@@ -53,3 +53,12 @@ verify_jwt = false
 
 [functions.secure-bank-read]
 verify_jwt = false
+
+[functions.secure-bank-write]
+verify_jwt = false
+
+[functions.secure-report-pdf]
+verify_jwt = false
+
+[functions.verify-report-integrity]
+verify_jwt = false

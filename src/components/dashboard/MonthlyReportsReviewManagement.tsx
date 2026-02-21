@@ -284,28 +284,22 @@ export function MonthlyReportsReviewManagement() {
   const handleViewPdf = async (reportId: string) => {
     setPdfLoading(true);
     try {
-      const { data: docs } = await supabase
-        .from("monthly_report_documents")
-        .select("storage_path")
-        .eq("report_id", reportId)
-        .eq("type", "official_pdf")
-        .order("generated_at", { ascending: false })
-        .limit(1);
+      const { data, error } = await supabase.functions.invoke("secure-report-pdf", {
+        body: { report_id: reportId, action: "view" },
+      });
 
-      if (!docs || docs.length === 0) {
+      if (error) throw error;
+
+      if (data?.signedUrl) {
+        setPdfViewerUrl(data.signedUrl);
+      } else if (data instanceof Blob) {
+        setPdfViewerUrl(URL.createObjectURL(data));
+      } else {
         toast.error("PDF não encontrado para este relatório");
         return;
       }
-
-      const { data: signed, error } = await supabase.storage
-        .from("relatorios")
-        .createSignedUrl(docs[0].storage_path, 900);
-      if (error) throw error;
-      if (signed?.signedUrl) {
-        setPdfViewerUrl(signed.signedUrl);
-        setPdfViewerTitle("Relatório Mensal");
-        setPdfViewerOpen(true);
-      }
+      setPdfViewerTitle("Relatório Mensal");
+      setPdfViewerOpen(true);
     } catch {
       toast.error("Erro ao abrir PDF");
     } finally {

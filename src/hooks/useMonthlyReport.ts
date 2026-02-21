@@ -111,22 +111,20 @@ export function useMonthlyReport({ projectId, year, month }: UseMonthlyReportPar
         setPayload(EMPTY_PAYLOAD);
       }
 
-      // Load PDF URL if exists
+      // Load PDF URL if exists (via secure-report-pdf Edge Function)
       if ((reportData as any).status !== "draft") {
-        const { data: docs } = await supabase
-          .from("monthly_report_documents")
-          .select("storage_path")
-          .eq("report_id", reportId)
-          .eq("type", "official_pdf")
-          .order("generated_at", { ascending: false })
-          .limit(1);
-
-        if (docs && docs.length > 0) {
-          const { data: signed } = await supabase.storage
-            .from("relatorios")
-            .createSignedUrl(docs[0].storage_path, 900);
-          setPdfUrl(signed?.signedUrl || null);
-        } else {
+        try {
+          const { data: pdfData } = await supabase.functions.invoke("secure-report-pdf", {
+            body: { report_id: reportId, action: "view" },
+          });
+          if (pdfData?.signedUrl) {
+            setPdfUrl(pdfData.signedUrl);
+          } else if (pdfData instanceof Blob) {
+            setPdfUrl(URL.createObjectURL(pdfData));
+          } else {
+            setPdfUrl(null);
+          }
+        } catch {
           setPdfUrl(null);
         }
       } else {

@@ -232,63 +232,23 @@ export function useScholarProfile(): UseScholarProfileReturn {
     setError(null);
 
     try {
-      // Note: PIX key encryption is handled by database triggers using encrypt_pix_key()
-      // We store the masked version for display purposes
       const pixKeyValue = data.pixKey || bankData?.pixKey || null;
-      const bankRecord = {
-        user_id: user.id,
-        bank_code: data.bankCode || bankData?.bankCode || "",
-        bank_name: data.bankName || bankData?.bankName || "",
-        agency: data.agency || bankData?.agency || "",
-        account_number: data.account || bankData?.account || "",
-        account_type: data.accountType || bankData?.accountType || "checking",
-        pix_key_type: data.pixKeyType || bankData?.pixKeyType || null,
-      };
 
-      // Check if bank account exists
-      const { data: existing } = await supabase
-        .from("bank_accounts")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle();
+      // Use secure-bank-write Edge Function for encrypted storage
+      const { data: result, error: fnError } = await supabase.functions.invoke("secure-bank-write", {
+        body: {
+          bank_name: data.bankName || bankData?.bankName || "",
+          bank_code: data.bankCode || bankData?.bankCode || "",
+          agency: data.agency || bankData?.agency || "",
+          account_number: data.account || bankData?.account || "",
+          account_type: data.accountType || bankData?.accountType || "checking",
+          pix_key: pixKeyValue,
+          pix_key_type: data.pixKeyType || bankData?.pixKeyType || null,
+        },
+      });
 
-      let upsertError;
-
-      if (existing) {
-        // Update existing - pix_key is handled by database trigger for encryption
-        const updateData: Record<string, string | null> = {
-          bank_code: bankRecord.bank_code,
-          bank_name: bankRecord.bank_name,
-          agency: bankRecord.agency,
-          account_number: bankRecord.account_number,
-          account_type: bankRecord.account_type,
-          pix_key_type: bankRecord.pix_key_type,
-        };
-        
-        // Only include PIX key fields if a new value is provided
-        if (pixKeyValue && pixKeyValue.trim() !== "") {
-          updateData.pix_key_masked = pixKeyValue; // Database trigger will encrypt and mask
-        }
-        
-        const { error } = await supabase
-          .from("bank_accounts")
-          .update(updateData)
-          .eq("user_id", user.id);
-        upsertError = error;
-      } else {
-        // Insert new - database trigger will handle PIX key encryption
-        const insertData = {
-          ...bankRecord,
-          pix_key_masked: pixKeyValue, // Database trigger will encrypt and mask
-        };
-        const { error } = await supabase
-          .from("bank_accounts")
-          .insert(insertData);
-        upsertError = error;
-      }
-
-      if (upsertError) {
-        console.error("Error saving bank data:", upsertError);
+      if (fnError) {
+        console.error("Error saving bank data:", fnError);
         return { success: false, error: "Erro ao salvar dados bancários. Tente novamente." };
       }
 
