@@ -30,7 +30,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 const formSchema = z.object({
   code: z.string().min(1, 'Código é obrigatório'),
   title: z.string().min(1, 'Título é obrigatório'),
-  orientador: z.string().min(1, 'Orientador é obrigatório'),
+  orientador: z.string().min(1, 'Bolsista é obrigatório'),
   modalidade_bolsa: z.string().min(1, 'Modalidade da bolsa é obrigatória'),
   valor_mensal: z.coerce.number().positive('Valor deve ser positivo'),
   start_date: z.string().min(1, 'Data de início é obrigatória'),
@@ -246,9 +246,9 @@ export function CreateProjectDialog({
                 name="orientador"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Orientador *</FormLabel>
+                    <FormLabel>Bolsista *</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="Nome do orientador" />
+                      <Input {...field} placeholder="Nome do bolsista" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -260,9 +260,9 @@ export function CreateProjectDialog({
                 name="coordenador_tecnico_icca"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Coordenador Técnico</FormLabel>
+                    <FormLabel>Orientador</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="Nome do coordenador (opcional)" />
+                      <Input {...field} placeholder="Nome do orientador (opcional)" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
