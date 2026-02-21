@@ -63,6 +63,10 @@ export function useLoginLockout() {
       setLockout(status);
       if (status.locked && status.remaining_seconds) {
         setCountdown(status.remaining_seconds);
+        // Fire-and-forget: notify admins about the lockout
+        supabase.functions.invoke("notify-lockout", {
+          body: { email, attempt_count: status.attempts },
+        }).catch(() => { /* silent */ });
       }
     } catch {
       // fail silently
