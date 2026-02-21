@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { PdfViewerDialog } from '@/components/ui/PdfViewerDialog';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -75,6 +76,9 @@ export default function FinancialManagement() {
   const [selectedSponsor, setSelectedSponsor] = useState<string>('all');
   const [selectedPeriod, setSelectedPeriod] = useState<string>('all');
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
+  const [pdfViewerUrl, setPdfViewerUrl] = useState<string | null>(null);
+  const [pdfViewerTitle, setPdfViewerTitle] = useState('');
 
   // ── Data fetching (scoped to current organization) ──
 
@@ -306,24 +310,10 @@ export default function FinancialManagement() {
       );
 
       toast.dismiss(toastId);
-      toast(
-        'Relatório executivo pronto!',
-        {
-          duration: 15000,
-          action: {
-            label: 'Abrir PDF',
-            onClick: () => {
-              const a = document.createElement('a');
-              a.href = data.signedUrl;
-              a.target = '_blank';
-              a.rel = 'noopener noreferrer';
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-            },
-          },
-        },
-      );
+      toast.success('Relatório executivo pronto!');
+      setPdfViewerUrl(data.signedUrl);
+      setPdfViewerTitle('Relatório Executivo');
+      setPdfViewerOpen(true);
     } catch (err: any) {
       console.error('Executive PDF error:', err);
       toast.error(friendlyError(err, 'Erro ao gerar relatório executivo'), { id: toastId });
@@ -731,6 +721,12 @@ export default function FinancialManagement() {
 
       <Footer />
 
+      <PdfViewerDialog
+        open={pdfViewerOpen}
+        onOpenChange={setPdfViewerOpen}
+        title={pdfViewerTitle}
+        pdfUrl={pdfViewerUrl}
+      />
     </div>
   );
 }

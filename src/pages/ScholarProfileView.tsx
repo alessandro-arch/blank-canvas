@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useEffect, useState } from "react";
+import { PdfViewerDialog } from '@/components/ui/PdfViewerDialog';
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getModalityLabel } from "@/lib/modality-labels";
@@ -76,6 +77,8 @@ const ScholarProfileView = () => {
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [bankAccount, setBankAccount] = useState<BankAccount | null>(null);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
+  const [pdfViewerUrl, setPdfViewerUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -218,21 +221,9 @@ const ScholarProfileView = () => {
       );
 
       toast.dismiss(toastId);
-      toast('Relatório da bolsa pronto!', {
-        duration: 15000,
-        action: {
-          label: 'Abrir PDF',
-          onClick: () => {
-            const a = document.createElement('a');
-            a.href = data.signedUrl;
-            a.target = '_blank';
-            a.rel = 'noopener noreferrer';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-          },
-        },
-      });
+      toast.success('Relatório da bolsa pronto!');
+      setPdfViewerUrl(data.signedUrl);
+      setPdfViewerOpen(true);
     } catch (err: any) {
       console.error('Scholar PDF error:', err);
       toast.error(friendlyError(err, 'Erro ao gerar relatório'), { id: toastId });
@@ -483,6 +474,12 @@ const ScholarProfileView = () => {
           )}
         </main>
         <Footer />
+        <PdfViewerDialog
+          open={pdfViewerOpen}
+          onOpenChange={setPdfViewerOpen}
+          title="Relatório da Bolsa"
+          pdfUrl={pdfViewerUrl}
+        />
       </div>
     </div>
   );

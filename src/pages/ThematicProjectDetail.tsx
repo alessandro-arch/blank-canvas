@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { PdfViewerDialog } from '@/components/ui/PdfViewerDialog';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -124,6 +125,9 @@ export default function ThematicProjectDetail() {
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [generatingExecPdf, setGeneratingExecPdf] = useState(false);
+  const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
+  const [pdfViewerUrl, setPdfViewerUrl] = useState<string | null>(null);
+  const [pdfViewerTitle, setPdfViewerTitle] = useState('');
 
   // Mobile filter persistence helpers
   const updateMobileParams = (updates: Record<string, string>) => {
@@ -331,21 +335,10 @@ export default function ThematicProjectDetail() {
       );
 
       toast.dismiss(toastId);
-      toast('Relatório consolidado pronto!', {
-        duration: 15000,
-        action: {
-          label: 'Abrir PDF',
-          onClick: () => {
-            const a = document.createElement('a');
-            a.href = data.signedUrl;
-            a.target = '_blank';
-            a.rel = 'noopener noreferrer';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-          },
-        },
-      });
+      toast.success('Relatório consolidado pronto!');
+      setPdfViewerUrl(data.signedUrl);
+      setPdfViewerTitle('Relatório Consolidado');
+      setPdfViewerOpen(true);
     } catch (err: any) {
       console.error('Thematic PDF error:', err);
       toast.error(friendlyError(err, 'Erro ao gerar relatório PDF'), { id: toastId });
@@ -371,21 +364,10 @@ export default function ThematicProjectDetail() {
       );
 
       toast.dismiss(toastId);
-      toast('Relatório executivo pronto!', {
-        duration: 15000,
-        action: {
-          label: 'Abrir PDF',
-          onClick: () => {
-            const a = document.createElement('a');
-            a.href = data.signedUrl;
-            a.target = '_blank';
-            a.rel = 'noopener noreferrer';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-          },
-        },
-      });
+      toast.success('Relatório executivo pronto!');
+      setPdfViewerUrl(data.signedUrl);
+      setPdfViewerTitle('Relatório Executivo');
+      setPdfViewerOpen(true);
     } catch (err: any) {
       console.error('Executive PDF error:', err);
       toast.error(friendlyError(err, 'Erro ao gerar relatório executivo'), { id: toastId });
@@ -828,6 +810,13 @@ export default function ThematicProjectDetail() {
       </div>
       
       <Footer />
+
+      <PdfViewerDialog
+        open={pdfViewerOpen}
+        onOpenChange={setPdfViewerOpen}
+        title={pdfViewerTitle}
+        pdfUrl={pdfViewerUrl}
+      />
 
       {/* Dialogs */}
       {thematicProject && (

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { PdfViewerDialog } from '@/components/ui/PdfViewerDialog';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/MobileStateDisplays';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -75,6 +76,9 @@ export function SubprojectsTable({
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [generatingPdfFor, setGeneratingPdfFor] = useState<string | null>(null);
+  const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
+  const [pdfViewerUrl, setPdfViewerUrl] = useState<string | null>(null);
+  const [pdfViewerTitle, setPdfViewerTitle] = useState('');
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -172,21 +176,10 @@ export function SubprojectsTable({
       );
 
       toast.dismiss(toastId);
-      toast('Relatório pronto!', {
-        duration: 15000,
-        action: {
-          label: 'Abrir PDF',
-          onClick: () => {
-            const a = document.createElement('a');
-            a.href = data.signedUrl;
-            a.target = '_blank';
-            a.rel = 'noopener noreferrer';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-          },
-        },
-      });
+      toast.success('Relatório pronto!');
+      setPdfViewerUrl(data.signedUrl);
+      setPdfViewerTitle('Relatório do Subprojeto');
+      setPdfViewerOpen(true);
     } catch (err: any) {
       console.error('PDF generation error:', err);
       toast.error(friendlyError(err, 'Erro ao gerar relatório PDF'), { id: toastId });
@@ -413,6 +406,12 @@ export function SubprojectsTable({
         </>
       )}
 
+      <PdfViewerDialog
+        open={pdfViewerOpen}
+        onOpenChange={setPdfViewerOpen}
+        title={pdfViewerTitle}
+        pdfUrl={pdfViewerUrl}
+      />
     </>
   );
 }
