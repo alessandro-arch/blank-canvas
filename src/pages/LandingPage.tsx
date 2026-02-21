@@ -468,30 +468,26 @@ const ComparisonSection = () => (
 );
 
 /* ───────── Segurança ───────── */
-const securityCards = [
-  { icon: ShieldCheck, title: "Rastreabilidade", desc: "Histórico completo de todas as ações e movimentações do sistema." },
-  { icon: FileSearch, title: "Auditoria", desc: "Registros detalhados para auditorias internas e externas." },
-  { icon: Lock, title: "Controle de Acesso", desc: "Gestão granular de permissões por perfil e função." },
-  { icon: Eye, title: "Transparência", desc: "Visibilidade total para gestores e órgãos de controle." },
-];
+import { SecurityShowcase } from "@/components/ui/SecurityBadge";
 
 const SecuritySection = () => (
   <Section id="seguranca" className="py-[100px]" bg="bg-muted/40">
     <div className="text-center mb-14">
       <p className="text-[13px] font-semibold text-primary tracking-wider uppercase mb-4">Segurança</p>
-      <h2 className="text-[34px] font-bold text-foreground mb-4">Sua instituição protegida.</h2>
-      <p className="text-[15px] text-muted-foreground">Infraestrutura segura com as melhores práticas de proteção de dados.</p>
+      <h2 className="text-[34px] font-bold text-foreground mb-4">Proteção de nível militar para seus dados.</h2>
+      <p className="text-[15px] text-muted-foreground max-w-[640px] mx-auto">
+        Criptografia AES-256-GCM, verificação SHA-256, arquitetura Zero-Trust e auditoria completa.
+        Seus dados nunca trafegam em texto puro.
+      </p>
     </div>
-    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-      {securityCards.map((c) => (
-        <div key={c.title} className="bg-white rounded-xl border border-border p-6 text-center hover:shadow-md transition-shadow">
-          <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-5">
-            <c.icon className="w-5 h-5 text-foreground" />
-          </div>
-          <h3 className="text-[15px] font-semibold text-foreground mb-2">{c.title}</h3>
-          <p className="text-[13px] text-muted-foreground leading-relaxed">{c.desc}</p>
-        </div>
-      ))}
+    <SecurityShowcase />
+    <div className="mt-10 text-center">
+      <div className="inline-flex items-center gap-2 bg-white border border-border rounded-full px-5 py-2.5 shadow-sm">
+        <Lock className="w-4 h-4 text-primary" />
+        <span className="text-[12px] font-medium text-foreground">
+          Criptografia AES-256-GCM • Hash SHA-256 • TLS 1.3 • Envelope Encryption • LGPD Compliant
+        </span>
+      </div>
     </div>
   </Section>
 );
@@ -575,9 +571,17 @@ const LandingFooter = () => (
           </div>
         </div>
       </div>
-      <div className="border-t border-white/10 pt-6 flex items-center justify-between flex-wrap gap-4">
-        <p className="text-[12px] text-white/40">© 2026 BolsaGO. Todos os direitos reservados.</p>
-        <p className="text-[12px] text-white/40">Uma solução <span className="font-semibold text-white/60">InnovaGO</span></p>
+      <div className="border-t border-white/10 pt-6 flex flex-col items-center gap-3">
+        <div className="flex items-center gap-2 text-white/40">
+          <Lock className="w-3.5 h-3.5" />
+          <span className="text-[11px] font-medium tracking-wide">
+            Criptografia AES-256-GCM • SHA-256 • TLS 1.3 • Dados protegidos
+          </span>
+        </div>
+        <div className="flex items-center justify-between w-full flex-wrap gap-4">
+          <p className="text-[12px] text-white/40">© 2026 BolsaGO. Todos os direitos reservados.</p>
+          <p className="text-[12px] text-white/40">Uma solução <span className="font-semibold text-white/60">InnovaGO</span></p>
+        </div>
       </div>
     </div>
   </footer>
