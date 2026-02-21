@@ -1,181 +1,100 @@
 
-# Plano de Hardening de Seguranca -- BolsaGO
+# Plano: Edge Function secure-bank-read + UI consumindo via funcao
 
-Este e um projeto extenso de seguranca dividido em 5 fases. O plano prioriza as acoes de maior impacto e menor risco de regressao, respeitando a arquitetura atual (React + Supabase).
+## Resumo
 
----
-
-## Estado Atual (o que ja existe)
-
-- **Route Guards**: `AdminProtectedRoute`, `ScholarProtectedRoute`, `ProtectedRoute`, `RoleProtectedRoute` ja validam sessao e role
-- **SessionGuard**: Timeout de 30min com modal de aviso (60s antes), interceptor de 401, deteccao de rede
-- **RLS**: Funcoes auxiliares `has_role()`, `is_org_admin()`, `get_user_organizations()`, etc. ja existem como SECURITY DEFINER
-- **PIX**: Ja usa criptografia via Vault com `encrypt_and_mask_pix_key` trigger e coluna `pix_key_masked`
-- **PDFs**: `PdfViewerDialog` ja existe; signed URLs ja sao usadas em `useSignedUrl.ts` (10min expiracao)
-- **Auditoria**: Tabela `audit_logs` ja registra acoes criticas
+Criar uma Edge Function `secure-bank-read` que centraliza a leitura de dados bancarios com mascaramento automatico e acesso completo apenas para admin/gestor do tenant. Atualizar o frontend para usar essa funcao em vez de SELECT direto.
 
 ---
 
-## FASE 1 -- Anti-cache e Limpeza de Estado pos-Logout
+## O que sera feito
 
-**Objetivo**: Impedir que "voltar no navegador" exiba conteudo protegido apos logout.
+### 1. Criar Edge Function `secure-bank-read`
 
-### 1.1 Limpar cache do React Query no signOut
+**Arquivo**: `supabase/functions/secure-bank-read/index.ts`
 
-- No `AuthContext.tsx`, importar `queryClient` e chamar `queryClient.clear()` dentro da funcao `signOut()` antes de `supabase.auth.signOut()`
-- Isso remove todos os dados em cache do React Query imediatamente
+A funcao recebe `organization_id` e `beneficiary_user_id` via POST e:
 
-### 1.2 Meta tags anti-cache no index.html
+- Valida JWT do usuario chamador via `getClaims()`
+- Verifica membership na organizacao via query em `organization_members` (role + is_active)
+- Busca dados bancarios do beneficiario em `bank_accounts`
+- Monta versao mascarada sempre:
+  - `bank_code`: "**"
+  - `bank_name`: nome completo (nao sensivel)
+  - `agency`: "***" + ultimos 1 digito
+  - `account_number`: "****" + ultimos 4 digitos
+  - `pix`: valor ja mascarado do `pix_key_masked`
+- Se role do chamador for `admin` ou `manager` na mesma org, retorna `mode: "full"` com dados completos + masked
+- Caso contrario, retorna `mode: "masked"` apenas com masked
+- Insere registro em `audit_logs` via service role (action: `bank_data_read`, mode, actor, beneficiary)
 
-- Adicionar no `<head>` do `index.html`:
-  ```text
-  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
-  <meta http-equiv="Pragma" content="no-cache" />
-  ```
+**Config**: Adicionar em `supabase/config.toml`:
+```text
+[functions.secure-bank-read]
+verify_jwt = false
+```
 
-### 1.3 Redirecionamento forcado no onAuthStateChange
+### 2. Atualizar BankDataManagement.tsx (gestor)
 
-- No `SessionGuard.tsx`, ao detectar evento `SIGNED_OUT`, forcar navegacao para `/acesso` e limpar query cache
-- Previne o cenario onde o usuario clica "voltar" e ve dados residuais
+Atualmente o componente faz SELECT direto em `bank_accounts` e recebe `bank_code`, `agency`, `account_number` em texto puro.
 
-### 1.4 Ajustar aviso pre-expiracao para 2 minutos
+**Mudancas**:
+- O SELECT inicial para listar contas continua (para status, IDs, nomes via profiles) -- mas os campos sensiveis (`bank_code`, `agency`, `account_number`) serao mascarados no display por padrao
+- O botao "Revelar" (olho) e o dialog "Detalhes" chamarao `secure-bank-read` para obter dados completos
+- Criar funcao `fetchBankDetails(orgId, beneficiaryUserId)` que chama `supabase.functions.invoke('secure-bank-read', ...)`
+- No `toggleReveal`: chamar a Edge Function e so revelar se `mode === 'full'`
+- No `openDetails`: chamar a Edge Function para popular o dialog com dados completos
 
-- Alterar `WARNING_BEFORE_MS` de 60s para 120s (2 minutos) no `SessionGuard.tsx`
+### 3. Atualizar BankDataThematicCard.tsx
 
-**Arquivos afetados**: `AuthContext.tsx`, `SessionGuard.tsx`, `index.html`
+- A tabela mostra dados mascarados por padrao (ja faz isso com `maskValue`)
+- O botao "Revelar" passara a chamar callback que invoca a Edge Function
+- Dados revelados serao armazenados em estado local temporario (nao persistido)
 
----
+### 4. Hook auxiliar `useBankDataSecureRead`
 
-## FASE 2 -- Reforco de RLS
+**Arquivo**: `src/hooks/useBankDataSecureRead.ts`
 
-**Objetivo**: Garantir isolamento de dados entre tenants e roles.
+Hook que encapsula a chamada a Edge Function:
+```text
+useBankDataSecureRead() => {
+  readBankData(orgId, beneficiaryUserId) => Promise<SecureBankResponse>
+  loading: boolean
+}
+```
 
-### 2.1 Auditoria das policies existentes
-
-- Executar `supabase--linter` para identificar tabelas sem RLS ou com policies permissivas
-- Revisar policies de `profiles`, `bank_accounts`, `payments`, `monthly_reports`
-
-### 2.2 Corrigir policy de profiles
-
-- SELECT: usuario ve apenas proprio perfil (`user_id = auth.uid()`) OU admin/gestor da mesma org (via `get_user_organizations()`)
-- UPDATE: usuario atualiza apenas proprio perfil; admin/gestor atualiza campos administrativos de usuarios da mesma org
-- Substituir qualquer policy generica tipo `authenticated can select`
-
-### 2.3 Reforcar bank_accounts
-
-- Verificar que RLS ja impede acesso cross-tenant (conforme memory `security/banking-data-isolation`)
-- Adicionar policy explicita: bolsista ve apenas proprio registro; gestor/admin ve apenas registros da mesma org
-
-### 2.4 Storage policies
-
-- Verificar que buckets privados (`reports`, `payment-receipts`, `grant-terms`, `relatorios`, `documentos-projetos`) bloqueiam acesso direto
-- Reforcar policies: bolsista acessa apenas seus arquivos; gestor/admin acessa apenas arquivos da mesma org
-
-**Implementacao**: Migracao SQL com `DROP POLICY IF EXISTS` + `CREATE POLICY` para cada tabela critica
-
----
-
-## FASE 3 -- Dados Bancarios (Reforco da Criptografia Existente)
-
-**Objetivo**: Garantir que nenhum dado bancario puro fique exposto.
-
-### 3.1 Verificar estado atual
-
-- PIX ja usa criptografia via Vault (`encrypt_and_mask_pix_key` trigger)
-- Verificar se campos `banco`, `agencia`, `conta` estao em texto puro ou mascarados
-- Se em texto puro, aplicar o mesmo padrao de mascaramento
-
-### 3.2 Criar Edge Function para leitura segura (se necessario)
-
-- Se campos bancarios alem do PIX estiverem em texto puro, criar Edge Function `secure-bank-read` que:
-  - Valida auth + role + tenant
-  - Retorna dados completos apenas para admin/gestor autorizado
-  - Registra auditoria
-- Frontend exibe apenas versao mascarada por padrao
-
-### 3.3 Remover colunas de texto puro (se existirem)
-
-- Migracao para NULL-ificar colunas antigas apos migrar para formato criptografado
-
-**Nota**: Esta fase depende de uma analise detalhada do schema atual de `bank_accounts`. Sera refinada durante a implementacao.
-
----
-
-## FASE 4 -- PDFs: Viewer Interno e Auditoria
-
-**Objetivo**: Eliminar abertura de URLs tecnicas em nova aba; registrar acessos.
-
-### 4.1 Centralizar acesso via PdfViewerDialog
-
-- Substituir todas as chamadas `window.open(signedUrl)` e `openReportPdf()` por abertura no `PdfViewerDialog` existente
-- Arquivos afetados (10 componentes): `GrantTermSection`, `MonthlyReportsReviewManagement`, `ProjectDocumentsSection`, `InstallmentsTable`, `ReportsTab`, `ReportVersionsDialog`, `GrantTermTab`, `ReportsReviewManagement`, `PdfReadyDialog`
-
-### 4.2 Registrar auditoria de visualizacao/download
-
-- Ao abrir ou baixar um PDF, inserir registro em `audit_logs` com acao `document_viewed` ou `document_downloaded`
-- Incluir `document_id`, `user_id`, `action`, timestamp
-
-### 4.3 Reduzir expiracao de signed URLs
-
-- Reduzir de 600s (10min) para 300s (5min) em `useSignedUrl.ts`
-
-**Arquivos afetados**: `useSignedUrl.ts`, `PdfViewerDialog.tsx`, 10 componentes que abrem PDFs
-
----
-
-## FASE 5 -- Headers de Seguranca e Melhorias Complementares
-
-**Objetivo**: Adicionar camadas de protecao adicionais.
-
-### 5.1 Headers de seguranca
-
-- Adicionar no `index.html` (via meta tags, ja que Lovable nao controla headers do servidor):
-  ```text
-  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-  <meta http-equiv="X-Frame-Options" content="SAMEORIGIN" />
-  ```
-- `Referrer-Policy` e `CSP` via meta tags (limitado mas funcional)
-
-### 5.2 MFA (informativo)
-
-- MFA via TOTP e suportado pelo Supabase Auth, mas requer configuracao no Dashboard do Supabase (Authentication > MFA)
-- Recomendacao: habilitar e adicionar fluxo de enrollment para admin/gestor
-- **Nota**: Implementacao completa de MFA e um projeto separado; nesta fase, documentar a recomendacao e configurar o lado do Supabase
-
-### 5.3 Rate limiting
-
-- Rate limiting em login/reset ja e parcialmente tratado pelo Supabase Auth (rate limits built-in)
-- Para endpoints custom, avaliar implementacao via Edge Function com contagem em tabela auxiliar
-- **Nota**: Escopo limitado nesta fase; implementacao completa sob demanda
-
----
-
-## Ordem de Implementacao Recomendada
-
-1. **Fase 1** (anti-cache + limpeza de estado) -- impacto imediato, baixo risco
-2. **Fase 4** (PDFs no viewer interno + auditoria) -- alta visibilidade, risco moderado
-3. **Fase 2** (RLS) -- requer analise cuidadosa das policies existentes para nao quebrar funcionalidades
-4. **Fase 5** (headers) -- simples, complementar
-5. **Fase 3** (criptografia bancaria) -- ja parcialmente implementada; refinamento sob demanda
+Retorno tipado com `mode`, `masked`, e opcionalmente campos completos.
 
 ---
 
 ## Detalhes Tecnicos
 
-### Arquivos a serem modificados
+### Edge Function - Fluxo
 
-| Arquivo | Fase | Alteracao |
-|---------|------|-----------|
-| `src/contexts/AuthContext.tsx` | 1 | Limpar queryClient no signOut |
-| `src/components/auth/SessionGuard.tsx` | 1 | Redirecionar no SIGNED_OUT, ajustar warning para 2min |
-| `index.html` | 1, 5 | Meta tags anti-cache e seguranca |
-| `src/hooks/useSignedUrl.ts` | 4 | Reduzir expiracao, adicionar auditoria |
-| `src/components/ui/PdfViewerDialog.tsx` | 4 | Melhorias para uso centralizado |
-| 10 componentes de PDF | 4 | Substituir `window.open` por `PdfViewerDialog` |
-| Migracao SQL | 2 | Policies RLS revisadas |
+```text
+1. Extrair Authorization header
+2. getClaims() para obter userId
+3. POST body: { organization_id, beneficiary_user_id }
+4. Service role client: query organization_members WHERE user_id = caller AND organization_id AND is_active
+5. Determinar mode: 'full' se role in ('admin','manager'), 'masked' caso contrario
+6. Service role client: query bank_accounts WHERE user_id = beneficiary_user_id
+7. Montar masked fields
+8. Se mode='full', incluir dados completos
+9. Inserir audit_logs (service role): action='bank_data_read', user_id=caller, entity_id=bank_account.id, details={mode, beneficiary_user_id, organization_id}
+10. Retornar response
+```
 
-### Riscos e Mitigacoes
+### Arquivos afetados
 
-- **Anti-cache agressivo**: Pode afetar performance em sessoes ativas. Mitigacao: aplicar `no-store` apenas via meta tags (nao afeta assets estaticos do Vite)
-- **RLS mais restritivo**: Pode bloquear queries legitimas. Mitigacao: testar cada policy antes de aplicar; manter policies antigas comentadas na migracao para rollback rapido
-- **PDF viewer interno**: Alguns PDFs pesados podem carregar lentamente no iframe. Mitigacao: manter botao "Baixar PDF" como fallback
+| Arquivo | Mudanca |
+|---------|---------|
+| `supabase/functions/secure-bank-read/index.ts` | Novo - Edge Function |
+| `supabase/config.toml` | Adicionar config da funcao |
+| `src/hooks/useBankDataSecureRead.ts` | Novo - hook de leitura segura |
+| `src/components/dashboard/BankDataManagement.tsx` | Usar hook para revelar/detalhes |
+| `src/components/dashboard/BankDataThematicCard.tsx` | Receber dados revelados do pai |
+| `src/hooks/useAuditLog.ts` | Adicionar tipo `bank_data_read` |
+
+### Nota sobre RLS
+
+Os dados bancarios continuam acessiveis via SELECT para gestores (policies existentes permitem). A Edge Function adiciona uma camada de auditoria e mascaramento, mas nao substitui o RLS -- funciona como camada complementar. A remocao total do SELECT direto no client exigiria restringir as colunas sensiveis via RLS (column-level security nao existe no Postgres RLS), o que quebraria outros fluxos como validacao de status. Por isso, a abordagem e: frontend consome via Edge Function, RLS continua como safety net.
