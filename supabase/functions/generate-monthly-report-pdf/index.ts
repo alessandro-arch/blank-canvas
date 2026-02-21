@@ -270,12 +270,20 @@ interface PdfData {
 }
 
 function hexToRgb(hex: string) {
-  const h = hex.replace("#", "");
+  const h = hex.replace("#", "").substring(0, 6);
   return rgb(
     parseInt(h.substring(0, 2), 16) / 255,
     parseInt(h.substring(2, 4), 16) / 255,
     parseInt(h.substring(4, 6), 16) / 255,
   );
+}
+
+function hexToRgbLight(hex: string, blend = 0.9) {
+  const h = hex.replace("#", "").substring(0, 6);
+  const r = parseInt(h.substring(0, 2), 16) / 255;
+  const g = parseInt(h.substring(2, 4), 16) / 255;
+  const b = parseInt(h.substring(4, 6), 16) / 255;
+  return rgb(r + (1 - r) * blend, g + (1 - g) * blend, b + (1 - b) * blend);
 }
 
 function sanitize(text: string): string {
@@ -382,7 +390,7 @@ async function buildMonthlyReportPdf(data: PdfData): Promise<Uint8Array> {
   const sectionTitle = (title: string) => {
     check(30);
     y -= 8;
-    page.drawRectangle({ x: M, y: y - 3, width: COL, height: 18, color: hexToRgb(data.primaryColor + "15") });
+    page.drawRectangle({ x: M, y: y - 3, width: COL, height: 18, color: hexToRgbLight(data.primaryColor, 0.88) });
     page.drawLine({ start: { x: M, y: y - 3 }, end: { x: M, y: y + 15 }, thickness: 3, color: primaryRgb });
     txt(title, M + 8, y, 10, fontBold, primaryRgb);
     y -= LH + 4;
