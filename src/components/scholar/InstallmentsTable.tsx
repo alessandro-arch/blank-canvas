@@ -166,14 +166,14 @@ function InstallmentActions({ installment, onRefresh }: InstallmentActionsProps)
         {contextualMessage && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Link to="/bolsista/relatorios">
+              <Link to="/bolsista/painel">
                 <Button 
                   size="sm" 
                   variant="outline" 
                   className="gap-1.5 text-xs border-primary/30 text-primary"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
-                  Meus Relatórios
+                  Preencher Relatório
                 </Button>
               </Link>
             </TooltipTrigger>
@@ -254,10 +254,10 @@ function InstallmentActions({ installment, onRefresh }: InstallmentActionsProps)
                     <Button variant="outline" onClick={() => setFeedbackOpen(false)}>
                       Fechar
                     </Button>
-                    <Link to="/bolsista/relatorios">
+                    <Link to="/bolsista/painel">
                       <Button className="gap-1.5">
                         <ExternalLink className="w-4 h-4" />
-                        Meus Relatórios
+                        Preencher Relatório
                       </Button>
                     </Link>
                   </div>
