@@ -2,13 +2,14 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useLoginLockout } from "@/hooks/useLoginLockout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
-import { AlertCircle, Mail, Lock, Loader2, ArrowLeft, Users } from "lucide-react";
+import { AlertCircle, Mail, Lock, Loader2, ArrowLeft, Users, ShieldAlert } from "lucide-react";
 import { z } from "zod";
 import logoInnovaGO from "@/assets/logo-innovago.png";
 
@@ -26,6 +27,7 @@ export default function AdminLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const { isLocked, remainingAttempts, countdown, formattedCountdown, checkLockout, recordAttempt } = useLoginLockout();
 
   // Redirect based on role after login
   useEffect(() => {
@@ -48,12 +50,16 @@ export default function AdminLogin() {
       setError(validation.error.errors[0].message);
       return;
     }
+
+    const locked = await checkLockout(email);
+    if (locked) return;
     
     setLoading(true);
     const { error } = await signIn(email, password);
     setLoading(false);
     
     if (error) {
+      await recordAttempt(email, false);
       if (error.message.includes("Invalid login credentials")) {
         setError("Email ou senha incorretos. Verifique suas credenciais.");
       } else if (error.message.includes("Email not confirmed")) {
@@ -61,6 +67,8 @@ export default function AdminLogin() {
       } else {
         setError("Erro ao fazer login. Tente novamente.");
       }
+    } else {
+      await recordAttempt(email, true);
     }
   };
 
@@ -109,6 +117,23 @@ export default function AdminLogin() {
           </CardHeader>
           
           <CardContent>
+            {isLocked && (
+              <Alert variant="destructive" className="mb-4">
+                <ShieldAlert className="h-4 w-4" />
+                <AlertDescription>
+                  Conta temporariamente bloqueada por excesso de tentativas.
+                  Tente novamente em <strong>{formattedCountdown}</strong>.
+                </AlertDescription>
+              </Alert>
+            )}
+            {!isLocked && remainingAttempts !== undefined && remainingAttempts <= 2 && remainingAttempts > 0 && (
+              <Alert className="mb-4">
+                <ShieldAlert className="h-4 w-4" />
+                <AlertDescription>
+                  Atenção: {remainingAttempts} tentativa{remainingAttempts > 1 ? "s" : ""} restante{remainingAttempts > 1 ? "s" : ""} antes do bloqueio temporário.
+                </AlertDescription>
+              </Alert>
+            )}
             {error && (
               <Alert variant="destructive" className="mb-4">
                 <AlertCircle className="h-4 w-4" />
@@ -157,12 +182,14 @@ export default function AdminLogin() {
                 </Link>
               </div>
               
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button type="submit" className="w-full" disabled={loading || isLocked}>
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     Entrando...
                   </>
+                ) : isLocked ? (
+                  `Bloqueado (${formattedCountdown})`
                 ) : (
                   "Entrar"
                 )}

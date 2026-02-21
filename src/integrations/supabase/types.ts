@@ -406,6 +406,30 @@ export type Database = {
           },
         ]
       }
+      login_attempts: {
+        Row: {
+          attempted_at: string
+          email: string
+          id: string
+          ip_address: string | null
+          success: boolean
+        }
+        Insert: {
+          attempted_at?: string
+          email: string
+          id?: string
+          ip_address?: string | null
+          success?: boolean
+        }
+        Update: {
+          attempted_at?: string
+          email?: string
+          id?: string
+          ip_address?: string | null
+          success?: boolean
+        }
+        Relationships: []
+      }
       message_templates: {
         Row: {
           body: string
@@ -1514,6 +1538,7 @@ export type Database = {
         }
         Returns: Json
       }
+      check_login_lockout: { Args: { p_email: string }; Returns: Json }
       create_monthly_report_draft: {
         Args: { p_month: number; p_project_id: string; p_year: number }
         Returns: Json
@@ -1562,6 +1587,10 @@ export type Database = {
       project_belongs_to_user_org: {
         Args: { p_project_id: string }
         Returns: boolean
+      }
+      record_login_attempt: {
+        Args: { p_email: string; p_success: boolean }
+        Returns: Json
       }
       reopen_monthly_report: { Args: { p_report_id: string }; Returns: Json }
       replace_scholarship: {
