@@ -285,6 +285,8 @@ export function MonthlyReportsReviewManagement() {
 
   const handleViewPdf = async (reportId: string) => {
     setPdfLoading(true);
+    // Open window synchronously to avoid popup blockers
+    const newTab = window.open("about:blank", "_blank", "noopener,noreferrer");
     try {
       const { data, error } = await supabase.functions.invoke("secure-report-pdf", {
         body: { report_id: reportId, action: "view" },
@@ -299,12 +301,17 @@ export function MonthlyReportsReviewManagement() {
         url = URL.createObjectURL(data);
       }
 
-      if (url) {
-        window.open(url, "_blank", "noopener,noreferrer");
+      if (url && newTab) {
+        newTab.location.href = url;
+      } else if (url) {
+        // Fallback if popup was blocked
+        window.open(url, "_blank");
       } else {
+        newTab?.close();
         toast.error("PDF não encontrado para este relatório");
       }
     } catch {
+      newTab?.close();
       toast.error("Erro ao abrir PDF");
     } finally {
       setPdfLoading(false);
