@@ -158,11 +158,11 @@ export function ProjectDetailsDialog({
             <TabsContent value="details" className="space-y-4 mt-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">Orientador</p>
+                  <p className="text-sm text-muted-foreground">Bolsista</p>
                   <p className="font-medium">{project.orientador}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Coordenador Técnico</p>
+                  <p className="text-sm text-muted-foreground">Orientador</p>
                   <p className="font-medium">{project.coordenador_tecnico_icca || '—'}</p>
                 </div>
                 <div>
