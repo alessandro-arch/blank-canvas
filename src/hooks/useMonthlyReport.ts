@@ -57,12 +57,13 @@ export function useMonthlyReport({ projectId, year, month }: UseMonthlyReportPar
   const [payload, setPayload] = useState<MonthlyReportPayload>(EMPTY_PAYLOAD);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const payloadRef = useRef(payload);
   const reportRef = useRef(report);
 
-  // Keep refs in sync
   useEffect(() => { payloadRef.current = payload; }, [payload]);
   useEffect(() => { reportRef.current = report; }, [report]);
 
@@ -81,7 +82,6 @@ export function useMonthlyReport({ projectId, year, month }: UseMonthlyReportPar
       const result = data as { report_id: string; status: string };
       const reportId = result.report_id;
 
-      // Fetch full report
       const { data: reportData, error: reportError } = await supabase
         .from("monthly_reports")
         .select("*")
@@ -90,7 +90,6 @@ export function useMonthlyReport({ projectId, year, month }: UseMonthlyReportPar
       if (reportError) throw reportError;
       setReport(reportData as unknown as MonthlyReport);
 
-      // Fetch fields
       const { data: fieldsData } = await supabase
         .from("monthly_report_fields")
         .select("payload")
@@ -111,6 +110,28 @@ export function useMonthlyReport({ projectId, year, month }: UseMonthlyReportPar
       } else {
         setPayload(EMPTY_PAYLOAD);
       }
+
+      // Load PDF URL if exists
+      if ((reportData as any).status !== "draft") {
+        const { data: docs } = await supabase
+          .from("monthly_report_documents")
+          .select("storage_path")
+          .eq("report_id", reportId)
+          .eq("type", "official_pdf")
+          .order("generated_at", { ascending: false })
+          .limit(1);
+
+        if (docs && docs.length > 0) {
+          const { data: signed } = await supabase.storage
+            .from("relatorios")
+            .createSignedUrl(docs[0].storage_path, 900);
+          setPdfUrl(signed?.signedUrl || null);
+        } else {
+          setPdfUrl(null);
+        }
+      } else {
+        setPdfUrl(null);
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erro ao carregar relatório";
       console.error("[MonthlyReport] fetchOrCreateDraft error:", msg);
@@ -125,7 +146,7 @@ export function useMonthlyReport({ projectId, year, month }: UseMonthlyReportPar
   // Save draft
   const saveDraft = useCallback(async (silent = false) => {
     const currentReport = reportRef.current;
-    if (!currentReport || currentReport.status !== "draft") return;
+    if (!currentReport || !["draft", "returned"].includes(currentReport.status)) return;
     setSaving(true);
     try {
       const { error } = await supabase.rpc("save_monthly_report_draft", {
@@ -145,18 +166,84 @@ export function useMonthlyReport({ projectId, year, month }: UseMonthlyReportPar
 
   // Autosave every 15s when draft
   useEffect(() => {
-    if (!report || report.status !== "draft") return;
+    if (!report || !["draft", "returned"].includes(report.status)) return;
     autosaveTimerRef.current = setInterval(() => {
       saveDraft(true);
     }, 15000);
     return () => { if (autosaveTimerRef.current) clearInterval(autosaveTimerRef.current); };
   }, [report?.id, report?.status, saveDraft]);
 
+  // Submit report
+  const submitReport = useCallback(async () => {
+    const currentReport = reportRef.current;
+    if (!currentReport) return;
+
+    // Save draft first
+    await saveDraft(true);
+
+    setSubmitting(true);
+    try {
+      const { error } = await supabase.rpc("submit_monthly_report", {
+        p_report_id: currentReport.id,
+      });
+      if (error) throw error;
+
+      toast.success("Relatório enviado com sucesso!");
+
+      // Trigger PDF generation
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+
+      if (token) {
+        try {
+          await fetch(`${supabaseUrl}/functions/v1/generate-monthly-report-pdf`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            },
+            body: JSON.stringify({ report_id: currentReport.id }),
+          });
+        } catch (pdfErr) {
+          console.warn("[MonthlyReport] PDF generation trigger failed:", pdfErr);
+        }
+      }
+
+      // Refresh to get updated state
+      await fetchOrCreateDraft();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erro ao enviar relatório";
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  }, [saveDraft, fetchOrCreateDraft]);
+
+  // Reopen report (after return)
+  const reopenReport = useCallback(async () => {
+    const currentReport = reportRef.current;
+    if (!currentReport || currentReport.status !== "returned") return;
+
+    try {
+      const { error } = await supabase.rpc("reopen_monthly_report", {
+        p_report_id: currentReport.id,
+      });
+      if (error) throw error;
+      toast.success("Relatório reaberto para correção");
+      await fetchOrCreateDraft();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erro ao reabrir relatório";
+      toast.error(msg);
+    }
+  }, [fetchOrCreateDraft]);
+
   const updatePayload = useCallback((partial: Partial<MonthlyReportPayload>) => {
     setPayload(prev => ({ ...prev, ...partial }));
   }, []);
 
-  const isDraft = report?.status === "draft";
+  const isDraft = report?.status === "draft" || report?.status === "returned";
   const isReadOnly = !isDraft;
 
   return {
@@ -164,10 +251,14 @@ export function useMonthlyReport({ projectId, year, month }: UseMonthlyReportPar
     payload,
     loading,
     saving,
+    submitting,
     lastSavedAt,
     isDraft,
     isReadOnly,
+    pdfUrl,
     saveDraft,
+    submitReport,
+    reopenReport,
     updatePayload,
     refresh: fetchOrCreateDraft,
   };

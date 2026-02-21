@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.generate-executive-report-pdf]
 verify_jwt = false
+
+[functions.generate-monthly-report-pdf]
+verify_jwt = false

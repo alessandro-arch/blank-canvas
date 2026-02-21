@@ -24,14 +24,18 @@ interface Props {
   returnReason: string | null;
   periodYear: number;
   periodMonth: number;
+  pdfUrl: string | null;
   onUpdate: (partial: Partial<MonthlyReportPayload>) => void;
   onSave: () => void;
+  onSubmit: () => void;
+  onReopen: () => void;
 }
 
 export function MonthlyReportForm({
   payload, status, loading, saving, lastSavedAt,
   isDraft, isReadOnly, submittedAt, returnReason,
-  periodYear, periodMonth, onUpdate, onSave,
+  periodYear, periodMonth, pdfUrl,
+  onUpdate, onSave, onSubmit, onReopen,
 }: Props) {
   const [newEntrega, setNewEntrega] = useState("");
 
@@ -69,7 +73,16 @@ export function MonthlyReportForm({
             </CardTitle>
             <MonthlyReportStatusBadge status={status} />
           </div>
-          <MonthlyReportActions isDraft={isDraft} saving={saving} lastSavedAt={lastSavedAt} onSave={onSave} />
+          <MonthlyReportActions
+            isDraft={isDraft}
+            saving={saving}
+            lastSavedAt={lastSavedAt}
+            status={status}
+            pdfUrl={pdfUrl}
+            onSave={onSave}
+            onSubmit={onSubmit}
+            onReopen={onReopen}
+          />
         </div>
 
         {status === "returned" && returnReason && (
