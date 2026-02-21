@@ -13,6 +13,7 @@ export interface InstitutionalDocument {
   file_name: string;
   file_size: number | null;
   uploaded_by: string;
+  organization_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -37,13 +38,14 @@ interface UploadDocumentParams {
   title: string;
   description: string;
   type: DocumentType;
+  organizationId?: string | null;
 }
 
 export function useUploadInstitutionalDocument() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ file, title, description, type }: UploadDocumentParams) => {
+    mutationFn: async ({ file, title, description, type, organizationId }: UploadDocumentParams) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
@@ -75,6 +77,7 @@ export function useUploadInstitutionalDocument() {
           file_name: file.name,
           file_size: file.size,
           uploaded_by: user.id,
+          organization_id: organizationId || null,
         })
         .select()
         .single();

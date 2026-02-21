@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { Upload, FileText, X } from "lucide-react";
+import { useOrganizationContext } from "@/contexts/OrganizationContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -47,6 +48,7 @@ export function UploadDocumentDialog() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const uploadMutation = useUploadInstitutionalDocument();
+  const { currentOrganization } = useOrganizationContext();
 
   const resetForm = () => {
     setTitle("");
@@ -101,6 +103,7 @@ export function UploadDocumentDialog() {
       title,
       description,
       type,
+      organizationId: currentOrganization?.id,
     });
 
     handleClose();
