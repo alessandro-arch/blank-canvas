@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +21,7 @@ export default function AdminLogin() {
   const { user, signIn } = useAuth();
   const { role, loading: roleLoading, hasManagerAccess, isScholar } = useUserRole();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,14 +30,14 @@ export default function AdminLogin() {
   // Redirect based on role after login
   useEffect(() => {
     if (user && !roleLoading) {
+      const returnUrl = searchParams.get("returnUrl");
       if (isScholar) {
-        // Scholar trying to access admin portal - redirect to scholar portal
-        navigate("/bolsista/painel", { replace: true });
+        navigate(returnUrl?.startsWith("/bolsista") ? returnUrl : "/bolsista/painel", { replace: true });
       } else if (hasManagerAccess) {
-        navigate("/admin/dashboard", { replace: true });
+        navigate(returnUrl?.startsWith("/admin") ? returnUrl : "/admin/dashboard", { replace: true });
       }
     }
-  }, [user, role, roleLoading, hasManagerAccess, isScholar, navigate]);
+  }, [user, role, roleLoading, hasManagerAccess, isScholar, navigate, searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

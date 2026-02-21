@@ -12,6 +12,7 @@ import { SupportCenterDrawer } from "@/components/support-center/SupportCenterDr
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ScholarProtectedRoute } from "@/components/auth/ScholarProtectedRoute";
 import { AdminProtectedRoute } from "@/components/auth/AdminProtectedRoute";
+import { SessionGuard } from "@/components/auth/SessionGuard";
 
 // Public pages
 import LandingPage from "./pages/LandingPage";
@@ -23,6 +24,7 @@ import ScholarSignup from "./pages/ScholarSignup";
 import AccessDenied from "./pages/AccessDenied";
 import OrgMemberSignup from "./pages/OrgMemberSignup";
 import NotFound from "./pages/NotFound";
+import SessionExpired from "./pages/SessionExpired";
 
 // Scholar pages (reusing existing)
 import Index from "./pages/Index";
@@ -80,6 +82,7 @@ const App = () => (
               <Route path="/criar-conta" element={<ScholarSignup />} />
               <Route path="/criar-conta-membro" element={<OrgMemberSignup />} />
               <Route path="/acesso-negado" element={<AccessDenied />} />
+              <Route path="/session-expired" element={<SessionExpired />} />
               
               {/* Public invite accept pages */}
               <Route path="/convite" element={<InviteAccept />} />
@@ -249,6 +252,7 @@ const App = () => (
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
+            <SessionGuard />
             <SupportCenterFAB />
             <SupportCenterDrawer />
           </BrowserRouter>
