@@ -536,6 +536,192 @@ export type Database = {
           },
         ]
       }
+      monthly_report_documents: {
+        Row: {
+          generated_at: string
+          generated_by_user_id: string
+          id: string
+          metadata: Json
+          report_id: string
+          sha256: string | null
+          storage_path: string
+          type: string
+        }
+        Insert: {
+          generated_at?: string
+          generated_by_user_id: string
+          id?: string
+          metadata?: Json
+          report_id: string
+          sha256?: string | null
+          storage_path: string
+          type: string
+        }
+        Update: {
+          generated_at?: string
+          generated_by_user_id?: string
+          id?: string
+          metadata?: Json
+          report_id?: string
+          sha256?: string | null
+          storage_path?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monthly_report_documents_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "monthly_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      monthly_report_fields: {
+        Row: {
+          id: string
+          payload: Json
+          report_id: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          payload?: Json
+          report_id: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          payload?: Json
+          report_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monthly_report_fields_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: true
+            referencedRelation: "monthly_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      monthly_report_versions: {
+        Row: {
+          change_summary: string | null
+          changed_at: string
+          changed_by_user_id: string
+          id: string
+          payload: Json
+          report_id: string
+          version: number
+        }
+        Insert: {
+          change_summary?: string | null
+          changed_at?: string
+          changed_by_user_id: string
+          id?: string
+          payload?: Json
+          report_id: string
+          version?: number
+        }
+        Update: {
+          change_summary?: string | null
+          changed_at?: string
+          changed_by_user_id?: string
+          id?: string
+          payload?: Json
+          report_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monthly_report_versions_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "monthly_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      monthly_reports: {
+        Row: {
+          approved_at: string | null
+          approved_by_user_id: string | null
+          beneficiary_user_id: string
+          created_at: string
+          id: string
+          locked_at: string | null
+          organization_id: string
+          period_month: number
+          period_year: number
+          project_id: string
+          return_reason: string | null
+          returned_at: string | null
+          returned_by_user_id: string | null
+          status: string
+          submitted_at: string | null
+          submitted_ip: string | null
+          submitted_user_agent: string | null
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by_user_id?: string | null
+          beneficiary_user_id: string
+          created_at?: string
+          id?: string
+          locked_at?: string | null
+          organization_id: string
+          period_month: number
+          period_year: number
+          project_id: string
+          return_reason?: string | null
+          returned_at?: string | null
+          returned_by_user_id?: string | null
+          status?: string
+          submitted_at?: string | null
+          submitted_ip?: string | null
+          submitted_user_agent?: string | null
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by_user_id?: string | null
+          beneficiary_user_id?: string
+          created_at?: string
+          id?: string
+          locked_at?: string | null
+          organization_id?: string
+          period_month?: number
+          period_year?: number
+          project_id?: string
+          return_reason?: string | null
+          returned_at?: string | null
+          returned_by_user_id?: string | null
+          status?: string
+          submitted_at?: string | null
+          submitted_ip?: string | null
+          submitted_user_agent?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monthly_reports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "monthly_reports_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       news_posts: {
         Row: {
           content: string
@@ -1260,6 +1446,10 @@ export type Database = {
         }
         Returns: Json
       }
+      create_monthly_report_draft: {
+        Args: { p_month: number; p_project_id: string; p_year: number }
+        Returns: Json
+      }
       create_org_invite: {
         Args: {
           p_email: string
@@ -1297,6 +1487,10 @@ export type Database = {
       }
       is_org_admin: { Args: { p_org_id: string }; Returns: boolean }
       is_org_admin_or_manager: { Args: { p_org_id: string }; Returns: boolean }
+      monthly_report_belongs_to_user_org: {
+        Args: { p_report_id: string }
+        Returns: boolean
+      }
       project_belongs_to_user_org: {
         Args: { p_project_id: string }
         Returns: boolean
@@ -1308,6 +1502,10 @@ export type Database = {
           p_old_enrollment_id: string
           p_start_date?: string
         }
+        Returns: Json
+      }
+      save_monthly_report_draft: {
+        Args: { p_payload: Json; p_report_id: string }
         Returns: Json
       }
       upsert_sensitive_profile: {

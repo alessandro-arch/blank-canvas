@@ -4,6 +4,7 @@ import { Footer } from "@/components/layout/Footer";
 import { ScholarStats } from "@/components/scholar/ScholarStats";
 import { ScholarProfileCard } from "@/components/scholar/ScholarProfileCard";
 import { InstallmentsTable } from "@/components/scholar/InstallmentsTable";
+import { MonthlyReportSection } from "@/components/scholar/monthly-report/MonthlyReportSection";
 import { ArrowLeft, AlertCircle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
@@ -89,9 +90,16 @@ const PaymentsReports = () => {
             </div>
           )}
 
+          {/* Monthly Report Form */}
+          {(loading || hasEnrollment) && (
+            <div className="animate-fade-in mb-6" style={{ animationDelay: "50ms" }}>
+              <MonthlyReportSection projectId={enrollment?.project_id || null} />
+            </div>
+          )}
+
           {/* Installments Table - only show if has enrollment */}
           {(loading || hasEnrollment) && (
-            <div className="animate-fade-in" style={{ animationDelay: "100ms" }}>
+            <div className="animate-fade-in" style={{ animationDelay: "150ms" }}>
               <InstallmentsTable 
                 payments={data?.payments || []}
                 grantValue={enrollment ? Number(enrollment.grant_value) : 0}
