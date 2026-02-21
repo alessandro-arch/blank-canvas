@@ -184,17 +184,40 @@ async function generatePdfInBackground(
     reportId,
   });
 
-  // Calculate SHA-256
+  // Calculate SHA-256 of the plain PDF (for integrity verification)
   const hashBuffer = await crypto.subtle.digest("SHA-256", pdfBytes);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   const sha256 = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 
-  // Upload to storage
-  const storagePath = `monthly-reports/${report.organization_id}/${report.project_id}/${report.beneficiary_user_id}/${report.period_year}-${String(report.period_month).padStart(2, "0")}/relatorio_oficial_v${Date.now()}.pdf`;
+  // Encrypt PDF with AES-256-GCM before upload
+  const cryptoKek = Deno.env.get("CRYPTO_KEK");
+  let uploadBytes: Uint8Array;
+  let storagePath: string;
+  const basePath = `monthly-reports/${report.organization_id}/${report.project_id}/${report.beneficiary_user_id}/${report.period_year}-${String(report.period_month).padStart(2, "0")}`;
+
+  if (cryptoKek && cryptoKek.length === 32) {
+    // Encrypt: IV (12 bytes) + ciphertext + tag
+    const enc = new TextEncoder();
+    const key = await crypto.subtle.importKey("raw", enc.encode(cryptoKek), "AES-GCM", false, ["encrypt"]);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv, tagLength: 128 }, key, pdfBytes);
+    const encBuf = new Uint8Array(encrypted);
+    // Prepend IV to ciphertext+tag
+    uploadBytes = new Uint8Array(iv.length + encBuf.length);
+    uploadBytes.set(iv, 0);
+    uploadBytes.set(encBuf, iv.length);
+    storagePath = `${basePath}/relatorio_oficial_v${Date.now()}.pdf.enc`;
+    console.log(`[rid:${requestId}] PDF encrypted with AES-256-GCM`);
+  } else {
+    // Fallback: upload plain PDF if KEK not configured
+    uploadBytes = pdfBytes;
+    storagePath = `${basePath}/relatorio_oficial_v${Date.now()}.pdf`;
+    console.warn(`[rid:${requestId}] CRYPTO_KEK not configured — uploading plain PDF`);
+  }
 
   const { error: uploadError } = await db.storage
     .from("relatorios")
-    .upload(storagePath, pdfBytes, { contentType: "application/pdf", upsert: true });
+    .upload(storagePath, uploadBytes, { contentType: "application/octet-stream", upsert: true });
 
   if (uploadError) {
     console.error(`[rid:${requestId}] Upload error:`, uploadError);
@@ -212,6 +235,9 @@ async function generatePdfInBackground(
     metadata: { pages: 1, period: periodLabel },
   });
 
+  // Update monthly_reports with sha256 for integrity verification
+  await db.from("monthly_reports").update({ pdf_sha256: sha256 }).eq("id", reportId);
+
   // Audit log
   await db.from("audit_logs").insert({
     user_id: userId,
@@ -219,7 +245,7 @@ async function generatePdfInBackground(
     entity_type: "monthly_report",
     entity_id: reportId,
     organization_id: report.organization_id,
-    details: { sha256, storage_path: storagePath, period: periodLabel },
+    details: { sha256, storage_path: storagePath, period: periodLabel, encrypted: storagePath.endsWith(".enc") },
   });
 
   console.log(`[rid:${requestId}] PDF generated in ${Date.now() - startTime}ms, sha256: ${sha256}`);
