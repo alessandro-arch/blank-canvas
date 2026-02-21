@@ -56,6 +56,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { MonthlyReportStatusBadge } from "@/components/scholar/monthly-report/MonthlyReportStatusBadge";
+import { MonthlyReportAIPanel } from "@/components/dashboard/MonthlyReportAIPanel";
 import type { MonthlyReportStatus } from "@/hooks/useMonthlyReport";
 
 interface MonthlyReportRow {
@@ -733,7 +734,7 @@ export function MonthlyReportsReviewManagement() {
 
       {/* Review Dialog */}
       <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileSearch className="w-5 h-5 text-primary" />
@@ -786,6 +787,12 @@ export function MonthlyReportsReviewManagement() {
                   Ver PDF
                 </Button>
               </div>
+
+              {/* AI Panel */}
+              <MonthlyReportAIPanel
+                reportId={selectedReport.id}
+                onInsertToFeedback={(text) => setFeedback(prev => prev ? prev + "\n\n" + text : text)}
+              />
 
               <div className="space-y-2">
                 <Label htmlFor="mr-feedback">Parecer / Observações</Label>
