@@ -1,115 +1,181 @@
 
-# Padronizar Envio de Relatórios no Formulário Digital
+# Plano de Hardening de Seguranca -- BolsaGO
 
-## Contexto
-
-O sistema possui dois fluxos paralelos de relatórios:
-- **Antigo**: tabela `reports` com upload manual de PDF (via `ReportUploadDialog` e `InstallmentsTable`)
-- **Novo**: tabelas `monthly_reports` + `monthly_report_fields` com formulário digital estruturado (via `MonthlyReportForm` e `MonthlyReportSection`)
-
-O objetivo é migrar todos os bolsistas para o novo fluxo, desabilitando o upload manual de PDF e orientando o reenvio via formulário digital.
+Este e um projeto extenso de seguranca dividido em 5 fases. O plano prioriza as acoes de maior impacto e menor risco de regressao, respeitando a arquitetura atual (React + Supabase).
 
 ---
 
-## Escopo das Alteracoes
+## Estado Atual (o que ja existe)
 
-### 1. Migracoes de Banco de Dados
+- **Route Guards**: `AdminProtectedRoute`, `ScholarProtectedRoute`, `ProtectedRoute`, `RoleProtectedRoute` ja validam sessao e role
+- **SessionGuard**: Timeout de 30min com modal de aviso (60s antes), interceptor de 401, deteccao de rede
+- **RLS**: Funcoes auxiliares `has_role()`, `is_org_admin()`, `get_user_organizations()`, etc. ja existem como SECURITY DEFINER
+- **PIX**: Ja usa criptografia via Vault com `encrypt_and_mask_pix_key` trigger e coluna `pix_key_masked`
+- **PDFs**: `PdfViewerDialog` ja existe; signed URLs ja sao usadas em `useSignedUrl.ts` (10min expiracao)
+- **Auditoria**: Tabela `audit_logs` ja registra acoes criticas
 
-Adicionar coluna `reenvio_solicitado` na tabela `reports` para marcar relatórios antigos que precisam ser reenviados no novo formato:
+---
 
-```text
-ALTER TABLE public.reports 
-  ADD COLUMN IF NOT EXISTS reenvio_solicitado boolean NOT NULL DEFAULT false,
-  ADD COLUMN IF NOT EXISTS reenvio_solicitado_at timestamptz,
-  ADD COLUMN IF NOT EXISTS reenvio_solicitado_by uuid,
-  ADD COLUMN IF NOT EXISTS monthly_report_id uuid REFERENCES monthly_reports(id);
-```
+## FASE 1 -- Anti-cache e Limpeza de Estado pos-Logout
 
-A coluna `monthly_report_id` vincula o relatório antigo ao novo relatório digital que o substituiu.
+**Objetivo**: Impedir que "voltar no navegador" exiba conteudo protegido apos logout.
 
-### 2. Desabilitar Upload Manual de PDF (Bolsista)
+### 1.1 Limpar cache do React Query no signOut
 
-**Arquivo**: `src/components/scholar/InstallmentsTable.tsx`
+- No `AuthContext.tsx`, importar `queryClient` e chamar `queryClient.clear()` dentro da funcao `signOut()` antes de `supabase.auth.signOut()`
+- Isso remove todos os dados em cache do React Query imediatamente
 
-- No componente `InstallmentActions`, substituir o botão "Enviar" / "Reenviar" que abre o `ReportUploadDialog` por uma orientacao para usar o formulário digital
-- Quando `canSubmitReport` ou `canResubmit` for verdadeiro, em vez de abrir `ReportUploadDialog`, redirecionar ou orientar o bolsista a usar a seção "Relatório Mensal" (formulário digital)
-- Manter o botao de upload apenas para relatórios que ja possuem status `approved` (historico) -- esses nao precisam de reenvio
+### 1.2 Meta tags anti-cache no index.html
 
-### 3. Alerta de Reenvio Solicitado (Bolsista)
+- Adicionar no `<head>` do `index.html`:
+  ```text
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  ```
 
-**Arquivo**: `src/components/scholar/monthly-report/MonthlyReportSection.tsx`
+### 1.3 Redirecionamento forcado no onAuthStateChange
 
-- Consultar a tabela `reports` para verificar se existem relatórios com `reenvio_solicitado = true` e `monthly_report_id IS NULL` para o bolsista no mesmo período
-- Exibir um banner de alerta informando que o gestor solicitou o reenvio no novo formato digital
-- Mostrar informacoes do relatório antigo (mes de referencia, feedback do gestor) para contextualizar
+- No `SessionGuard.tsx`, ao detectar evento `SIGNED_OUT`, forcar navegacao para `/acesso` e limpar query cache
+- Previne o cenario onde o usuario clica "voltar" e ve dados residuais
 
-**Novo componente**: `src/components/scholar/monthly-report/ResubmitAlertBanner.tsx`
+### 1.4 Ajustar aviso pre-expiracao para 2 minutos
 
-- Banner com icone de alerta, descricao do motivo e botao para iniciar o preenchimento no formulário
+- Alterar `WARNING_BEFORE_MS` de 60s para 120s (2 minutos) no `SessionGuard.tsx`
 
-### 4. Fluxo de Submissao via Formulário com PDF Automatico
+**Arquivos afetados**: `AuthContext.tsx`, `SessionGuard.tsx`, `index.html`
 
-O fluxo ja existe (Fases 1-5 implementadas anteriormente):
-- Bolsista preenche o formulário digital
-- Ao submeter, o sistema gera PDF automaticamente via `generate-monthly-report-pdf`
-- Nenhuma alteracao necessaria nesta etapa
+---
 
-### 5. Vincular Reenvio ao Relatório Antigo
+## FASE 2 -- Reforco de RLS
 
-**Arquivo**: `src/hooks/useMonthlyReport.ts`
+**Objetivo**: Garantir isolamento de dados entre tenants e roles.
 
-- Apos submissao bem-sucedida do relatório mensal, verificar se existe um `report` antigo com `reenvio_solicitado = true` para o mesmo periodo
-- Se existir, atualizar o registro antigo:
-  - `monthly_report_id` = id do novo relatório
-  - `status` = `'replaced_by_digital'` (novo status)
-- Registrar no `audit_logs` a substituicao
+### 2.1 Auditoria das policies existentes
 
-### 6. Acao do Gestor: Solicitar Reenvio Digital
+- Executar `supabase--linter` para identificar tabelas sem RLS ou com policies permissivas
+- Revisar policies de `profiles`, `bank_accounts`, `payments`, `monthly_reports`
 
-**Arquivo**: `src/components/dashboard/ReportsReviewManagement.tsx`
+### 2.2 Corrigir policy de profiles
 
-- Adicionar botao "Solicitar reenvio digital" no painel de revisao de relatórios antigos
-- Ao clicar, marcar o `report` como `reenvio_solicitado = true` com timestamp e user_id
-- Registrar no audit log
+- SELECT: usuario ve apenas proprio perfil (`user_id = auth.uid()`) OU admin/gestor da mesma org (via `get_user_organizations()`)
+- UPDATE: usuario atualiza apenas proprio perfil; admin/gestor atualiza campos administrativos de usuarios da mesma org
+- Substituir qualquer policy generica tipo `authenticated can select`
+
+### 2.3 Reforcar bank_accounts
+
+- Verificar que RLS ja impede acesso cross-tenant (conforme memory `security/banking-data-isolation`)
+- Adicionar policy explicita: bolsista ve apenas proprio registro; gestor/admin ve apenas registros da mesma org
+
+### 2.4 Storage policies
+
+- Verificar que buckets privados (`reports`, `payment-receipts`, `grant-terms`, `relatorios`, `documentos-projetos`) bloqueiam acesso direto
+- Reforcar policies: bolsista acessa apenas seus arquivos; gestor/admin acessa apenas arquivos da mesma org
+
+**Implementacao**: Migracao SQL com `DROP POLICY IF EXISTS` + `CREATE POLICY` para cada tabela critica
+
+---
+
+## FASE 3 -- Dados Bancarios (Reforco da Criptografia Existente)
+
+**Objetivo**: Garantir que nenhum dado bancario puro fique exposto.
+
+### 3.1 Verificar estado atual
+
+- PIX ja usa criptografia via Vault (`encrypt_and_mask_pix_key` trigger)
+- Verificar se campos `banco`, `agencia`, `conta` estao em texto puro ou mascarados
+- Se em texto puro, aplicar o mesmo padrao de mascaramento
+
+### 3.2 Criar Edge Function para leitura segura (se necessario)
+
+- Se campos bancarios alem do PIX estiverem em texto puro, criar Edge Function `secure-bank-read` que:
+  - Valida auth + role + tenant
+  - Retorna dados completos apenas para admin/gestor autorizado
+  - Registra auditoria
+- Frontend exibe apenas versao mascarada por padrao
+
+### 3.3 Remover colunas de texto puro (se existirem)
+
+- Migracao para NULL-ificar colunas antigas apos migrar para formato criptografado
+
+**Nota**: Esta fase depende de uma analise detalhada do schema atual de `bank_accounts`. Sera refinada durante a implementacao.
+
+---
+
+## FASE 4 -- PDFs: Viewer Interno e Auditoria
+
+**Objetivo**: Eliminar abertura de URLs tecnicas em nova aba; registrar acessos.
+
+### 4.1 Centralizar acesso via PdfViewerDialog
+
+- Substituir todas as chamadas `window.open(signedUrl)` e `openReportPdf()` por abertura no `PdfViewerDialog` existente
+- Arquivos afetados (10 componentes): `GrantTermSection`, `MonthlyReportsReviewManagement`, `ProjectDocumentsSection`, `InstallmentsTable`, `ReportsTab`, `ReportVersionsDialog`, `GrantTermTab`, `ReportsReviewManagement`, `PdfReadyDialog`
+
+### 4.2 Registrar auditoria de visualizacao/download
+
+- Ao abrir ou baixar um PDF, inserir registro em `audit_logs` com acao `document_viewed` ou `document_downloaded`
+- Incluir `document_id`, `user_id`, `action`, timestamp
+
+### 4.3 Reduzir expiracao de signed URLs
+
+- Reduzir de 600s (10min) para 300s (5min) em `useSignedUrl.ts`
+
+**Arquivos afetados**: `useSignedUrl.ts`, `PdfViewerDialog.tsx`, 10 componentes que abrem PDFs
+
+---
+
+## FASE 5 -- Headers de Seguranca e Melhorias Complementares
+
+**Objetivo**: Adicionar camadas de protecao adicionais.
+
+### 5.1 Headers de seguranca
+
+- Adicionar no `index.html` (via meta tags, ja que Lovable nao controla headers do servidor):
+  ```text
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <meta http-equiv="X-Frame-Options" content="SAMEORIGIN" />
+  ```
+- `Referrer-Policy` e `CSP` via meta tags (limitado mas funcional)
+
+### 5.2 MFA (informativo)
+
+- MFA via TOTP e suportado pelo Supabase Auth, mas requer configuracao no Dashboard do Supabase (Authentication > MFA)
+- Recomendacao: habilitar e adicionar fluxo de enrollment para admin/gestor
+- **Nota**: Implementacao completa de MFA e um projeto separado; nesta fase, documentar a recomendacao e configurar o lado do Supabase
+
+### 5.3 Rate limiting
+
+- Rate limiting em login/reset ja e parcialmente tratado pelo Supabase Auth (rate limits built-in)
+- Para endpoints custom, avaliar implementacao via Edge Function com contagem em tabela auxiliar
+- **Nota**: Escopo limitado nesta fase; implementacao completa sob demanda
+
+---
+
+## Ordem de Implementacao Recomendada
+
+1. **Fase 1** (anti-cache + limpeza de estado) -- impacto imediato, baixo risco
+2. **Fase 4** (PDFs no viewer interno + auditoria) -- alta visibilidade, risco moderado
+3. **Fase 2** (RLS) -- requer analise cuidadosa das policies existentes para nao quebrar funcionalidades
+4. **Fase 5** (headers) -- simples, complementar
+5. **Fase 3** (criptografia bancaria) -- ja parcialmente implementada; refinamento sob demanda
 
 ---
 
 ## Detalhes Tecnicos
 
-### Migracoes SQL
+### Arquivos a serem modificados
 
-```text
--- Novas colunas em reports
-ALTER TABLE public.reports 
-  ADD COLUMN IF NOT EXISTS reenvio_solicitado boolean NOT NULL DEFAULT false,
-  ADD COLUMN IF NOT EXISTS reenvio_solicitado_at timestamptz,
-  ADD COLUMN IF NOT EXISTS reenvio_solicitado_by uuid,
-  ADD COLUMN IF NOT EXISTS monthly_report_id uuid REFERENCES public.monthly_reports(id);
+| Arquivo | Fase | Alteracao |
+|---------|------|-----------|
+| `src/contexts/AuthContext.tsx` | 1 | Limpar queryClient no signOut |
+| `src/components/auth/SessionGuard.tsx` | 1 | Redirecionar no SIGNED_OUT, ajustar warning para 2min |
+| `index.html` | 1, 5 | Meta tags anti-cache e seguranca |
+| `src/hooks/useSignedUrl.ts` | 4 | Reduzir expiracao, adicionar auditoria |
+| `src/components/ui/PdfViewerDialog.tsx` | 4 | Melhorias para uso centralizado |
+| 10 componentes de PDF | 4 | Substituir `window.open` por `PdfViewerDialog` |
+| Migracao SQL | 2 | Policies RLS revisadas |
 
-CREATE INDEX IF NOT EXISTS idx_reports_reenvio 
-  ON public.reports (user_id, reenvio_solicitado) 
-  WHERE reenvio_solicitado = true;
-```
+### Riscos e Mitigacoes
 
-### Arquivos a Criar
-- `src/components/scholar/monthly-report/ResubmitAlertBanner.tsx`
-
-### Arquivos a Editar
-- `src/components/scholar/InstallmentsTable.tsx` -- desabilitar upload manual, redirecionar para formulário digital
-- `src/components/scholar/monthly-report/MonthlyReportSection.tsx` -- exibir alerta de reenvio solicitado
-- `src/hooks/useMonthlyReport.ts` -- vincular relatório antigo apos submissao
-- `src/components/dashboard/ReportsReviewManagement.tsx` -- botao de solicitar reenvio digital
-- `src/integrations/supabase/types.ts` -- atualizado automaticamente
-
-### Fluxo Completo
-
-```text
-Gestor clica "Solicitar reenvio digital"
-  -> reports.reenvio_solicitado = true
-  -> Bolsista ve alerta no painel
-  -> Bolsista preenche formulário digital
-  -> Submissao gera PDF automatico
-  -> reports.monthly_report_id = novo ID
-  -> reports.status = 'replaced_by_digital'
-  -> Historico registrado em audit_logs
-```
+- **Anti-cache agressivo**: Pode afetar performance em sessoes ativas. Mitigacao: aplicar `no-store` apenas via meta tags (nao afeta assets estaticos do Vite)
+- **RLS mais restritivo**: Pode bloquear queries legitimas. Mitigacao: testar cada policy antes de aplicar; manter policies antigas comentadas na migracao para rollback rapido
+- **PDF viewer interno**: Alguns PDFs pesados podem carregar lentamente no iframe. Mitigacao: manter botao "Baixar PDF" como fallback
