@@ -166,14 +166,14 @@ function InstallmentActions({ installment, onRefresh }: InstallmentActionsProps)
         {contextualMessage && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Link to="/bolsista/painel">
+              <Link to="/bolsista/relatorios">
                 <Button 
                   size="sm" 
                   variant="outline" 
                   className="gap-1.5 text-xs border-primary/30 text-primary"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
-                  Acessar Subprojeto
+                  Meus Relatórios
                 </Button>
               </Link>
             </TooltipTrigger>
@@ -254,10 +254,10 @@ function InstallmentActions({ installment, onRefresh }: InstallmentActionsProps)
                     <Button variant="outline" onClick={() => setFeedbackOpen(false)}>
                       Fechar
                     </Button>
-                    <Link to="/bolsista/painel">
+                    <Link to="/bolsista/relatorios">
                       <Button className="gap-1.5">
                         <ExternalLink className="w-4 h-4" />
-                        Acessar Subprojeto
+                        Meus Relatórios
                       </Button>
                     </Link>
                   </div>
@@ -477,9 +477,9 @@ export function InstallmentsTable({
               <li><strong>Relatório pendente</strong> → Pagamento aguardando ⏳</li>
               <li><strong>Relatório devolvido</strong> → Pagamento bloqueado 🚫</li>
             </ul>
-            <Link to="/bolsista/painel" className="inline-flex items-center gap-1.5 text-sm text-primary font-medium mt-2 hover:underline">
+            <Link to="/bolsista/relatorios" className="inline-flex items-center gap-1.5 text-sm text-primary font-medium mt-2 hover:underline">
               <ExternalLink className="w-3.5 h-3.5" />
-              Acessar Subprojeto para enviar relatório
+              Acessar Meus Relatórios
             </Link>
           </div>
         </div>
