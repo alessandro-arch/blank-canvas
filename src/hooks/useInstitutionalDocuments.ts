@@ -61,11 +61,7 @@ export function useUploadInstitutionalDocument() {
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from("institutional-documents")
-        .getPublicUrl(filePath);
-
+      // Store the storage path (not public URL) for signed URL generation
       // Insert document record
       const { data, error } = await supabase
         .from("institutional_documents")
@@ -73,7 +69,7 @@ export function useUploadInstitutionalDocument() {
           title,
           description: description || null,
           type,
-          file_url: urlData.publicUrl,
+          file_url: filePath,
           file_name: file.name,
           file_size: file.size,
           uploaded_by: user.id,
@@ -101,13 +97,20 @@ export function useDeleteInstitutionalDocument() {
 
   return useMutation({
     mutationFn: async (document: InstitutionalDocument) => {
-      // Extract file path from URL
-      const urlParts = document.file_url.split("/institutional-documents/");
-      if (urlParts.length > 1) {
-        const filePath = urlParts[1];
+      // Delete file from storage
+      const storagePath = document.file_url;
+      if (storagePath && !storagePath.startsWith("http")) {
         await supabase.storage
           .from("institutional-documents")
-          .remove([filePath]);
+          .remove([storagePath]);
+      } else {
+        // Legacy: extract path from full URL
+        const urlParts = storagePath.split("/institutional-documents/");
+        if (urlParts.length > 1) {
+          await supabase.storage
+            .from("institutional-documents")
+            .remove([urlParts[1]]);
+        }
       }
 
       const { error } = await supabase
@@ -159,21 +162,23 @@ export function useUpdateInstitutionalDocument() {
 
         if (uploadError) throw uploadError;
 
-        // Get public URL for new file
-        const { data: urlData } = supabase.storage
-          .from("institutional-documents")
-          .getPublicUrl(filePath);
-
-        // Delete old file
-        const oldUrlParts = document.file_url.split("/institutional-documents/");
-        if (oldUrlParts.length > 1) {
-          const oldFilePath = oldUrlParts[1];
+        // Delete old file from storage
+        const oldFilePath = document.file_url;
+        if (oldFilePath && !oldFilePath.startsWith("http")) {
           await supabase.storage
             .from("institutional-documents")
             .remove([oldFilePath]);
+        } else {
+          // Legacy: extract path from full URL
+          const oldUrlParts = oldFilePath.split("/institutional-documents/");
+          if (oldUrlParts.length > 1) {
+            await supabase.storage
+              .from("institutional-documents")
+              .remove([oldUrlParts[1]]);
+          }
         }
 
-        fileUrl = urlData.publicUrl;
+        fileUrl = filePath;
         fileName = newFile.name;
         fileSize = newFile.size;
       }
