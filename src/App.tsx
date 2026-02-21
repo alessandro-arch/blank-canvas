@@ -49,6 +49,7 @@ import ScholarProfileView from "./pages/ScholarProfileView";
 import Import from "./pages/Import";
 import AuditTrail from "./pages/AuditTrail";
 import ScholarMessages from "./pages/ScholarMessages";
+import ScholarReports from "./pages/ScholarReports";
 import AdminMessages from "./pages/AdminMessages";
 import AdminMembers from "./pages/AdminMembers";
 import AllUsers from "./pages/AllUsers";
@@ -120,6 +121,11 @@ const App = () => (
               <Route path="/bolsista/manual" element={
                 <ScholarProtectedRoute>
                   <ScholarManual />
+                </ScholarProtectedRoute>
+              } />
+              <Route path="/bolsista/relatorios" element={
+                <ScholarProtectedRoute>
+                  <ScholarReports />
                 </ScholarProtectedRoute>
               } />
               <Route path="/bolsista/mensagens" element={

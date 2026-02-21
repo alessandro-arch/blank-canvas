@@ -41,6 +41,7 @@ const scholarNavigation: NavItem[] = [
   { name: "Meu Painel", icon: LayoutDashboard, href: "/bolsista/painel" },
   { name: "Meu Perfil", icon: UserCircle, href: "/bolsista/perfil" },
   { name: "Meus Pagamentos", icon: Receipt, href: "/bolsista/pagamentos-relatorios" },
+  { name: "Meus Relatórios", icon: FileText, href: "/bolsista/relatorios" },
   { name: "Mensagens", icon: Mail, href: "/bolsista/mensagens" },
   { name: "Documentos", icon: FileText, href: "/bolsista/documentos" },
   { name: "Manual", icon: HelpCircle, href: "/bolsista/manual" },
