@@ -15,7 +15,8 @@ import { useAvatarUpload } from "@/hooks/useAvatarUpload";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { Button } from "@/components/ui/button";
 import { useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+import { getLoginRouteForPath } from "@/lib/login-redirect";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileSidebar } from "./MobileSidebar";
 
@@ -23,6 +24,7 @@ export function Header() {
   const { user, signOut } = useAuth();
   const { hasManagerAccess, role } = useUserRole();
   const navigate = useNavigate();
+  const location = useLocation();
   const { avatarUrl, uploading, uploadAvatar, refreshAvatar } = useAvatarUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
@@ -147,7 +149,14 @@ export function Header() {
                 Alterar senha
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive">
+            <DropdownMenuItem
+              onClick={async () => {
+                const loginRoute = getLoginRouteForPath(location.pathname);
+                await signOut();
+                navigate(loginRoute, { replace: true });
+              }}
+              className="text-destructive focus:text-destructive"
+            >
               <LogOut className="w-4 h-4 mr-2" />
               Sair
             </DropdownMenuItem>

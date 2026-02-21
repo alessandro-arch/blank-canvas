@@ -19,6 +19,7 @@ import LandingPage from "./pages/LandingPage";
 import Access from "./pages/Access";
 import ScholarLogin from "./pages/ScholarLogin";
 import AdminLogin from "./pages/AdminLogin";
+import ManagerLogin from "./pages/ManagerLogin";
 import PasswordRecovery from "./pages/PasswordRecovery";
 import ScholarSignup from "./pages/ScholarSignup";
 import AccessDenied from "./pages/AccessDenied";
@@ -78,6 +79,7 @@ const App = () => (
               {/* Public routes */}
               <Route path="/acesso" element={<Access />} />
               <Route path="/bolsista/login" element={<ScholarLogin />} />
+              <Route path="/manager/login" element={<ManagerLogin />} />
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/recuperar-senha" element={<PasswordRecovery />} />
               <Route path="/criar-conta" element={<ScholarSignup />} />
