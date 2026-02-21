@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useInstitutionalDocuments, useDeleteInstitutionalDocument, InstitutionalDocument, DocumentType } from "@/hooks/useInstitutionalDocuments";
 import { useUserRole } from "@/hooks/useUserRole";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -49,15 +51,35 @@ function DocumentCard({ document, isAdmin, canEdit }: { document: InstitutionalD
   const Icon = config.icon;
   const deleteMutation = useDeleteInstitutionalDocument();
 
-  const handleView = () => {
-    window.open(document.file_url, "_blank");
+  const getSignedDocUrl = async (fileUrl: string) => {
+    let storagePath = fileUrl;
+    if (fileUrl.startsWith("http")) {
+      const parts = fileUrl.split("/institutional-documents/");
+      storagePath = parts.length > 1 ? parts[1] : fileUrl;
+    }
+    const { data, error } = await supabase.storage
+      .from("institutional-documents")
+      .createSignedUrl(storagePath, 3600);
+    if (error || !data?.signedUrl) {
+      toast.error("Erro ao gerar link de acesso");
+      return null;
+    }
+    return data.signedUrl;
   };
 
-  const handleDownload = () => {
-    const link = window.document.createElement("a");
-    link.href = document.file_url;
-    link.download = document.file_name;
-    link.click();
+  const handleView = async () => {
+    const url = await getSignedDocUrl(document.file_url);
+    if (url) window.open(url, "_blank");
+  };
+
+  const handleDownload = async () => {
+    const url = await getSignedDocUrl(document.file_url);
+    if (url) {
+      const link = window.document.createElement("a");
+      link.href = url;
+      link.download = document.file_name;
+      link.click();
+    }
   };
 
   const handleDelete = () => {

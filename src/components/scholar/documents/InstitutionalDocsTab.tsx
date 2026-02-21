@@ -1,6 +1,8 @@
 import { FileText, Download, Eye, Loader2, BookOpen, FileSpreadsheet, File, Calendar, HardDrive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useInstitutionalDocuments, InstitutionalDocument, DocumentType } from "@/hooks/useInstitutionalDocuments";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -66,12 +68,35 @@ export function InstitutionalDocsTab({ searchQuery = "" }: InstitutionalDocsTabP
         const config = typeConfig[doc.type];
         const Icon = config.icon;
 
-        const handleView = () => window.open(doc.file_url, "_blank");
-        const handleDownload = () => {
-          const link = window.document.createElement("a");
-          link.href = doc.file_url;
-          link.download = doc.file_name;
-          link.click();
+        const getSignedDocUrl = async (fileUrl: string) => {
+          // If it's a legacy full URL, extract the path
+          let storagePath = fileUrl;
+          if (fileUrl.startsWith("http")) {
+            const parts = fileUrl.split("/institutional-documents/");
+            storagePath = parts.length > 1 ? parts[1] : fileUrl;
+          }
+          const { data, error } = await supabase.storage
+            .from("institutional-documents")
+            .createSignedUrl(storagePath, 3600);
+          if (error || !data?.signedUrl) {
+            toast.error("Erro ao gerar link de acesso");
+            return null;
+          }
+          return data.signedUrl;
+        };
+
+        const handleView = async () => {
+          const url = await getSignedDocUrl(doc.file_url);
+          if (url) window.open(url, "_blank");
+        };
+        const handleDownload = async () => {
+          const url = await getSignedDocUrl(doc.file_url);
+          if (url) {
+            const link = window.document.createElement("a");
+            link.href = url;
+            link.download = doc.file_name;
+            link.click();
+          }
         };
 
         return (
