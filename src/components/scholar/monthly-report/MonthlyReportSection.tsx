@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { MonthlyReportForm } from "./MonthlyReportForm";
+import { SubmitReportDialog } from "./SubmitReportDialog";
 import { Clock } from "lucide-react";
 
 interface Props {
@@ -10,10 +12,11 @@ export function MonthlyReportSection({ projectId }: Props) {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
+  const [showSubmitDialog, setShowSubmitDialog] = useState(false);
 
   const {
-    report, payload, loading, saving, lastSavedAt,
-    isDraft, isReadOnly, saveDraft, updatePayload,
+    report, payload, loading, saving, submitting, lastSavedAt,
+    isDraft, isReadOnly, pdfUrl, saveDraft, submitReport, reopenReport, updatePayload,
   } = useMonthlyReport({ projectId, year, month });
 
   if (!projectId) {
@@ -32,20 +35,35 @@ export function MonthlyReportSection({ projectId }: Props) {
   }
 
   return (
-    <MonthlyReportForm
-      payload={payload}
-      status={report?.status || "draft"}
-      loading={loading}
-      saving={saving}
-      lastSavedAt={lastSavedAt}
-      isDraft={isDraft}
-      isReadOnly={isReadOnly}
-      submittedAt={report?.submitted_at || null}
-      returnReason={report?.return_reason || null}
-      periodYear={year}
-      periodMonth={month}
-      onUpdate={updatePayload}
-      onSave={() => saveDraft(false)}
-    />
+    <>
+      <MonthlyReportForm
+        payload={payload}
+        status={report?.status || "draft"}
+        loading={loading}
+        saving={saving}
+        lastSavedAt={lastSavedAt}
+        isDraft={isDraft}
+        isReadOnly={isReadOnly}
+        submittedAt={report?.submitted_at || null}
+        returnReason={report?.return_reason || null}
+        periodYear={year}
+        periodMonth={month}
+        pdfUrl={pdfUrl}
+        onUpdate={updatePayload}
+        onSave={() => saveDraft(false)}
+        onSubmit={() => setShowSubmitDialog(true)}
+        onReopen={reopenReport}
+      />
+
+      <SubmitReportDialog
+        open={showSubmitDialog}
+        onOpenChange={setShowSubmitDialog}
+        onConfirm={async () => {
+          await submitReport();
+          setShowSubmitDialog(false);
+        }}
+        submitting={submitting}
+      />
+    </>
   );
 }

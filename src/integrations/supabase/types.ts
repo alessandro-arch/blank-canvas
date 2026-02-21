@@ -1495,6 +1495,7 @@ export type Database = {
         Args: { p_project_id: string }
         Returns: boolean
       }
+      reopen_monthly_report: { Args: { p_report_id: string }; Returns: Json }
       replace_scholarship: {
         Args: {
           p_monthly_amount?: number
@@ -1506,6 +1507,10 @@ export type Database = {
       }
       save_monthly_report_draft: {
         Args: { p_payload: Json; p_report_id: string }
+        Returns: Json
+      }
+      submit_monthly_report: {
+        Args: { p_ip?: string; p_report_id: string; p_user_agent?: string }
         Returns: Json
       }
       upsert_sensitive_profile: {
