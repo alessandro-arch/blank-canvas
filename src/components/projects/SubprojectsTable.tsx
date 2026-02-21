@@ -176,7 +176,15 @@ export function SubprojectsTable({
         duration: 15000,
         action: {
           label: 'Abrir PDF',
-          onClick: () => { window.open(data.signedUrl, '_blank', 'noopener,noreferrer'); },
+          onClick: () => {
+            const a = document.createElement('a');
+            a.href = data.signedUrl;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          },
         },
       });
     } catch (err: any) {
