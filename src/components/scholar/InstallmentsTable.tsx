@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { 
-  FileUp, 
-  RefreshCw, 
   History, 
   FileSearch, 
   Download, 
@@ -14,7 +12,8 @@ import {
   Lock,
   Loader2,
   Info,
-  Eye
+  Eye,
+  ExternalLink
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -40,8 +39,8 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { ReportVersionsDialog, type ReportVersion } from "./ReportVersionsDialog";
-import { ReportUploadDialog } from "./ReportUploadDialog";
 import { openReportPdf, downloadReportPdf, downloadPaymentReceipt } from "@/hooks/useSignedUrl";
+import { Link } from "react-router-dom";
 import type { PaymentWithReport } from "@/hooks/useScholarPayments";
 import { format, parseISO, isBefore } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -73,7 +72,7 @@ interface Installment {
 
 const reportStatusConfig: Record<ReportStatus, { label: string; icon: typeof Clock; className: string }> = {
   pending: { label: "Pendente de Envio", icon: Clock, className: "bg-warning/10 text-warning" },
-  submitted: { label: "Enviado", icon: FileUp, className: "bg-info/10 text-info" },
+  submitted: { label: "Enviado", icon: CheckCircle, className: "bg-info/10 text-info" },
   under_review: { label: "Em Análise", icon: Search, className: "bg-primary/10 text-primary" },
   approved: { label: "Aprovado", icon: CheckCircle, className: "bg-success/10 text-success" },
   rejected: { label: "Devolvido", icon: XCircle, className: "bg-destructive/10 text-destructive" },
@@ -133,44 +132,19 @@ interface InstallmentActionsProps {
 function InstallmentActions({ installment, onRefresh }: InstallmentActionsProps) {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [versionsOpen, setVersionsOpen] = useState(false);
-  const [uploadOpen, setUploadOpen] = useState(false);
-
 
   const isFutureMonth = installment.monthStatus === "future";
-  const isPastOrCurrent = installment.monthStatus === "past" || installment.monthStatus === "current";
-  const isDeadlineExpired = installment.isDeadlineExpired;
-  const hasExistingReport = installment.reportStatus === "approved" || 
-    installment.reportStatus === "submitted" || 
-    installment.reportStatus === "under_review";
-  // Allow submission only for past/current months with pending report and no existing report
-  const canSubmitReport = isPastOrCurrent && installment.reportStatus === "pending" && !hasExistingReport;
-  const canResubmit = installment.reportStatus === "rejected" && !isDeadlineExpired;
   const canViewFeedback = (installment.reportStatus === "rejected" || installment.reportStatus === "deadline_expired") && installment.feedback;
   const canDownloadReceipt = installment.paymentStatus === "paid" && installment.receiptUrl;
   const hasVersions = installment.versions && installment.versions.length > 0;
-  const hasReportUnderReview = installment.hasReportUnderReview;
 
-  // Determine if submit button should be disabled
-  const isSubmitDisabled = !canSubmitReport && !canResubmit;
-  
-  // Get tooltip message for disabled state
-  const getDisabledTooltip = (): string => {
-    if (hasReportUnderReview) {
-      return "Você já possui um relatório em análise para este mês";
-    }
-    if (installment.reportStatus === "approved") {
-      return "Relatório já aprovado";
-    }
-    if (installment.reportStatus === "under_review") {
-      return "Relatório em análise pelo gestor";
-    }
-    if (isDeadlineExpired) {
-      return "O prazo para reenvio expirou. Entre em contato com o gestor.";
-    }
-    if (isFutureMonth) {
-      return "Aguarde o período para envio";
-    }
-    return "Envio não disponível";
+  // Contextual message based on status
+  const getContextualMessage = (): string | null => {
+    if (installment.reportStatus === "approved") return null;
+    if (installment.reportStatus === "under_review") return "Relatório em análise";
+    if (installment.reportStatus === "pending") return "Envie via Relatório Mensal";
+    if (installment.reportStatus === "rejected") return "Reenvie via Relatório Mensal";
+    return null;
   };
 
   // Future months - no actions available
@@ -183,47 +157,28 @@ function InstallmentActions({ installment, onRefresh }: InstallmentActionsProps)
     );
   }
 
+  const contextualMessage = getContextualMessage();
+
   return (
     <TooltipProvider>
       <div className="flex items-center gap-2">
-        {/* Primary Action Button - Upload desabilitado, usar formulário digital */}
-        {(canSubmitReport || canResubmit) ? (
+        {/* Contextual message + link to subproject */}
+        {contextualMessage && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <span>
+              <Link to="/">
                 <Button 
                   size="sm" 
                   variant="outline" 
-                  className="gap-1.5 border-primary/30 text-primary"
-                  disabled
+                  className="gap-1.5 text-xs border-primary/30 text-primary"
                 >
-                  <FileUp className="w-3.5 h-3.5" />
-                  {canResubmit ? "Reenviar" : "Enviar"}
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Acessar Subprojeto
                 </Button>
-              </span>
+              </Link>
             </TooltipTrigger>
             <TooltipContent side="top" className="max-w-[250px]">
-              <p>Use a seção "Relatório Mensal" (formulário digital) para enviar seu relatório.</p>
-            </TooltipContent>
-          </Tooltip>
-        ) : (
-          // Disabled state with tooltip
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span>
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  className="gap-1.5"
-                  disabled
-                >
-                  <Lock className="w-3.5 h-3.5" />
-                  Enviar
-                </Button>
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              <p>{getDisabledTooltip()}</p>
+              <p>{contextualMessage}</p>
             </TooltipContent>
           </Tooltip>
         )}
@@ -299,19 +254,12 @@ function InstallmentActions({ installment, onRefresh }: InstallmentActionsProps)
                     <Button variant="outline" onClick={() => setFeedbackOpen(false)}>
                       Fechar
                     </Button>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span>
-                          <Button className="gap-1.5" disabled>
-                            <RefreshCw className="w-4 h-4" />
-                            Reenviar Relatório
-                          </Button>
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Use a seção "Relatório Mensal" (formulário digital)</p>
-                      </TooltipContent>
-                    </Tooltip>
+                    <Link to="/">
+                      <Button className="gap-1.5">
+                        <ExternalLink className="w-4 h-4" />
+                        Acessar Subprojeto
+                      </Button>
+                    </Link>
                   </div>
                 </DialogContent>
               </Dialog>
@@ -351,18 +299,6 @@ function InstallmentActions({ installment, onRefresh }: InstallmentActionsProps)
             versions={installment.versions || []}
           />
         )}
-
-        {/* Upload Dialog */}
-        <ReportUploadDialog
-          open={uploadOpen}
-          onOpenChange={setUploadOpen}
-          referenceMonth={installment.referenceMonthRaw}
-          referenceMonthFormatted={installment.referenceMonth}
-          installmentNumber={installment.number}
-          enrollmentId={installment.enrollmentId}
-          isResubmit={canResubmit}
-          onSuccess={onRefresh}
-        />
       </div>
     </TooltipProvider>
   );
@@ -524,21 +460,27 @@ export function InstallmentsTable({
   return (
     <div className="card-institutional overflow-hidden p-0">
       {/* Info Banner */}
-      <div className="p-4 bg-warning/5 border-b border-warning/20">
+      <div className="p-4 bg-primary/5 border-b border-primary/20">
         <div className="flex items-start gap-3">
-          <div className="w-8 h-8 rounded-full bg-warning/10 flex items-center justify-center flex-shrink-0">
-            <Lock className="w-4 h-4 text-warning" />
+          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <Info className="w-4 h-4 text-primary" />
           </div>
           <div>
             <p className="font-medium text-foreground text-sm">
-              🔒 Como funciona o desbloqueio de valores
+              📋 Como funciona
             </p>
             <p className="text-sm text-muted-foreground mt-1">
-              Os valores dos pagamentos ficam bloqueados até o envio do relatório.
+              O envio de relatórios é feito na seção <strong>"Relatório Mensal"</strong> do seu subprojeto.
             </p>
-            <p className="text-sm text-warning mt-2">
-              <strong>Regra:</strong> Envie o relatório do mês → O valor fica visível 🔓 → Após aprovação → Pagamento liberado
-            </p>
+            <ul className="text-sm text-muted-foreground mt-2 space-y-1 list-disc list-inside">
+              <li><strong>Relatório aprovado</strong> → Pagamento liberado ✅</li>
+              <li><strong>Relatório pendente</strong> → Pagamento aguardando ⏳</li>
+              <li><strong>Relatório devolvido</strong> → Pagamento bloqueado 🚫</li>
+            </ul>
+            <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-primary font-medium mt-2 hover:underline">
+              <ExternalLink className="w-3.5 h-3.5" />
+              Acessar Subprojeto para enviar relatório
+            </Link>
           </div>
         </div>
       </div>
@@ -548,7 +490,7 @@ export function InstallmentsTable({
           <div>
             <h3 className="text-lg font-semibold text-foreground">Histórico de Parcelas</h3>
             <p className="text-sm text-muted-foreground">
-              Gerencie o envio de relatórios para liberar seus pagamentos. O envio é liberado apenas para o mês de referência atual ou para relatórios rejeitados.
+              Acompanhe o status dos seus relatórios e pagamentos por período.
             </p>
           </div>
           
@@ -689,7 +631,7 @@ export function InstallmentsTable({
       <div className="p-4 bg-muted/30 border-t border-border">
         <p className="text-xs text-muted-foreground flex items-center gap-2">
           <Info className="w-3.5 h-3.5" />
-          O envio de relatório está disponível apenas para o mês atual ou para relatórios devolvidos que precisam de correção.
+          Os relatórios devem ser enviados via formulário digital na seção "Relatório Mensal" do seu subprojeto.
         </p>
       </div>
     </div>
