@@ -1,4 +1,5 @@
 import { Navigate, useLocation } from "react-router-dom";
+import { getLoginRouteForPath } from "@/lib/login-redirect";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
 import { ThemeProvider } from "@/contexts/ThemeContext";
@@ -33,7 +34,7 @@ export function AdminProtectedRoute({
   }
 
   if (!user) {
-    return <Navigate to="/admin/login" state={{ from: location }} replace />;
+    return <Navigate to={getLoginRouteForPath(location.pathname)} state={{ from: location }} replace />;
   }
 
   // If user is a scholar, redirect them to scholar panel

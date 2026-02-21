@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { getLoginRouteForPath } from "@/lib/login-redirect";
 import { supabase } from "@/integrations/supabase/client";
 import { queryClient } from "@/App";
 import {
@@ -21,7 +22,7 @@ const ACTIVITY_EVENTS = ["mousemove", "keydown", "scroll", "touchstart", "click"
 const THROTTLE_MS = 15_000; // only reset timer every 15s to reduce overhead
 
 // Public routes that don't need session guarding
-const PUBLIC_ROUTES = ["/", "/acesso", "/bolsista/login", "/admin/login", "/recuperar-senha", "/criar-conta", "/criar-conta-membro", "/acesso-negado", "/session-expired", "/convite", "/invite"];
+const PUBLIC_ROUTES = ["/", "/acesso", "/bolsista/login", "/manager/login", "/admin/login", "/recuperar-senha", "/criar-conta", "/criar-conta-membro", "/acesso-negado", "/session-expired", "/convite", "/invite"];
 
 export function SessionGuard() {
   const { user, signOut } = useAuth();
@@ -123,7 +124,7 @@ export function SessionGuard() {
       if (event === "SIGNED_OUT") {
         // Clear all cached data and force redirect to login
         queryClient.clear();
-        navigate("/acesso", { replace: true });
+        navigate(getLoginRouteForPath(location.pathname), { replace: true });
       }
     });
 

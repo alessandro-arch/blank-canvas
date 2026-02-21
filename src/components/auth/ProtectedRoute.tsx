@@ -2,6 +2,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { Loader2 } from "lucide-react";
+import { getLoginRouteForPath } from "@/lib/login-redirect";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -23,7 +24,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   if (!user) {
-    return <Navigate to="/acesso" state={{ from: location }} replace />;
+    return <Navigate to={getLoginRouteForPath(location.pathname)} state={{ from: location }} replace />;
   }
 
   return <ThemeProvider>{children}</ThemeProvider>;

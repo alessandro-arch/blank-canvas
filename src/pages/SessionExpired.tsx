@@ -1,5 +1,6 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { getLoginRouteForPath } from "@/lib/login-redirect";
 import { ShieldAlert, LogIn, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,9 +13,7 @@ export default function SessionExpired() {
 
   const handleLoginAgain = async () => {
     await signOut();
-    const loginPath = returnUrl?.startsWith("/bolsista")
-      ? "/bolsista/login"
-      : "/admin/login";
+    const loginPath = getLoginRouteForPath(returnUrl || "");
     navigate(loginPath + (returnUrl ? `?returnUrl=${encodeURIComponent(returnUrl)}` : ""), { replace: true });
   };
 
