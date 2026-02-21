@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import {
   ChevronDown,
   User,
@@ -24,11 +24,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { format, parseISO, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -63,9 +58,7 @@ export interface ScholarRow {
   project_code: string;
   thematic_project_title: string;
   enrollment_id: string;
-  // Current month report (or null)
   current_report: ReportRecord | null;
-  // All reports for the history panel
   all_reports: ReportRecord[];
 }
 
@@ -97,10 +90,9 @@ function formatMonth(refMonth: string): string {
 
 function getDeadlineText(report: ReportRecord | null, selectedMonth: string): { text: string; urgent: boolean } | null {
   if (!report) {
-    // No report submitted — calculate based on end of month
     try {
       const [y, m] = selectedMonth.split("-").map(Number);
-      const endOfMonth = new Date(y, m, 0); // last day of month
+      const endOfMonth = new Date(y, m, 0);
       const daysLeft = differenceInDays(endOfMonth, new Date());
       if (daysLeft < 0) return { text: `Atrasado (${Math.abs(daysLeft)}d)`, urgent: true };
       if (daysLeft <= 5) return { text: `Vence em ${daysLeft}d`, urgent: true };
@@ -137,90 +129,91 @@ export function ScholarReportRow({
   const deadline = getDeadlineText(report, selectedMonth);
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+    <Fragment>
       {/* Main Row */}
-      <CollapsibleTrigger asChild>
-        <TableRow className="cursor-pointer hover:bg-muted/50 transition-colors group">
-          {/* Scholar */}
-          <TableCell>
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                <User className="w-4 h-4 text-muted-foreground" />
-              </div>
-              <div className="min-w-0">
-                <p className="font-medium text-sm truncate">{scholar.full_name}</p>
-                <p className="text-xs text-muted-foreground truncate">{scholar.email}</p>
-              </div>
+      <TableRow
+        className="cursor-pointer hover:bg-muted/50 transition-colors group"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        {/* Scholar */}
+        <TableCell>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+              <User className="w-4 h-4 text-muted-foreground" />
             </div>
-          </TableCell>
-
-          {/* Project */}
-          <TableCell>
-            <div>
-              <Badge variant="outline" className="text-xs mb-0.5">{scholar.project_code}</Badge>
-              <p className="text-xs text-muted-foreground truncate max-w-[200px]">{scholar.thematic_project_title}</p>
+            <div className="min-w-0">
+              <p className="font-medium text-sm truncate">{scholar.full_name}</p>
+              <p className="text-xs text-muted-foreground truncate">{scholar.email}</p>
             </div>
-          </TableCell>
+          </div>
+        </TableCell>
 
-          {/* Status badge */}
-          <TableCell>
-            <span className={cn(
-              "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border",
-              config.className
-            )}>
-              <StatusIcon className="w-3 h-3" />
-              {config.label}
+        {/* Project */}
+        <TableCell>
+          <div>
+            <Badge variant="outline" className="text-xs mb-0.5">{scholar.project_code}</Badge>
+            <p className="text-xs text-muted-foreground truncate max-w-[200px]">{scholar.thematic_project_title}</p>
+          </div>
+        </TableCell>
+
+        {/* Status badge */}
+        <TableCell>
+          <span className={cn(
+            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border",
+            config.className
+          )}>
+            <StatusIcon className="w-3 h-3" />
+            {config.label}
+          </span>
+        </TableCell>
+
+        {/* Submitted date */}
+        <TableCell>
+          {report ? (
+            <span className="text-xs text-muted-foreground flex items-center gap-1">
+              <Calendar className="w-3 h-3" />
+              {format(parseISO(report.submitted_at), "dd/MM/yyyy")}
             </span>
-          </TableCell>
+          ) : (
+            <span className="text-xs text-muted-foreground">—</span>
+          )}
+        </TableCell>
 
-          {/* Submitted date */}
-          <TableCell>
-            {report ? (
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <Calendar className="w-3 h-3" />
-                {format(parseISO(report.submitted_at), "dd/MM/yyyy")}
-              </span>
-            ) : (
-              <span className="text-xs text-muted-foreground">—</span>
-            )}
-          </TableCell>
+        {/* Deadline */}
+        <TableCell>
+          {deadline ? (
+            <span className={cn(
+              "text-xs font-medium flex items-center gap-1",
+              deadline.urgent ? "text-destructive" : "text-muted-foreground"
+            )}>
+              {deadline.urgent && <AlertTriangle className="w-3 h-3" />}
+              {deadline.text}
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground">—</span>
+          )}
+        </TableCell>
 
-          {/* Deadline */}
-          <TableCell>
-            {deadline ? (
-              <span className={cn(
-                "text-xs font-medium flex items-center gap-1",
-                deadline.urgent ? "text-destructive" : "text-muted-foreground"
-              )}>
-                {deadline.urgent && <AlertTriangle className="w-3 h-3" />}
-                {deadline.text}
-              </span>
-            ) : (
-              <span className="text-xs text-muted-foreground">—</span>
-            )}
-          </TableCell>
-
-          {/* Actions */}
-          <TableCell>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="gap-1 text-xs"
-                onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
-              >
-                <ChevronDown className={cn("w-4 h-4 transition-transform", isOpen && "rotate-180")} />
-                Histórico
-              </Button>
-            </div>
-          </TableCell>
-        </TableRow>
-      </CollapsibleTrigger>
+        {/* Actions */}
+        <TableCell>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1 text-xs"
+              onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
+            >
+              <ChevronDown className={cn("w-4 h-4 transition-transform", isOpen && "rotate-180")} />
+              Histórico
+            </Button>
+          </div>
+        </TableCell>
+      </TableRow>
 
       {/* Expanded History Panel */}
-      <CollapsibleContent asChild>
-        <tr>
-          <td colSpan={6} className="p-0">
+      {isOpen && (
+        <TableRow>
+          <TableCell colSpan={6} className="p-0">
             <div className="bg-muted/30 border-t border-b px-6 py-4 space-y-4">
               {/* Header */}
               <div className="flex items-center justify-between">
@@ -355,9 +348,9 @@ export function ScholarReportRow({
                 </div>
               )}
             </div>
-          </td>
-        </tr>
-      </CollapsibleContent>
-    </Collapsible>
+          </TableCell>
+        </TableRow>
+      )}
+    </Fragment>
   );
 }
