@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { SecureBankResponse } from '@/hooks/useBankDataSecureRead';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -71,7 +72,9 @@ interface BankDataThematicCardProps {
   group: ThematicBankDataGroup;
   onOpenDetails: (account: BankAccountWithProfile) => void;
   revealedIds: Set<string>;
+  revealedData: Map<string, SecureBankResponse>;
   onToggleReveal: (id: string) => void;
+  secureBankLoading: boolean;
 }
 
 const STATUS_CONFIG = {
@@ -105,7 +108,9 @@ export function BankDataThematicCard({
   group, 
   onOpenDetails, 
   revealedIds, 
-  onToggleReveal 
+  revealedData,
+  onToggleReveal,
+  secureBankLoading,
 }: BankDataThematicCardProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -280,6 +285,7 @@ export function BankDataThematicCard({
                   ) : (
                     group.accounts.map((account) => {
                       const isRevealed = revealedIds.has(account.id);
+                      const secureData = revealedData.get(account.id);
                       const statusCfg = STATUS_CONFIG[account.validation_status];
                       const StatusIcon = statusCfg.icon;
 
@@ -304,10 +310,14 @@ export function BankDataThematicCard({
                             <span className="font-medium">{account.bank_name}</span>
                           </TableCell>
                           <TableCell className="font-mono">
-                            {maskValue(account.agency, isRevealed)}
+                            {isRevealed && secureData?.mode === 'full'
+                              ? secureData.agency
+                              : maskValue(account.agency, false)}
                           </TableCell>
                           <TableCell className="font-mono">
-                            {maskValue(account.account_number, isRevealed)}
+                            {isRevealed && secureData?.mode === 'full'
+                              ? secureData.account_number
+                              : maskValue(account.account_number, false)}
                           </TableCell>
                           <TableCell>
                             <Badge variant={statusCfg.variant} className="gap-1">

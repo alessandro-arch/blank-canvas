@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAuditLog } from '@/hooks/useAuditLog';
+import { useOrganizationContext } from '@/contexts/OrganizationContext';
+import { useBankDataSecureRead, SecureBankResponse } from '@/hooks/useBankDataSecureRead';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -111,12 +113,16 @@ export function BankDataManagement() {
   const { user } = useAuth();
   const { logAction } = useAuditLog();
   const queryClient = useQueryClient();
+  const { currentOrganization } = useOrganizationContext();
+  const { readBankData, loading: secureBankLoading } = useBankDataSecureRead();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sponsorFilter, setSponsorFilter] = useState<string>('all');
   const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
+  const [revealedData, setRevealedData] = useState<Map<string, SecureBankResponse>>(new Map());
   const [selectedAccount, setSelectedAccount] = useState<BankAccountWithProfile | null>(null);
+  const [selectedAccountSecure, setSelectedAccountSecure] = useState<SecureBankResponse | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [gestorNotes, setGestorNotes] = useState('');
 
@@ -383,16 +389,33 @@ export function BankDataManagement() {
     return groups;
   }, [data, searchTerm, statusFilter, sponsorFilter]);
 
-  const toggleReveal = (id: string) => {
-    setRevealedIds(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(id)) {
+  const toggleReveal = async (id: string) => {
+    if (revealedIds.has(id)) {
+      // Hide
+      setRevealedIds(prev => {
+        const newSet = new Set(prev);
         newSet.delete(id);
-      } else {
-        newSet.add(id);
-      }
-      return newSet;
-    });
+        return newSet;
+      });
+      return;
+    }
+
+    // Fetch secure data via Edge Function
+    if (!currentOrganization?.id) return;
+    const account = data?.accounts.find(a => a.id === id);
+    if (!account) return;
+
+    const result = await readBankData(currentOrganization.id, account.user_id);
+    if (result && result.mode === 'full') {
+      setRevealedData(prev => new Map(prev).set(id, result));
+      setRevealedIds(prev => new Set(prev).add(id));
+    } else {
+      toast({
+        title: 'Acesso negado',
+        description: 'Você não tem permissão para ver dados completos.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const getAccountTypeLabel = (type: string | null) => {
@@ -405,10 +428,19 @@ export function BankDataManagement() {
     }
   };
 
-  const openDetails = (account: BankAccountWithProfile) => {
+  const openDetails = async (account: BankAccountWithProfile) => {
     setSelectedAccount(account);
     setGestorNotes(account.notes_gestor || '');
+    setSelectedAccountSecure(null);
     setIsDetailOpen(true);
+
+    // Fetch secure data for the detail dialog
+    if (currentOrganization?.id) {
+      const result = await readBankData(currentOrganization.id, account.user_id);
+      if (result) {
+        setSelectedAccountSecure(result);
+      }
+    }
   };
 
   const handleStatusChange = (newStatus: BankValidationStatus) => {
@@ -580,7 +612,9 @@ export function BankDataManagement() {
                   group={group}
                   onOpenDetails={openDetails}
                   revealedIds={revealedIds}
+                  revealedData={revealedData}
                   onToggleReveal={toggleReveal}
+                  secureBankLoading={secureBankLoading}
                 />
               ))
             )}
@@ -621,30 +655,84 @@ export function BankDataManagement() {
               {/* Bank Data */}
               <div className="p-4 rounded-lg border space-y-2">
                 <h4 className="font-semibold text-sm">Dados Bancários</h4>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Banco:</span>
-                    <p className="font-medium">{selectedAccount.bank_name}</p>
+                {secureBankLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-3/4" />
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">Tipo:</span>
-                    <p className="font-medium">{getAccountTypeLabel(selectedAccount.account_type)}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Agência:</span>
-                    <p className="font-mono">{selectedAccount.agency}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Conta:</span>
-                    <p className="font-mono">{selectedAccount.account_number}</p>
-                  </div>
-                  {selectedAccount.pix_key_masked && (
-                    <div className="col-span-2">
-                      <span className="text-muted-foreground">Chave PIX:</span>
-                      <p className="font-mono">{selectedAccount.pix_key_masked}</p>
+                ) : selectedAccountSecure ? (
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Banco:</span>
+                      <p className="font-medium">
+                        {selectedAccountSecure.mode === 'full' 
+                          ? `${selectedAccountSecure.bank_name} (${selectedAccountSecure.bank_code})`
+                          : selectedAccountSecure.masked.bank_name}
+                      </p>
                     </div>
-                  )}
-                </div>
+                    <div>
+                      <span className="text-muted-foreground">Tipo:</span>
+                      <p className="font-medium">
+                        {getAccountTypeLabel(selectedAccountSecure.mode === 'full' 
+                          ? selectedAccountSecure.account_type ?? null 
+                          : selectedAccountSecure.masked.account_type)}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Agência:</span>
+                      <p className="font-mono">
+                        {selectedAccountSecure.mode === 'full' 
+                          ? selectedAccountSecure.agency 
+                          : selectedAccountSecure.masked.agency}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Conta:</span>
+                      <p className="font-mono">
+                        {selectedAccountSecure.mode === 'full' 
+                          ? selectedAccountSecure.account_number 
+                          : selectedAccountSecure.masked.account_number}
+                      </p>
+                    </div>
+                    {(selectedAccountSecure.masked.pix && selectedAccountSecure.masked.pix !== '***') && (
+                      <div className="col-span-2">
+                        <span className="text-muted-foreground">Chave PIX:</span>
+                        <p className="font-mono">
+                          {selectedAccountSecure.mode === 'full' 
+                            ? selectedAccountSecure.pix 
+                            : selectedAccountSecure.masked.pix}
+                          {selectedAccountSecure.pix_protected && (
+                            <span className="ml-2 text-xs text-muted-foreground">(protegida por Vault)</span>
+                          )}
+                        </p>
+                      </div>
+                    )}
+                    {selectedAccountSecure.mode === 'masked' && (
+                      <div className="col-span-2 text-xs text-muted-foreground italic">
+                        Dados mascarados. Apenas admin/gestor pode visualizar dados completos.
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Banco:</span>
+                      <p className="font-medium">{selectedAccount.bank_name}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Tipo:</span>
+                      <p className="font-medium">{getAccountTypeLabel(selectedAccount.account_type)}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Agência:</span>
+                      <p className="font-mono">****</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Conta:</span>
+                      <p className="font-mono">****</p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Current Status */}
