@@ -282,6 +282,7 @@ export type Database = {
           file_size: number | null
           file_url: string
           id: string
+          organization_id: string | null
           title: string
           type: string
           updated_at: string
@@ -294,6 +295,7 @@ export type Database = {
           file_size?: number | null
           file_url: string
           id?: string
+          organization_id?: string | null
           title: string
           type: string
           updated_at?: string
@@ -306,12 +308,21 @@ export type Database = {
           file_size?: number | null
           file_url?: string
           id?: string
+          organization_id?: string | null
           title?: string
           type?: string
           updated_at?: string
           uploaded_by?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "institutional_documents_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       invite_code_uses: {
         Row: {
