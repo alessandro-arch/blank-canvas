@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Sparkles, FileText, AlertTriangle, BarChart3, Scale, Loader2, Copy, Check } from "lucide-react";
+import { Sparkles, FileText, AlertTriangle, BarChart3, Scale, Loader2, Copy, Check, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -31,6 +32,7 @@ export function MonthlyReportAIPanel({ reportId, onInsertToFeedback }: MonthlyRe
     opinion: "",
   });
   const [copied, setCopied] = useState<AnalysisType | null>(null);
+  const [expandedType, setExpandedType] = useState<AnalysisType | null>(null);
 
   const handleAnalyze = async (type: AnalysisType) => {
     setLoading(type);
@@ -65,88 +67,147 @@ export function MonthlyReportAIPanel({ reportId, onInsertToFeedback }: MonthlyRe
     }
   };
 
-  return (
-    <Card className="border-primary/20 bg-primary/5">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-sm">
-          <Sparkles className="h-4 w-4 text-primary" />
-          Sugestões da IA
-          <Badge variant="outline" className="text-[10px] font-normal ml-auto">Beta</Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {/* Action buttons */}
-        <div className="grid grid-cols-2 gap-2">
-          {analysisOptions.map(({ type, label, icon: Icon }) => (
-            <Button
-              key={type}
-              variant={results[type] ? "secondary" : "outline"}
-              size="sm"
-              className="justify-start gap-2 h-9 text-xs"
-              onClick={() => handleAnalyze(type)}
-              disabled={loading !== null}
-            >
-              {loading === type ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Icon className="h-3.5 w-3.5" />
-              )}
-              {label}
-            </Button>
-          ))}
-        </div>
+  const expandedOpt = expandedType ? analysisOptions.find(o => o.type === expandedType) : null;
 
-        {/* Results */}
-        {Object.entries(results).map(([type, text]) => {
-          if (!text) return null;
-          const opt = analysisOptions.find(o => o.type === type)!;
-          const Icon = opt.icon;
-          return (
-            <div key={type} className="space-y-2">
-              <Separator />
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Icon className="h-3.5 w-3.5 text-primary" />
-                  <span className="text-xs font-medium">{opt.label}</span>
-                </div>
-                <div className="flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={() => handleCopy(type as AnalysisType)}
-                    title="Copiar"
-                  >
-                    {copied === type ? (
-                      <Check className="h-3 w-3 text-emerald-500" />
-                    ) : (
-                      <Copy className="h-3 w-3" />
-                    )}
-                  </Button>
-                  {onInsertToFeedback && (
+  return (
+    <>
+      <Card className="border-primary/20 bg-primary/5">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <Sparkles className="h-4 w-4 text-primary" />
+            Sugestões da IA
+            <Badge variant="outline" className="text-[10px] font-normal ml-auto">Beta</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {/* Action buttons */}
+          <div className="grid grid-cols-2 gap-2">
+            {analysisOptions.map(({ type, label, icon: Icon }) => (
+              <Button
+                key={type}
+                variant={results[type] ? "secondary" : "outline"}
+                size="sm"
+                className="justify-start gap-2 h-9 text-xs"
+                onClick={() => handleAnalyze(type)}
+                disabled={loading !== null}
+              >
+                {loading === type ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Icon className="h-3.5 w-3.5" />
+                )}
+                {label}
+              </Button>
+            ))}
+          </div>
+
+          {/* Results */}
+          {Object.entries(results).map(([type, text]) => {
+            if (!text) return null;
+            const opt = analysisOptions.find(o => o.type === type)!;
+            const Icon = opt.icon;
+            const maxH = type === "opinion" ? "max-h-80" : "max-h-64";
+            return (
+              <div key={type} className="space-y-2">
+                <Separator />
+                {/* Sticky actions bar */}
+                <div className="sticky top-0 z-10 bg-primary/5 flex items-center justify-between py-1">
+                  <div className="flex items-center gap-1.5">
+                    <Icon className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-xs font-medium">{opt.label}</span>
+                  </div>
+                  <div className="flex gap-1">
                     <Button
                       variant="ghost"
-                      size="sm"
-                      className="h-6 text-[10px] px-2"
-                      onClick={() => handleInsert(type as AnalysisType)}
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => setExpandedType(type as AnalysisType)}
+                      title="Expandir"
                     >
-                      Inserir no parecer
+                      <Maximize2 className="h-3 w-3" />
                     </Button>
-                  )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => handleCopy(type as AnalysisType)}
+                      title="Copiar"
+                    >
+                      {copied === type ? (
+                        <Check className="h-3 w-3 text-emerald-500" />
+                      ) : (
+                        <Copy className="h-3 w-3" />
+                      )}
+                    </Button>
+                    {onInsertToFeedback && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-[10px] px-2"
+                        onClick={() => handleInsert(type as AnalysisType)}
+                      >
+                        Inserir no parecer
+                      </Button>
+                    )}
+                  </div>
                 </div>
+                <ScrollArea className={maxH}>
+                  <div className="text-xs text-foreground/80 whitespace-pre-wrap break-words leading-relaxed p-3 bg-background rounded border">
+                    {text}
+                  </div>
+                </ScrollArea>
+                <p className="text-[10px] text-muted-foreground italic flex items-center gap-1">
+                  <Sparkles className="h-2.5 w-2.5" /> Gerado por IA — requer validação do gestor
+                </p>
               </div>
-              <ScrollArea className="max-h-48">
-                <div className="text-xs text-foreground/80 whitespace-pre-wrap leading-relaxed p-2 bg-background rounded border">
-                  {text}
-                </div>
-              </ScrollArea>
-              <p className="text-[10px] text-muted-foreground italic flex items-center gap-1">
-                <Sparkles className="h-2.5 w-2.5" /> Gerado por IA — requer validação do gestor
-              </p>
+            );
+          })}
+        </CardContent>
+      </Card>
+
+      {/* Fullscreen Dialog */}
+      <Dialog open={expandedType !== null} onOpenChange={(open) => { if (!open) setExpandedType(null); }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-6 pt-6 pb-3 shrink-0">
+            <DialogTitle className="flex items-center gap-2 text-base">
+              {expandedOpt && <expandedOpt.icon className="h-4 w-4 text-primary" />}
+              {expandedOpt?.label}
+              <Badge variant="outline" className="text-[10px] font-normal ml-2">IA Beta</Badge>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center gap-2 px-6 pb-3 shrink-0 border-b">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs gap-1.5"
+              onClick={() => expandedType && handleCopy(expandedType)}
+            >
+              {copied === expandedType ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+              Copiar
+            </Button>
+            {onInsertToFeedback && expandedType && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs gap-1.5"
+                onClick={() => expandedType && handleInsert(expandedType)}
+              >
+                Inserir no parecer
+              </Button>
+            )}
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
+            <div className="text-sm sm:text-xs text-foreground/80 whitespace-pre-wrap break-words leading-relaxed p-4 bg-muted/50 rounded border min-h-[200px]">
+              {expandedType && results[expandedType]}
             </div>
-          );
-        })}
-      </CardContent>
-    </Card>
+          </div>
+          <div className="px-6 py-3 border-t shrink-0">
+            <p className="text-[10px] text-muted-foreground italic flex items-center gap-1">
+              <Sparkles className="h-2.5 w-2.5" /> Gerado por IA — requer validação do gestor
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
