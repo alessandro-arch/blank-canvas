@@ -732,8 +732,8 @@ export function MonthlyReportsReviewManagement() {
 
       {/* Review Dialog */}
       <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden p-0 gap-0">
+          <DialogHeader className="px-6 pt-6 pb-3 shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <FileSearch className="w-5 h-5 text-primary" />
               Avaliar Relatório Mensal
@@ -741,72 +741,74 @@ export function MonthlyReportsReviewManagement() {
             <DialogDescription>Analise o relatório e forneça seu parecer</DialogDescription>
           </DialogHeader>
 
-          {selectedReport && selectedScholar && (
-            <div className="space-y-4">
-              <div className="p-4 bg-muted/50 rounded-lg space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Bolsista</span>
-                  <span className="font-medium text-sm">{selectedScholar.full_name}</span>
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
+            {selectedReport && selectedScholar && (
+              <div className="space-y-4">
+                <div className="p-4 bg-muted/50 rounded-lg space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Bolsista</span>
+                    <span className="font-medium text-sm">{selectedScholar.full_name}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Projeto</span>
+                    <span className="font-medium text-sm">{selectedScholar.project_code}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Período</span>
+                    <span className="font-medium text-sm">
+                      {formatMonthLabel(selectedReport.period_year, selectedReport.period_month)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Status</span>
+                    <MonthlyReportStatusBadge status={selectedReport.status as MonthlyReportStatus} />
+                  </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Projeto</span>
-                  <span className="font-medium text-sm">{selectedScholar.project_code}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Período</span>
-                  <span className="font-medium text-sm">
-                    {formatMonthLabel(selectedReport.period_year, selectedReport.period_month)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Status</span>
-                  <MonthlyReportStatusBadge status={selectedReport.status as MonthlyReportStatus} />
-                </div>
-              </div>
 
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => handleViewFields(selectedReport.id, selectedScholar?.full_name)}
-                >
-                  <FileSearch className="h-4 w-4 mr-2" />
-                  Ver Campos
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => handleViewPdf(selectedReport.id)}
-                  disabled={pdfLoading}
-                >
-                  <Eye className="h-4 w-4 mr-2" />
-                  Ver PDF
-                </Button>
-              </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => handleViewFields(selectedReport.id, selectedScholar?.full_name)}
+                  >
+                    <FileSearch className="h-4 w-4 mr-2" />
+                    Ver Campos
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => handleViewPdf(selectedReport.id)}
+                    disabled={pdfLoading}
+                  >
+                    <Eye className="h-4 w-4 mr-2" />
+                    Ver PDF
+                  </Button>
+                </div>
 
-              {/* AI Panel */}
-              <MonthlyReportAIPanel
-                reportId={selectedReport.id}
-                onInsertToFeedback={(text) => setFeedback(prev => prev ? prev + "\n\n" + text : text)}
-              />
-
-              <div className="space-y-2">
-                <Label htmlFor="mr-feedback">Parecer / Observações</Label>
-                <Textarea
-                  id="mr-feedback"
-                  placeholder="Adicione seu parecer sobre o relatório..."
-                  value={feedback}
-                  onChange={e => setFeedback(e.target.value)}
-                  rows={4}
+                {/* AI Panel */}
+                <MonthlyReportAIPanel
+                  reportId={selectedReport.id}
+                  onInsertToFeedback={(text) => setFeedback(prev => prev ? prev + "\n\n" + text : text)}
                 />
-                <p className="text-xs text-muted-foreground">* Obrigatório para devolução</p>
-              </div>
-            </div>
-          )}
 
-          <DialogFooter className="gap-2 sm:gap-0">
+                <div className="space-y-2">
+                  <Label htmlFor="mr-feedback">Parecer / Observações</Label>
+                  <Textarea
+                    id="mr-feedback"
+                    placeholder="Adicione seu parecer sobre o relatório..."
+                    value={feedback}
+                    onChange={e => setFeedback(e.target.value)}
+                    rows={4}
+                  />
+                  <p className="text-xs text-muted-foreground">* Obrigatório para devolução</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="px-6 pb-6 pt-3 border-t shrink-0 gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setReviewDialogOpen(false)} disabled={submitting}>
               Cancelar
             </Button>
