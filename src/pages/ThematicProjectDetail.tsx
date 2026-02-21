@@ -379,7 +379,7 @@ export default function ThematicProjectDetail() {
   const handleExport = () => {
     if (!filteredProjects?.length) return;
     
-    const headers = ['Código', 'Título', 'Orientador', 'Bolsista', 'Modalidade', 'Valor Mensal', 'Início', 'Término', 'Status'];
+    const headers = ['Código', 'Título', 'Bolsista (cadastro)', 'Bolsista (vínculo)', 'Modalidade', 'Valor Mensal', 'Início', 'Término', 'Status'];
     const rows = filteredProjects.map(p => [
       p.code,
       p.title,
@@ -611,7 +611,7 @@ export default function ThematicProjectDetail() {
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
                         type="search"
-                        placeholder="Buscar por código, título ou orientador..."
+                        placeholder="Buscar por código, título ou bolsista..."
                         value={searchTerm}
                         onChange={(e) => handleSearchChange(e.target.value)}
                         className="pl-10 min-h-[44px]"
@@ -645,7 +645,7 @@ export default function ThematicProjectDetail() {
                     <div className="relative flex-1">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
-                        placeholder="Buscar por código, título ou orientador..."
+                        placeholder="Buscar por código, título ou bolsista..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="pl-10"
@@ -687,8 +687,8 @@ export default function ThematicProjectDetail() {
                       <TableRow>
                         <TableHead className="w-[120px]">Código</TableHead>
                         <TableHead>Título</TableHead>
-                        <TableHead>Orientador</TableHead>
-                        <TableHead>Bolsista</TableHead>
+                        <TableHead>Bolsista (cadastro)</TableHead>
+                        <TableHead>Bolsista (vínculo)</TableHead>
                         <TableHead>Modalidade</TableHead>
                         <TableHead className="text-right">Valor Mensal</TableHead>
                         <TableHead>Período</TableHead>
