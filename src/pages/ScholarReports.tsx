@@ -398,8 +398,6 @@ export default function ScholarReports() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Mês Referência</TableHead>
-                          <TableHead className="hidden md:table-cell">Projeto</TableHead>
-                          <TableHead className="hidden lg:table-cell">Subprojeto</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Data Envio</TableHead>
                           <TableHead className="hidden sm:table-cell text-center">Versões</TableHead>
@@ -411,18 +409,6 @@ export default function ScholarReports() {
                           <TableRow key={`${report.source}-${report.id}`}>
                             <TableCell className="font-medium whitespace-nowrap">
                               {report.reference_label}
-                            </TableCell>
-                            <TableCell className="hidden md:table-cell text-muted-foreground max-w-[200px] truncate">
-                              {report.thematic_project_title}
-                            </TableCell>
-                            <TableCell className="hidden lg:table-cell text-muted-foreground">
-                              <span className="text-xs font-medium">{report.project_code}</span>
-                              {report.project_title !== "—" && (
-                                <>
-                                  <br />
-                                  <span className="text-xs text-muted-foreground/70">{report.project_title}</span>
-                                </>
-                              )}
                             </TableCell>
                             <TableCell>
                               {renderStatusBadge(report)}
