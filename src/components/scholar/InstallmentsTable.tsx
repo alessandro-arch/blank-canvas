@@ -166,7 +166,7 @@ function InstallmentActions({ installment, onRefresh }: InstallmentActionsProps)
         {contextualMessage && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Link to="/">
+              <Link to="/bolsista/painel">
                 <Button 
                   size="sm" 
                   variant="outline" 
@@ -254,7 +254,7 @@ function InstallmentActions({ installment, onRefresh }: InstallmentActionsProps)
                     <Button variant="outline" onClick={() => setFeedbackOpen(false)}>
                       Fechar
                     </Button>
-                    <Link to="/">
+                    <Link to="/bolsista/painel">
                       <Button className="gap-1.5">
                         <ExternalLink className="w-4 h-4" />
                         Acessar Subprojeto
@@ -477,7 +477,7 @@ export function InstallmentsTable({
               <li><strong>Relatório pendente</strong> → Pagamento aguardando ⏳</li>
               <li><strong>Relatório devolvido</strong> → Pagamento bloqueado 🚫</li>
             </ul>
-            <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-primary font-medium mt-2 hover:underline">
+            <Link to="/bolsista/painel" className="inline-flex items-center gap-1.5 text-sm text-primary font-medium mt-2 hover:underline">
               <ExternalLink className="w-3.5 h-3.5" />
               Acessar Subprojeto para enviar relatório
             </Link>
