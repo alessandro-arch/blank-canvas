@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
@@ -13,6 +15,17 @@ import { useScholarPayments } from "@/hooks/useScholarPayments";
 
 const PaymentsReports = () => {
   const { data, loading, error, refresh } = useScholarPayments();
+  const location = useLocation();
+
+  // Auto-scroll to anchor when hash is present
+  useEffect(() => {
+    if (location.hash && !loading) {
+      const id = location.hash.replace("#", "");
+      setTimeout(() => {
+        document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 200);
+    }
+  }, [location.hash, loading]);
 
   const hasEnrollment = !!data?.enrollment;
   const enrollment = data?.enrollment;

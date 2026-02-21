@@ -40,7 +40,7 @@ import {
 import { cn } from "@/lib/utils";
 import { ReportVersionsDialog, type ReportVersion } from "./ReportVersionsDialog";
 import { openReportPdf, downloadReportPdf, downloadPaymentReceipt } from "@/hooks/useSignedUrl";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import type { PaymentWithReport } from "@/hooks/useScholarPayments";
 import { format, parseISO, isBefore } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -130,8 +130,16 @@ interface InstallmentActionsProps {
 }
 
 function InstallmentActions({ installment, onRefresh }: InstallmentActionsProps) {
+  const navigate = useNavigate();
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [versionsOpen, setVersionsOpen] = useState(false);
+
+  const goToReportForm = () => {
+    navigate("/bolsista/pagamentos-relatorios");
+    setTimeout(() => {
+      document.getElementById("relatorio-mensal")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 300);
+  };
 
   const isFutureMonth = installment.monthStatus === "future";
   const canViewFeedback = (installment.reportStatus === "rejected" || installment.reportStatus === "deadline_expired") && installment.feedback;
@@ -166,16 +174,15 @@ function InstallmentActions({ installment, onRefresh }: InstallmentActionsProps)
         {contextualMessage && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <a href="/bolsista/painel#relatorio-mensal">
                 <Button 
                   size="sm" 
                   variant="outline" 
                   className="gap-1.5 text-xs border-primary/30 text-primary"
+                  onClick={goToReportForm}
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
                   Preencher Relatório
                 </Button>
-              </a>
             </TooltipTrigger>
             <TooltipContent side="top" className="max-w-[250px]">
               <p>{contextualMessage}</p>
@@ -254,12 +261,10 @@ function InstallmentActions({ installment, onRefresh }: InstallmentActionsProps)
                     <Button variant="outline" onClick={() => setFeedbackOpen(false)}>
                       Fechar
                     </Button>
-                    <a href="/bolsista/painel#relatorio-mensal">
-                      <Button className="gap-1.5">
-                        <ExternalLink className="w-4 h-4" />
-                        Preencher Relatório
-                      </Button>
-                    </a>
+                    <Button className="gap-1.5" onClick={goToReportForm}>
+                      <ExternalLink className="w-4 h-4" />
+                      Preencher Relatório
+                    </Button>
                   </div>
                 </DialogContent>
               </Dialog>
@@ -477,9 +482,9 @@ export function InstallmentsTable({
               <li><strong>Relatório pendente</strong> → Pagamento aguardando ⏳</li>
               <li><strong>Relatório devolvido</strong> → Pagamento bloqueado 🚫</li>
             </ul>
-            <Link to="/bolsista/relatorios" className="inline-flex items-center gap-1.5 text-sm text-primary font-medium mt-2 hover:underline">
+            <Link to="/bolsista/pagamentos-relatorios#relatorio-mensal" className="inline-flex items-center gap-1.5 text-sm text-primary font-medium mt-2 hover:underline">
               <ExternalLink className="w-3.5 h-3.5" />
-              Acessar Meus Relatórios
+              Acessar Relatório Mensal
             </Link>
           </div>
         </div>

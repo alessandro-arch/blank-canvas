@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -70,6 +71,7 @@ function parseReferenceMonth(ref: string): { label: string; sortKey: string } {
 
 export default function ScholarReports() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [reports, setReports] = useState<UnifiedReportRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -266,14 +268,17 @@ export default function ScholarReports() {
     // Draft/returned digital → edit
     if (report.source === "digital" && (report.status === "draft" || report.status === "returned")) {
       actions.push(
-        <a key="edit" href="/bolsista/painel#relatorio-mensal">
-          <Button size="sm" variant="outline" className="gap-1.5">
-            <Edit className="w-4 h-4" />
-            <span className="hidden sm:inline">
-              {report.status === "returned" ? "Corrigir" : "Editar"}
-            </span>
-          </Button>
-        </a>
+        <Button key="edit" size="sm" variant="outline" className="gap-1.5" onClick={() => {
+          navigate("/bolsista/pagamentos-relatorios");
+          setTimeout(() => {
+            document.getElementById("relatorio-mensal")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }, 300);
+        }}>
+          <Edit className="w-4 h-4" />
+          <span className="hidden sm:inline">
+            {report.status === "returned" ? "Corrigir" : "Editar"}
+          </span>
+        </Button>
       );
     }
 
