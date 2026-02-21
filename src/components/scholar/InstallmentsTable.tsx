@@ -186,28 +186,26 @@ function InstallmentActions({ installment, onRefresh }: InstallmentActionsProps)
   return (
     <TooltipProvider>
       <div className="flex items-center gap-2">
-        {/* Primary Action Button */}
+        {/* Primary Action Button - Upload desabilitado, usar formulário digital */}
         {(canSubmitReport || canResubmit) ? (
-          <>
-            {canSubmitReport && (
-              <Button size="sm" className="gap-1.5" onClick={() => setUploadOpen(true)}>
-                <FileUp className="w-3.5 h-3.5" />
-                Enviar
-              </Button>
-            )}
-            
-            {canResubmit && (
-              <Button 
-                size="sm" 
-                variant="outline" 
-                className="gap-1.5 border-warning text-warning hover:bg-warning/10"
-                onClick={() => setUploadOpen(true)}
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                Reenviar
-              </Button>
-            )}
-          </>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="gap-1.5 border-primary/30 text-primary"
+                  disabled
+                >
+                  <FileUp className="w-3.5 h-3.5" />
+                  {canResubmit ? "Reenviar" : "Enviar"}
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-[250px]">
+              <p>Use a seção "Relatório Mensal" (formulário digital) para enviar seu relatório.</p>
+            </TooltipContent>
+          </Tooltip>
         ) : (
           // Disabled state with tooltip
           <Tooltip>
@@ -301,16 +299,19 @@ function InstallmentActions({ installment, onRefresh }: InstallmentActionsProps)
                     <Button variant="outline" onClick={() => setFeedbackOpen(false)}>
                       Fechar
                     </Button>
-                    <Button 
-                      className="gap-1.5"
-                      onClick={() => {
-                        setFeedbackOpen(false);
-                        setUploadOpen(true);
-                      }}
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                      Reenviar Relatório
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <Button className="gap-1.5" disabled>
+                            <RefreshCw className="w-4 h-4" />
+                            Reenviar Relatório
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Use a seção "Relatório Mensal" (formulário digital)</p>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                 </DialogContent>
               </Dialog>

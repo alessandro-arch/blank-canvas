@@ -388,6 +388,40 @@ export function ReportsReviewManagement() {
     // Future: integrate with messaging system
   };
 
+  // Request digital resubmission
+  const handleRequestDigitalResubmit = async (report: ReportRecord, scholar: ScholarRow) => {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from("reports")
+        .update({
+          reenvio_solicitado: true,
+          reenvio_solicitado_at: new Date().toISOString(),
+          reenvio_solicitado_by: user.id,
+        })
+        .eq("id", report.id);
+      if (error) throw error;
+
+      await logAction({
+        action: "report_returned" as any,
+        entityType: "report",
+        entityId: report.id,
+        details: {
+          action: "request_digital_resubmit",
+          scholar_id: report.user_id,
+          scholar_name: scholar.full_name,
+          reference_month: report.reference_month,
+        },
+      });
+
+      toast.success(`Reenvio digital solicitado para ${scholar.full_name}`);
+      refetch();
+    } catch (error) {
+      console.error("Error requesting digital resubmit:", error);
+      toast.error("Erro ao solicitar reenvio digital");
+    }
+  };
+
   // CSV export
   const handleExportCSV = () => {
     if (filteredScholars.length === 0) {
@@ -605,6 +639,7 @@ export function ReportsReviewManagement() {
                     onReview={handleOpenReview}
                     onReplaceFile={handleReplaceFile}
                     onSendReminder={handleSendReminder}
+                    onRequestDigitalResubmit={handleRequestDigitalResubmit}
                   />
                 ))}
               </TableBody>
