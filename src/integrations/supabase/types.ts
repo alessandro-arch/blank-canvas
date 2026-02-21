@@ -1438,6 +1438,10 @@ export type Database = {
     }
     Functions: {
       accept_org_invite: { Args: { p_token: string }; Returns: Json }
+      approve_monthly_report: {
+        Args: { p_feedback?: string; p_report_id: string }
+        Returns: Json
+      }
       cancel_scholarship: {
         Args: {
           p_effective_date?: string
@@ -1503,6 +1507,10 @@ export type Database = {
           p_old_enrollment_id: string
           p_start_date?: string
         }
+        Returns: Json
+      }
+      return_monthly_report: {
+        Args: { p_reason: string; p_report_id: string }
         Returns: Json
       }
       save_monthly_report_draft: {
