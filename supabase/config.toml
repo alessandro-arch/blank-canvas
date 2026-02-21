@@ -62,3 +62,6 @@ verify_jwt = false
 
 [functions.verify-report-integrity]
 verify_jwt = false
+
+[functions.migrate-bank-encryption]
+verify_jwt = false
