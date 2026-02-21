@@ -22,6 +22,7 @@ import {
   RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SecurityBadge } from "@/components/ui/SecurityBadge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -211,6 +212,7 @@ export function ScholarDataCards() {
 
   return (
     <div className="space-y-6">
+      <SecurityBadge variant="banner" />
       {/* Header with last updated and reveal button */}
       <div className="flex flex-col sm:flex-row justify-between gap-4">
         {lastUpdated && (

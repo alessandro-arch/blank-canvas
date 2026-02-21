@@ -1,4 +1,5 @@
 import logoInnovago from "@/assets/logo-innovago.png";
+import { SecurityBadge } from "@/components/ui/SecurityBadge";
 
 export function Footer() {
   return (
@@ -17,6 +18,7 @@ export function Footer() {
           </a>
           )
         </p>
+        <SecurityBadge variant="footer" />
       </div>
     </footer>
   );

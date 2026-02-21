@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { SecurityBadge } from '@/components/ui/SecurityBadge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAuditLog } from '@/hooks/useAuditLog';
@@ -474,6 +475,7 @@ export function BankDataManagement() {
 
   return (
     <>
+      <SecurityBadge variant="banner" className="mb-4" />
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
