@@ -3,7 +3,7 @@ import { Sparkles, FileText, AlertTriangle, BarChart3, Scale, Loader2, Copy, Che
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -120,23 +120,23 @@ export function MonthlyReportAIPanel({ reportId, onInsertToFeedback }: MonthlyRe
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6"
+                      className="h-7 w-7"
                       onClick={() => setExpandedType(type as AnalysisType)}
                       title="Expandir"
                     >
-                      <Maximize2 className="h-3 w-3" />
+                      <Maximize2 className="h-3.5 w-3.5" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6"
+                      className="h-7 w-7"
                       onClick={() => handleCopy(type as AnalysisType)}
                       title="Copiar"
                     >
                       {copied === type ? (
-                        <Check className="h-3 w-3 text-emerald-500" />
+                        <Check className="h-3.5 w-3.5 text-emerald-500" />
                       ) : (
-                        <Copy className="h-3 w-3" />
+                        <Copy className="h-3.5 w-3.5" />
                       )}
                     </Button>
                     {onInsertToFeedback && (
@@ -151,11 +151,12 @@ export function MonthlyReportAIPanel({ reportId, onInsertToFeedback }: MonthlyRe
                     )}
                   </div>
                 </div>
-                <ScrollArea className={maxH}>
-                  <div className="text-xs text-foreground/80 whitespace-pre-wrap break-words leading-relaxed p-3 bg-background rounded border">
-                    {text}
-                  </div>
-                </ScrollArea>
+                <div
+                  className="resize-y overflow-auto min-h-[180px] max-h-[480px] rounded-md border bg-background p-4 text-[15px] leading-relaxed whitespace-pre-wrap break-words text-foreground/80"
+                  style={{ resize: 'vertical' }}
+                >
+                  {text}
+                </div>
                 <p className="text-[10px] text-muted-foreground italic flex items-center gap-1">
                   <Sparkles className="h-2.5 w-2.5" /> Gerado por IA — requer validação do gestor
                 </p>
@@ -197,7 +198,7 @@ export function MonthlyReportAIPanel({ reportId, onInsertToFeedback }: MonthlyRe
             )}
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
-            <div className="text-sm sm:text-xs text-foreground/80 whitespace-pre-wrap break-words leading-relaxed p-4 bg-muted/50 rounded border min-h-[200px]">
+            <div className="text-base leading-relaxed whitespace-pre-wrap break-words text-foreground/80 p-6 bg-muted/50 rounded border min-h-[200px]">
               {expandedType && results[expandedType]}
             </div>
           </div>
