@@ -37,6 +37,9 @@ export interface SubprojectWithScholar {
   scholar_email: string | null;
   enrollment_id: string | null;
   enrollment_status: string | null;
+  enrollment_total_installments: number | null;
+  enrollment_paid_installments: number | null;
+  enrollment_replaced_by: string | null;
   user_id: string | null;
   // Monthly stats
   report_status: string | null;

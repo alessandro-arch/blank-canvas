@@ -31,7 +31,8 @@ import {
   DollarSign,
   User,
   FileText,
-  Loader2
+  Loader2,
+  Ban
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -40,6 +41,8 @@ import { ProjectDetailsDialog } from './ProjectDetailsDialog';
 import { EditProjectDialog } from './EditProjectDialog';
 import { ArchiveProjectDialog } from './ArchiveProjectDialog';
 import { AssignScholarToProjectDialog } from './AssignScholarToProjectDialog';
+import { CancelScholarshipDialog } from './CancelScholarshipDialog';
+import { ReplaceScholarDialog } from './ReplaceScholarDialog';
 import type { SubprojectWithScholar, Project } from './types';
 import { useUserRole } from '@/hooks/useUserRole';
 import { getModalityLabel } from '@/lib/modality-labels';
@@ -75,6 +78,8 @@ export function SubprojectsTable({
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [cancelScholarshipOpen, setCancelScholarshipOpen] = useState(false);
+  const [replaceScholarOpen, setReplaceScholarOpen] = useState(false);
   const [generatingPdfFor, setGeneratingPdfFor] = useState<string | null>(null);
   const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
   const [pdfViewerUrl, setPdfViewerUrl] = useState<string | null>(null);
@@ -152,6 +157,16 @@ export function SubprojectsTable({
   const handleAssignScholar = (project: SubprojectWithScholar) => {
     setSelectedProject(project);
     setAssignDialogOpen(true);
+  };
+
+  const handleCancelScholarship = (project: SubprojectWithScholar) => {
+    setSelectedProject(project);
+    setCancelScholarshipOpen(true);
+  };
+
+  const handleReplaceScholar = (project: SubprojectWithScholar) => {
+    setSelectedProject(project);
+    setReplaceScholarOpen(true);
   };
 
   const handleProjectUpdated = () => {
@@ -350,6 +365,23 @@ export function SubprojectsTable({
                                 Atribuir bolsista
                               </DropdownMenuItem>
                             )}
+                            {/* Cancel scholarship */}
+                            {project.enrollment_id && project.enrollment_status === 'active' && (
+                              <DropdownMenuItem 
+                                onClick={() => handleCancelScholarship(project)}
+                                className="text-destructive"
+                              >
+                                <Ban className="h-4 w-4 mr-2" />
+                                Cancelar bolsa
+                              </DropdownMenuItem>
+                            )}
+                            {/* Replace scholar */}
+                            {project.enrollment_id && project.enrollment_status === 'cancelled' && !project.enrollment_replaced_by && (
+                              <DropdownMenuItem onClick={() => handleReplaceScholar(project)}>
+                                <UserPlus className="h-4 w-4 mr-2" />
+                                Indicar substituto
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuSeparator />
                             {project.status === 'active' && isAdmin && (
                               <DropdownMenuItem 
@@ -403,6 +435,39 @@ export function SubprojectsTable({
             onOpenChange={setAssignDialogOpen}
             onSuccess={handleProjectUpdated}
           />
+
+          {/* Cancel Scholarship Dialog */}
+          {selectedProject?.enrollment_id && (
+            <CancelScholarshipDialog
+              open={cancelScholarshipOpen}
+              onOpenChange={setCancelScholarshipOpen}
+              enrollmentId={selectedProject.enrollment_id}
+              scholarName={selectedProject.scholar_name || 'Bolsista'}
+              projectCode={selectedProject.code}
+              projectTitle={selectedProject.title}
+              totalInstallments={selectedProject.enrollment_total_installments || 0}
+              paidInstallments={selectedProject.enrollment_paid_installments || 0}
+              monthlyAmount={selectedProject.valor_mensal}
+              onSuccess={handleProjectUpdated}
+            />
+          )}
+
+          {/* Replace Scholar Dialog */}
+          {selectedProject?.enrollment_id && (
+            <ReplaceScholarDialog
+              open={replaceScholarOpen}
+              onOpenChange={setReplaceScholarOpen}
+              enrollmentId={selectedProject.enrollment_id}
+              previousScholarName={selectedProject.scholar_name || 'Bolsista'}
+              projectCode={selectedProject.code}
+              projectTitle={selectedProject.title}
+              totalInstallments={selectedProject.enrollment_total_installments || 0}
+              paidInstallments={selectedProject.enrollment_paid_installments || 0}
+              monthlyAmount={selectedProject.valor_mensal}
+              projectEndDate={selectedProject.end_date}
+              onSuccess={handleProjectUpdated}
+            />
+          )}
         </>
       )}
 

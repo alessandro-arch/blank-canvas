@@ -132,13 +132,17 @@ export type Database = {
       }
       enrollments: {
         Row: {
+          cancel_reason: string | null
+          canceled_at: string | null
           created_at: string
+          effective_cancel_date: string | null
           end_date: string
           grant_value: number
           id: string
           modality: Database["public"]["Enums"]["grant_modality"]
           observations: string | null
           project_id: string
+          replaced_by_enrollment_id: string | null
           start_date: string
           status: Database["public"]["Enums"]["enrollment_status"]
           total_installments: number
@@ -146,13 +150,17 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          cancel_reason?: string | null
+          canceled_at?: string | null
           created_at?: string
+          effective_cancel_date?: string | null
           end_date: string
           grant_value: number
           id?: string
           modality: Database["public"]["Enums"]["grant_modality"]
           observations?: string | null
           project_id: string
+          replaced_by_enrollment_id?: string | null
           start_date: string
           status?: Database["public"]["Enums"]["enrollment_status"]
           total_installments: number
@@ -160,13 +168,17 @@ export type Database = {
           user_id: string
         }
         Update: {
+          cancel_reason?: string | null
+          canceled_at?: string | null
           created_at?: string
+          effective_cancel_date?: string | null
           end_date?: string
           grant_value?: number
           id?: string
           modality?: Database["public"]["Enums"]["grant_modality"]
           observations?: string | null
           project_id?: string
+          replaced_by_enrollment_id?: string | null
           start_date?: string
           status?: Database["public"]["Enums"]["enrollment_status"]
           total_installments?: number
@@ -179,6 +191,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrollments_replaced_by_enrollment_id_fkey"
+            columns: ["replaced_by_enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "enrollments"
             referencedColumns: ["id"]
           },
         ]
@@ -1222,6 +1241,14 @@ export type Database = {
     }
     Functions: {
       accept_org_invite: { Args: { p_token: string }; Returns: Json }
+      cancel_scholarship: {
+        Args: {
+          p_effective_date?: string
+          p_enrollment_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       create_org_invite: {
         Args: {
           p_email: string
@@ -1262,6 +1289,15 @@ export type Database = {
       project_belongs_to_user_org: {
         Args: { p_project_id: string }
         Returns: boolean
+      }
+      replace_scholarship: {
+        Args: {
+          p_monthly_amount?: number
+          p_new_scholar_user_id: string
+          p_old_enrollment_id: string
+          p_start_date?: string
+        }
+        Returns: Json
       }
       upsert_sensitive_profile: {
         Args: { p_cpf?: string; p_phone?: string }
