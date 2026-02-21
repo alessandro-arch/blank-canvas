@@ -13,6 +13,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ScholarProtectedRoute } from "@/components/auth/ScholarProtectedRoute";
 import { AdminProtectedRoute } from "@/components/auth/AdminProtectedRoute";
 import { SessionGuard } from "@/components/auth/SessionGuard";
+import { AuthGate } from "@/components/auth/AuthGate";
 
 // Public pages
 import LandingPage from "./pages/LandingPage";
@@ -70,6 +71,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthProvider>
+        <AuthGate>
         <OrganizationProvider>
           <SupportCenterProvider>
           <Toaster />
@@ -266,6 +268,7 @@ const App = () => (
           </BrowserRouter>
           </SupportCenterProvider>
         </OrganizationProvider>
+        </AuthGate>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
