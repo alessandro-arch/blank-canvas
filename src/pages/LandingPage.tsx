@@ -71,6 +71,25 @@ const HeroSection = () => {
   );
 };
 
+/* ───────── Brand Signature ───────── */
+const BrandSignature = () => (
+  <Section className="py-16 sm:py-20">
+    <div className="flex flex-col items-center text-center">
+      <img
+        src="/favicon.png"
+        alt="BolsaGO"
+        className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl object-contain mb-5"
+      />
+      <h2 className="text-[22px] sm:text-[28px] font-bold text-foreground mb-2">
+        BolsaGO <span className="font-normal text-muted-foreground">by InnovaGO</span>
+      </h2>
+      <p className="text-[14px] sm:text-[15px] text-muted-foreground leading-relaxed max-w-[520px]">
+        Plataforma BolsaGO: Inteligência digital para a gestão de bolsas e projetos.
+      </p>
+    </div>
+  </Section>
+);
+
 /* ───────── Benefícios principais ───────── */
 const benefits = [
   "Gestão completa de bolsistas e projetos",
@@ -578,6 +597,7 @@ const LandingPage = () => {
     <div className="min-h-screen bg-white">
       <Navbar />
       <HeroSection />
+      <BrandSignature />
       <BenefitsSection />
       <AudienceSection />
       <MidCTASection />
