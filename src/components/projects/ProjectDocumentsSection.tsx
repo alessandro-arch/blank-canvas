@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useOrganizationContext } from '@/contexts/OrganizationContext';
+import { PdfViewerDialog } from '@/components/ui/PdfViewerDialog';
 
 interface ProjectDocumentsSectionProps {
   projectId: string;
@@ -31,6 +32,9 @@ export function ProjectDocumentsSection({
 }: ProjectDocumentsSectionProps) {
   const [uploadingContrato, setUploadingContrato] = useState(false);
   const [uploadingPlano, setUploadingPlano] = useState(false);
+  const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfTitle, setPdfTitle] = useState("");
   const contratoInputRef = useRef<HTMLInputElement>(null);
   const planoInputRef = useRef<HTMLInputElement>(null);
   const { currentOrganization } = useOrganizationContext();
@@ -75,7 +79,7 @@ export function ProjectDocumentsSection({
     }
   };
 
-  const handleView = async (filePath: string) => {
+  const handleView = async (filePath: string, docLabel: string) => {
     try {
       const { data, error } = await supabase.storage
         .from('documentos-projetos')
@@ -83,17 +87,9 @@ export function ProjectDocumentsSection({
 
       if (error) throw error;
 
-      // Use direct window.open — if blocked, show toast with link
-      const opened = window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
-      if (!opened) {
-        toast('Documento pronto!', {
-          duration: 15000,
-          action: {
-            label: 'Abrir',
-            onClick: () => { window.open(data.signedUrl, '_blank', 'noopener,noreferrer'); },
-          },
-        });
-      }
+      setPdfUrl(data.signedUrl);
+      setPdfTitle(docLabel);
+      setPdfViewerOpen(true);
     } catch (err) {
       console.error(err);
       toast.error('Erro ao abrir documento. O arquivo pode não existir mais.');
@@ -138,7 +134,7 @@ export function ProjectDocumentsSection({
             </div>
           )}
           <div className="flex flex-col gap-2">
-            <Button variant="outline" size="sm" onClick={() => handleView(url)}>
+            <Button variant="outline" size="sm" onClick={() => handleView(url!, label)}>
               <Eye className="h-4 w-4 mr-1" />
               Visualizar
             </Button>
@@ -185,6 +181,12 @@ export function ProjectDocumentsSection({
           {renderDocCard('Plano de Trabalho', planoUrl, planoNome, planoUploadedAt, uploadingPlano, planoInputRef, 'plano')}
         </div>
       </CardContent>
+      <PdfViewerDialog
+        open={pdfViewerOpen}
+        onOpenChange={setPdfViewerOpen}
+        title={pdfTitle}
+        pdfUrl={pdfUrl}
+      />
     </Card>
   );
 }

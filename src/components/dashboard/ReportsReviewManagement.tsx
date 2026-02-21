@@ -53,6 +53,7 @@ import { ptBR } from "date-fns/locale";
 import { ReplaceReportFileDialog } from "./ReplaceReportFileDialog";
 import { ScholarReportRow, type ScholarRow, type ReportRecord } from "./ScholarReportRow";
 import { cn } from "@/lib/utils";
+import { PdfViewerDialog } from "@/components/ui/PdfViewerDialog";
 
 export function ReportsReviewManagement() {
   const { user } = useAuth();
@@ -71,6 +72,9 @@ export function ReportsReviewManagement() {
   const [feedback, setFeedback] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
+  const [pdfViewerUrl, setPdfViewerUrl] = useState<string | null>(null);
+  const [pdfViewerTitle, setPdfViewerTitle] = useState("");
 
   // Replace file dialog state
   const [replaceDialogOpen, setReplaceDialogOpen] = useState(false);
@@ -259,16 +263,13 @@ export function ReportsReviewManagement() {
   const handleViewPdf = async (fileUrl: string) => {
     setPdfLoading(true);
     try {
-      const { data, error } = await supabase.storage.from("reports").createSignedUrl(fileUrl, 900);
+      const { data, error } = await supabase.storage.from("reports").createSignedUrl(fileUrl, 300);
       if (error) throw error;
       if (data?.signedUrl) {
-        const opened = window.open(data.signedUrl, "_blank", "noopener,noreferrer");
-        if (!opened) window.location.href = data.signedUrl;
+        setPdfViewerUrl(data.signedUrl);
+        setPdfViewerTitle("Relatório");
+        setPdfViewerOpen(true);
       }
-    } catch (error: any) {
-      console.error("Error opening PDF:", error);
-      const isNotFound = error?.statusCode === "404" || error?.message?.includes("not found");
-      toast.error(isNotFound ? "Arquivo PDF não encontrado no storage" : "Erro ao abrir PDF");
     } finally {
       setPdfLoading(false);
     }
@@ -727,6 +728,12 @@ export function ReportsReviewManagement() {
           onSuccess={() => refetch()}
         />
       )}
+      <PdfViewerDialog
+        open={pdfViewerOpen}
+        onOpenChange={setPdfViewerOpen}
+        title={pdfViewerTitle}
+        pdfUrl={pdfViewerUrl}
+      />
     </Card>
   );
 }

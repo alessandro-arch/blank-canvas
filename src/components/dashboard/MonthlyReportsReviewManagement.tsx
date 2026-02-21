@@ -58,6 +58,7 @@ import { cn } from "@/lib/utils";
 import { MonthlyReportStatusBadge } from "@/components/scholar/monthly-report/MonthlyReportStatusBadge";
 import { MonthlyReportAIPanel } from "@/components/dashboard/MonthlyReportAIPanel";
 import type { MonthlyReportStatus } from "@/hooks/useMonthlyReport";
+import { PdfViewerDialog } from "@/components/ui/PdfViewerDialog";
 
 interface MonthlyReportRow {
   id: string;
@@ -106,6 +107,9 @@ export function MonthlyReportsReviewManagement() {
 
   // PDF loading
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
+  const [pdfViewerUrl, setPdfViewerUrl] = useState<string | null>(null);
+  const [pdfViewerTitle, setPdfViewerTitle] = useState("");
 
   const toggleExpand = (userId: string) => {
     setExpandedUsers(prev => {
@@ -298,7 +302,9 @@ export function MonthlyReportsReviewManagement() {
         .createSignedUrl(docs[0].storage_path, 900);
       if (error) throw error;
       if (signed?.signedUrl) {
-        window.open(signed.signedUrl, "_blank", "noopener,noreferrer");
+        setPdfViewerUrl(signed.signedUrl);
+        setPdfViewerTitle("Relatório Mensal");
+        setPdfViewerOpen(true);
       }
     } catch {
       toast.error("Erro ao abrir PDF");
@@ -395,6 +401,7 @@ export function MonthlyReportsReviewManagement() {
   };
 
   return (
+    <>
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -824,5 +831,12 @@ export function MonthlyReportsReviewManagement() {
         </DialogContent>
       </Dialog>
     </Card>
+    <PdfViewerDialog
+      open={pdfViewerOpen}
+      onOpenChange={setPdfViewerOpen}
+      title={pdfViewerTitle}
+      pdfUrl={pdfViewerUrl}
+    />
+    </>
   );
 }

@@ -8,6 +8,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { PdfViewerDialog } from "@/components/ui/PdfViewerDialog";
 
 function formatFileSize(bytes: number | null) {
   if (!bytes) return "";
@@ -24,6 +25,8 @@ export function GrantTermTab({ searchQuery = "" }: GrantTermTabProps) {
   const { user } = useAuth();
   const { grantTerm, loading, error } = useGrantTerm(user?.id);
   const [viewLoading, setViewLoading] = useState(false);
+  const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 
   const handleView = async () => {
     if (!grantTerm) return;
@@ -31,13 +34,11 @@ export function GrantTermTab({ searchQuery = "" }: GrantTermTabProps) {
     try {
       const { data, error } = await supabase.storage
         .from("grant-terms")
-        .createSignedUrl(grantTerm.fileUrl, 900);
+        .createSignedUrl(grantTerm.fileUrl, 300);
       if (error) throw error;
       if (data?.signedUrl) {
-        const opened = window.open(data.signedUrl, "_blank", "noopener,noreferrer");
-        if (!opened) {
-          window.location.href = data.signedUrl;
-        }
+        setPdfUrl(data.signedUrl);
+        setPdfViewerOpen(true);
       } else {
         toast.error("Link de acesso não disponível");
       }
@@ -54,7 +55,7 @@ export function GrantTermTab({ searchQuery = "" }: GrantTermTabProps) {
     try {
       const { data, error } = await supabase.storage
         .from("grant-terms")
-        .createSignedUrl(grantTerm.fileUrl, 900);
+        .createSignedUrl(grantTerm.fileUrl, 300);
       if (error) throw error;
       if (data?.signedUrl) {
         const link = document.createElement("a");
@@ -105,7 +106,6 @@ export function GrantTermTab({ searchQuery = "" }: GrantTermTabProps) {
     );
   }
 
-  // Filter by search
   if (searchQuery && !grantTerm.fileName.toLowerCase().includes(searchQuery.toLowerCase())) {
     return (
       <div className="card-institutional flex flex-col items-center justify-center py-12">
@@ -124,7 +124,6 @@ export function GrantTermTab({ searchQuery = "" }: GrantTermTabProps) {
 
   return (
     <div className="space-y-4">
-      {/* Info message */}
       <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 border border-border">
         <Info className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
         <p className="text-sm text-muted-foreground">
@@ -133,7 +132,6 @@ export function GrantTermTab({ searchQuery = "" }: GrantTermTabProps) {
         </p>
       </div>
 
-      {/* Document Card */}
       <div className="card-institutional">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-lg border bg-card border-border hover:bg-muted/30 transition-colors">
           <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
@@ -187,6 +185,13 @@ export function GrantTermTab({ searchQuery = "" }: GrantTermTabProps) {
           </div>
         </div>
       </div>
+
+      <PdfViewerDialog
+        open={pdfViewerOpen}
+        onOpenChange={setPdfViewerOpen}
+        title="Termo de Outorga"
+        pdfUrl={pdfUrl}
+      />
     </div>
   );
 }
