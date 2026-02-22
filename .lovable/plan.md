@@ -1,54 +1,68 @@
 
 
-# Corrigir visualizacao de documentos do Projeto Tematico para Auditor
+# Fix: "WinAnsi cannot encode" error in PDF generation
 
-## Problema
+## Problem
 
-O bucket de storage `documentos-projetos` so permite SELECT para `manager` e `admin`. Quando o auditor clica "Visualizar", o `createSignedUrl` falha com erro de permissao, e o frontend mostra "Erro ao abrir documento. O arquivo pode nao existir mais."
+The `generate-thematic-project-pdf` edge function uses `StandardFonts.Helvetica` (WinAnsi encoding only). When any data field contains characters outside WinAnsi range (like the checkmark U+2713, accented chars not in WinAnsi, emojis, etc.), `pdf-lib` throws an error and the PDF fails to generate.
 
-Alem disso, o botao "Substituir" (upload) aparece para o auditor, o que nao deveria.
+This affects all profiles (Admin, Manager, Auditor) because the issue is in the Edge Function, not in frontend permissions.
 
-## Correcoes
+## Solution
 
-### 1. Migracao SQL - Adicionar politica de leitura no Storage para auditor
+Add a text sanitization function in the edge function that replaces or removes non-WinAnsi characters before passing them to `page.drawText()`.
 
-Criar nova politica SELECT no bucket `documentos-projetos` para auditors:
+### File: `supabase/functions/generate-thematic-project-pdf/index.ts`
+
+1. Add a `sanitize()` helper function near the top of `buildConsolidatedPdf` that:
+   - Replaces common Unicode symbols with WinAnsi-safe equivalents (e.g., checkmark -> "OK", bullet -> "-", em-dash -> "--")
+   - Strips any remaining characters outside the WinAnsi range (codes 32-255, excluding 127-159 control chars)
+
+2. Apply `sanitize()` in the `txt()` helper so ALL text drawn to the PDF is automatically cleaned -- single point of fix.
+
+3. Apply `sanitize()` in the table cell rendering loop (line 502) which calls `page.drawText()` directly instead of using `txt()`.
+
+### Also fix the same issue in related PDF edge functions
+
+The same pattern exists in:
+- `generate-scholarship-pdf/index.ts` (or `template.ts`)
+- `generate-executive-report-pdf/index.ts`
+- `generate-monthly-report-pdf/index.ts`
+
+Each will get the same `sanitize()` helper applied to their text-drawing functions to prevent the same error from appearing elsewhere.
+
+## Technical Details
+
+The sanitize function:
 
 ```text
-CREATE POLICY "Auditors can view project docs"
-ON storage.objects FOR SELECT
-USING (
-  bucket_id = 'documentos-projetos'
-  AND public.has_role(auth.uid(), 'auditor'::public.app_role)
-);
+function sanitize(text: string): string {
+  const replacements: Record<string, string> = {
+    '\u2713': 'OK',   // checkmark
+    '\u2714': 'OK',   // heavy checkmark
+    '\u2716': 'X',    // heavy X
+    '\u2022': '-',    // bullet
+    '\u2019': "'",    // right single quote
+    '\u2018': "'",    // left single quote
+    '\u201C': '"',    // left double quote
+    '\u201D': '"',    // right double quote
+    '\u2013': '-',    // en-dash
+    '\u2014': '--',   // em-dash
+    '\u2026': '...',  // ellipsis
+    '\u00A0': ' ',    // non-breaking space
+  };
+  let result = text;
+  for (const [k, v] of Object.entries(replacements)) {
+    result = result.replaceAll(k, v);
+  }
+  // Remove any remaining non-WinAnsi characters
+  return result.replace(/[^\x20-\x7E\xA0-\xFF]/g, '');
+}
 ```
 
-O escopo organizacional ja e garantido pela RLS da tabela `thematic_projects` -- o auditor so consegue ver projetos da sua organizacao, portanto so tera acesso aos file_paths de documentos permitidos.
+## Impact
 
-### 2. Frontend - Esconder botao "Substituir" para auditor
-
-**Arquivo:** `src/components/projects/ProjectDocumentsSection.tsx`
-
-- Adicionar prop `readOnly?: boolean` na interface
-- Quando `readOnly = true`:
-  - Esconder botao "Substituir"
-  - Esconder input de upload
-  - Esconder botao "Enviar PDF" (estado sem documento)
-  - Manter botao "Visualizar" funcionando normalmente
-
-**Arquivo:** `src/pages/ThematicProjectDetail.tsx`
-
-- Importar `useUserRole` (se ainda nao importado)
-- Passar `readOnly={isAuditor}` ao componente `ProjectDocumentsSection` quando renderizado na pagina de detalhe
-
-### Resumo
-
-| Camada | Recurso | Alteracao |
-|--------|---------|-----------|
-| Storage | `documentos-projetos` | Nova politica SELECT para auditor |
-| Frontend | `ProjectDocumentsSection.tsx` | Prop `readOnly` para esconder upload/substituir |
-| Frontend | `ThematicProjectDetail.tsx` | Passar `readOnly={isAuditor}` |
-
-### Sem regressao
-
-A nova politica de storage e aditiva (PERMISSIVE). A prop `readOnly` tem default `false`, mantendo o comportamento atual para admin/manager.
+- No visual regression: common symbols get readable replacements
+- Prevents crashes for any future data containing special characters
+- All profiles benefit (Admin, Manager, Auditor)
+- No database or RLS changes needed
