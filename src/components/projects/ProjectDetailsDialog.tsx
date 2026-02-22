@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Edit, Archive, Trash2, AlertTriangle } from 'lucide-react';
+import { Edit, Archive, Trash2, AlertTriangle, FileText, Eye, Upload, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { EditProjectDialog } from './EditProjectDialog';
@@ -19,6 +19,9 @@ import { DeleteProjectDialog } from './DeleteProjectDialog';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
+import { useWorkPlanByProject } from '@/hooks/useWorkPlans';
+import { UploadWorkPlanDialog } from '@/components/scholars/UploadWorkPlanDialog';
+import { toast } from 'sonner';
 
 type ProjectStatus = Database['public']['Enums']['project_status'];
 
@@ -57,6 +60,69 @@ export function ProjectDetailsDialog({
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [workPlanDialogOpen, setWorkPlanDialogOpen] = useState(false);
+  const [wpViewLoading, setWpViewLoading] = useState(false);
+
+  // Get enrollment to find scholar_user_id
+  const { data: enrollmentData } = useQuery({
+    queryKey: ['project-enrollment', project.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('enrollments')
+        .select('user_id')
+        .eq('project_id', project.id)
+        .eq('status', 'active')
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    enabled: open,
+  });
+
+  // Get thematic project for org_id
+  const { data: thematicData } = useQuery({
+    queryKey: ['project-thematic', project.thematic_project_id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('thematic_projects')
+        .select('organization_id')
+        .eq('id', project.thematic_project_id)
+        .single();
+      return data;
+    },
+    enabled: open,
+  });
+
+  const scholarUserId = enrollmentData?.user_id;
+  const orgId = thematicData?.organization_id;
+
+  const { activeWorkPlan, refetch: refetchWorkPlan } = useWorkPlanByProject(
+    project.id,
+    scholarUserId || undefined
+  );
+
+  const handleViewWorkPlan = async () => {
+    if (!activeWorkPlan) return;
+    setWpViewLoading(true);
+    const newTab = window.open("about:blank", "_blank", "noopener,noreferrer");
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-workplan-signed-url", {
+        body: { workplan_id: activeWorkPlan.id },
+      });
+      if (error) throw error;
+      if (data?.signedUrl && newTab) {
+        newTab.location.href = data.signedUrl;
+      } else {
+        newTab?.close();
+        toast.error("Não foi possível abrir o plano de trabalho");
+      }
+    } catch {
+      newTab?.close();
+      toast.error("Erro ao abrir plano de trabalho");
+    } finally {
+      setWpViewLoading(false);
+    }
+  };
 
   // Check for dependencies (enrollments, payments, reports)
   const { data: dependencies } = useQuery({
@@ -150,8 +216,9 @@ export function ProjectDetailsDialog({
           </DialogHeader>
 
           <Tabs defaultValue="details" className="mt-4">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="details">Detalhes</TabsTrigger>
+              <TabsTrigger value="workplan">Plano de Trabalho</TabsTrigger>
               <TabsTrigger value="actions">Ações</TabsTrigger>
             </TabsList>
 
@@ -230,6 +297,64 @@ export function ProjectDetailsDialog({
                       </div>
                     </div>
                   </div>
+                </>
+              )}
+            </TabsContent>
+
+            {/* Work Plan Tab */}
+            <TabsContent value="workplan" className="space-y-4 mt-4">
+              {!scholarUserId ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <FileText className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                  <p className="text-sm">Nenhum bolsista vinculado a este subprojeto.</p>
+                  <p className="text-xs mt-1">Vincule um bolsista para gerenciar o plano de trabalho.</p>
+                </div>
+              ) : (
+                <>
+                  {activeWorkPlan ? (
+                    <div className="p-4 rounded-lg border bg-card space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                          <FileText className="w-5 h-5 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm">{activeWorkPlan.file_name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Enviado em {format(new Date(activeWorkPlan.uploaded_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                            {activeWorkPlan.file_size && ` • ${(activeWorkPlan.file_size / 1024 / 1024).toFixed(1)} MB`}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleViewWorkPlan}
+                          disabled={wpViewLoading}
+                        >
+                          {wpViewLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Eye className="h-4 w-4 mr-2" />}
+                          Visualizar
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setWorkPlanDialogOpen(true)}
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Substituir
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <FileText className="h-10 w-10 mx-auto mb-3 text-muted-foreground opacity-50" />
+                      <p className="text-sm text-muted-foreground mb-3">Nenhum plano de trabalho enviado.</p>
+                      <Button onClick={() => setWorkPlanDialogOpen(true)} size="sm">
+                        <Upload className="h-4 w-4 mr-2" />
+                        Enviar Plano de Trabalho
+                      </Button>
+                    </div>
+                  )}
                 </>
               )}
             </TabsContent>
@@ -339,6 +464,19 @@ export function ProjectDetailsDialog({
         onSuccess={handleProjectUpdated}
         hasDependencies={dependencies?.hasDependencies ?? false}
       />
+
+      {scholarUserId && orgId && (
+        <UploadWorkPlanDialog
+          open={workPlanDialogOpen}
+          onOpenChange={setWorkPlanDialogOpen}
+          projectId={project.id}
+          organizationId={orgId}
+          scholarUserId={scholarUserId}
+          scholarName={project.orientador}
+          existingPlan={activeWorkPlan ? { id: activeWorkPlan.id, fileName: activeWorkPlan.file_name } : null}
+          onSuccess={() => refetchWorkPlan()}
+        />
+      )}
     </>
   );
 }

@@ -796,6 +796,7 @@ export function MonthlyReportsReviewManagement() {
                 {/* AI Panel */}
                 <MonthlyReportAIPanel
                   reportId={selectedReport.id}
+                  projectId={selectedReport.project_id}
                   onInsertToFeedback={(text) => setFeedback(prev => prev ? prev + "\n\n" + text : text)}
                 />
 

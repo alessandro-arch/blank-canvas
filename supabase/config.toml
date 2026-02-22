@@ -65,3 +65,6 @@ verify_jwt = false
 
 [functions.migrate-bank-encryption]
 verify_jwt = false
+
+[functions.generate-workplan-signed-url]
+verify_jwt = false
