@@ -1371,25 +1371,31 @@ export type Database = {
       profiles_sensitive: {
         Row: {
           cpf: string | null
+          cpf_enc: string | null
           created_at: string
           id: string
           phone: string | null
+          phone_enc: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           cpf?: string | null
+          cpf_enc?: string | null
           created_at?: string
           id?: string
           phone?: string | null
+          phone_enc?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           cpf?: string | null
+          cpf_enc?: string | null
           created_at?: string
           id?: string
           phone?: string | null
+          phone_enc?: string | null
           updated_at?: string
           user_id?: string
         }

@@ -71,3 +71,9 @@ verify_jwt = false
 
 [functions.generate-workplan-signed-url]
 verify_jwt = false
+
+[functions.secure-pii-read]
+verify_jwt = false
+
+[functions.secure-pii-write]
+verify_jwt = false
