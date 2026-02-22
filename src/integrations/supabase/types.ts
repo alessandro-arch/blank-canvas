@@ -1128,6 +1128,59 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_status_log: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          enrollment_id: string
+          gates: Json
+          id: string
+          new_status: string
+          old_status: string
+          origin: string
+          payment_id: string
+          period_key: string
+          status_reason: string | null
+          user_id: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          enrollment_id: string
+          gates?: Json
+          id?: string
+          new_status: string
+          old_status: string
+          origin: string
+          payment_id: string
+          period_key: string
+          status_reason?: string | null
+          user_id: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          enrollment_id?: string
+          gates?: Json
+          id?: string
+          new_status?: string
+          old_status?: string
+          origin?: string
+          payment_id?: string
+          period_key?: string
+          status_reason?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_status_log_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount: number
@@ -1140,6 +1193,8 @@ export type Database = {
           reference_month: string
           report_id: string | null
           status: Database["public"]["Enums"]["payment_status"]
+          status_gate_snapshot: Json | null
+          status_reason: string | null
           updated_at: string
           user_id: string
         }
@@ -1154,6 +1209,8 @@ export type Database = {
           reference_month: string
           report_id?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
+          status_gate_snapshot?: Json | null
+          status_reason?: string | null
           updated_at?: string
           user_id: string
         }
@@ -1168,6 +1225,8 @@ export type Database = {
           reference_month?: string
           report_id?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
+          status_gate_snapshot?: Json | null
+          status_reason?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -1810,6 +1869,20 @@ export type Database = {
         Returns: boolean
       }
       ensure_profile_exists: { Args: never; Returns: Json }
+      fn_evaluate_payment_gates: {
+        Args: { p_period_key: string; p_project_id: string; p_user_id: string }
+        Returns: Json
+      }
+      fn_sync_payment_status: {
+        Args: {
+          p_actor_user_id?: string
+          p_origin?: string
+          p_period_key: string
+          p_project_id: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
       get_invite_details: { Args: { p_token: string }; Returns: Json }
       get_user_organizations: { Args: never; Returns: string[] }
       has_role: {
@@ -1906,7 +1979,7 @@ export type Database = {
         | "senior"
         | "prod"
         | "visitor"
-      payment_status: "pending" | "eligible" | "paid" | "cancelled"
+      payment_status: "pending" | "eligible" | "paid" | "cancelled" | "blocked"
       project_status: "active" | "inactive" | "archived"
     }
     CompositeTypes: {
@@ -2056,7 +2129,7 @@ export const Constants = {
         "prod",
         "visitor",
       ],
-      payment_status: ["pending", "eligible", "paid", "cancelled"],
+      payment_status: ["pending", "eligible", "paid", "cancelled", "blocked"],
       project_status: ["active", "inactive", "archived"],
     },
   },
