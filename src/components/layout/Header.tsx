@@ -33,8 +33,16 @@ export function Header() {
     refreshAvatar();
   }, [refreshAvatar]);
 
-  const getInitials = (email: string) => {
-    return email?.substring(0, 2).toUpperCase() || "US";
+  const getInitials = () => {
+    const name = user?.user_metadata?.full_name;
+    if (name) {
+      const parts = name.trim().split(/\s+/);
+      if (parts.length >= 2) {
+        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+      }
+      return parts[0].substring(0, 2).toUpperCase();
+    }
+    return user?.email?.substring(0, 2).toUpperCase() || "US";
   };
 
   const getRoleLabel = () => {
@@ -94,7 +102,7 @@ export function Header() {
               <Avatar className="w-8 h-8">
                 {avatarUrl && <AvatarImage src={avatarUrl} alt="Foto de perfil" />}
                 <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                  {getInitials(user?.email || "")}
+                  {getInitials()}
                 </AvatarFallback>
               </Avatar>
               <ChevronDown className="w-4 h-4 text-muted-foreground hidden md:block" />
@@ -107,7 +115,7 @@ export function Header() {
                 <Avatar className="w-12 h-12">
                   {avatarUrl && <AvatarImage src={avatarUrl} alt="Foto de perfil" />}
                   <AvatarFallback className="bg-primary/10 text-primary text-lg">
-                    {getInitials(user?.email || "")}
+                    {getInitials()}
                   </AvatarFallback>
                 </Avatar>
                 <button

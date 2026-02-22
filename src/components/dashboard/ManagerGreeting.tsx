@@ -48,8 +48,9 @@ export function ManagerGreeting() {
         .eq("user_id", user.id)
         .single();
       
-      if (profile?.full_name) {
-        setManagerName(profile.full_name.split(" ")[0]);
+      const name = profile?.full_name || user.user_metadata?.full_name;
+      if (name) {
+        setManagerName(name.split(" ")[0]);
       }
       
       // Fetch summary stats
