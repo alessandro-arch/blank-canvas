@@ -11,12 +11,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { PdfViewerDialog } from "@/components/ui/PdfViewerDialog";
-import { FileText, Download, Eye, Edit, Info, ExternalLink, History, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FileText, Download, Eye, Edit, Info, ExternalLink, History, Loader2, Sparkles } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useSecureReportPdf } from "@/hooks/useSecureReportPdf";
+import { ScholarAIParecerPanel } from "@/components/scholar/monthly-report/ScholarAIParecerPanel";
 
 // Unified report row combining digital (monthly_reports) and legacy (reports)
 interface UnifiedReportRow {
@@ -81,6 +83,10 @@ export default function ScholarReports() {
   const [pdfViewer, setPdfViewer] = useState<{ open: boolean; url: string | null; title: string }>({
     open: false, url: null, title: "",
   });
+  const [aiParecerDialog, setAiParecerDialog] = useState<{ open: boolean; reportId: string; title: string }>({
+    open: false, reportId: "", title: "",
+  });
+  const [reportsWithAI, setReportsWithAI] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!user) return;
@@ -111,7 +117,7 @@ export default function ScholarReports() {
         let pdfMap: Record<string, string> = {};
 
         if (digitalIds.length > 0) {
-          const [versionsRes, docsRes] = await Promise.all([
+          const [versionsRes, docsRes, aiRes] = await Promise.all([
             supabase
               .from("monthly_report_versions")
               .select("report_id")
@@ -121,6 +127,10 @@ export default function ScholarReports() {
               .select("report_id, storage_path")
               .in("report_id", digitalIds)
               .eq("type", "official_pdf"),
+            supabase
+              .from("monthly_report_ai_outputs")
+              .select("report_id")
+              .in("report_id", digitalIds),
           ]);
 
           if (versionsRes.data) {
@@ -133,6 +143,13 @@ export default function ScholarReports() {
               if (!pdfMap[doc.report_id]) pdfMap[doc.report_id] = doc.storage_path;
             }
           }
+          const aiSet = new Set<string>();
+          if (aiRes.data) {
+            for (const ai of aiRes.data) {
+              aiSet.add(ai.report_id);
+            }
+          }
+          setReportsWithAI(aiSet);
         }
 
         // 2. Fetch legacy reports (reports table)
@@ -342,6 +359,22 @@ export default function ScholarReports() {
       );
     }
 
+    // View AI Parecer (only for digital reports with AI output, status approved/returned)
+    if (report.source === "digital" && reportsWithAI.has(report.id) && (report.status === "approved" || report.status === "returned")) {
+      actions.push(
+        <Button
+          key="ai-parecer"
+          size="sm"
+          variant="outline"
+          className="gap-1.5 text-primary border-primary/30"
+          onClick={() => setAiParecerDialog({ open: true, reportId: report.id, title: `Parecer IA — ${report.reference_label}` })}
+        >
+          <Sparkles className="w-4 h-4" />
+          <span className="hidden sm:inline">Ver Parecer</span>
+        </Button>
+      );
+    }
+
     if (actions.length === 0) {
       actions.push(
         <span key="none" className="text-xs text-muted-foreground">—</span>
@@ -492,6 +525,21 @@ export default function ScholarReports() {
         title={pdfViewer.title}
         pdfUrl={pdfViewer.url}
       />
+
+      {/* AI Parecer Dialog */}
+      <Dialog open={aiParecerDialog.open} onOpenChange={(open) => setAiParecerDialog(prev => ({ ...prev, open }))}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Sparkles className="h-4 w-4 text-primary" />
+              {aiParecerDialog.title}
+            </DialogTitle>
+          </DialogHeader>
+          {aiParecerDialog.reportId && (
+            <ScholarAIParecerPanel reportId={aiParecerDialog.reportId} />
+          )}
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   );
 }
