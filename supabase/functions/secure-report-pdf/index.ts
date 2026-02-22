@@ -69,8 +69,9 @@ Deno.serve(async (req) => {
     const roles = (userRoles || []).map((r: { role: string }) => r.role);
     const isAdmin = roles.includes("admin");
     const isManager = roles.includes("manager");
-    const isScholar = !isAdmin && !isManager;
-    const role = isAdmin ? "admin" : isManager ? "manager" : "scholar";
+    const isAuditor = roles.includes("auditor");
+    const isScholar = !isAdmin && !isManager && !isAuditor;
+    const role = isAdmin ? "admin" : isManager ? "manager" : isAuditor ? "auditor" : "scholar";
 
     if (isScholar && report.beneficiary_user_id !== user.id) {
       return new Response(JSON.stringify({ error: "Acesso negado" }), {
@@ -78,7 +79,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (isManager) {
+    if (isManager || isAuditor) {
       const { data: membership } = await db
         .from("organization_members")
         .select("id")
