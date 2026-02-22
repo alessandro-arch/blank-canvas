@@ -4,6 +4,7 @@ import { MonthlyReportForm } from "./MonthlyReportForm";
 import { SubmitReportDialog } from "./SubmitReportDialog";
 import { ResubmitAlertBanner } from "./ResubmitAlertBanner";
 import { ScholarAIParecerPanel } from "./ScholarAIParecerPanel";
+import { ReportAttachmentsSection } from "./ReportAttachmentsSection";
 import { Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -84,6 +85,11 @@ export function MonthlyReportSection({ projectId }: Props) {
         onSave={() => saveDraft(false)}
         onSubmit={() => setShowSubmitDialog(true)}
         onReopen={reopenReport}
+      />
+
+      <ReportAttachmentsSection
+        reportId={report?.id || null}
+        isEditable={isDraft}
       />
 
       {showAIParecer && (
