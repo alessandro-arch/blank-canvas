@@ -10,5 +10,6 @@ export function getLoginRouteForPath(pathname: string): string {
   if (pathname.startsWith("/bolsista")) return "/bolsista/login";
   if (pathname.startsWith("/manager")) return "/manager/login";
   if (pathname.startsWith("/admin")) return "/admin/login";
+  if (pathname.startsWith("/auditor")) return "/auditor/login";
   return "/bolsista/login";
 }

@@ -1,24 +1,19 @@
 import { Navigate, useLocation } from "react-router-dom";
+import { getLoginRouteForPath } from "@/lib/login-redirect";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import { Loader2 } from "lucide-react";
 
-interface RoleProtectedRouteProps {
+interface AuditorProtectedRouteProps {
   children: React.ReactNode;
-  allowedRoles?: ("admin" | "manager" | "scholar" | "auditor")[];
-  requireManagerAccess?: boolean;
 }
 
-export function RoleProtectedRoute({ 
-  children, 
-  allowedRoles,
-  requireManagerAccess = false 
-}: RoleProtectedRouteProps) {
+export function AuditorProtectedRoute({ children }: AuditorProtectedRouteProps) {
   const { user, loading: authLoading } = useAuth();
-  const { role, loading: roleLoading, hasManagerAccess } = useUserRole();
+  const { role, loading: roleLoading, isAuditor } = useUserRole();
   const location = useLocation();
 
-  // Avoid race conditions: after auth resolves, role might still be unknown for one render
   const roleUnknown = !!user && role === null;
   const isLoading = authLoading || roleLoading || roleUnknown;
 
@@ -34,18 +29,12 @@ export function RoleProtectedRoute({
   }
 
   if (!user) {
-    return <Navigate to="/acesso" state={{ from: location }} replace />;
+    return <Navigate to={getLoginRouteForPath(location.pathname)} state={{ from: location }} replace />;
   }
 
-  // Check manager access requirement
-  if (requireManagerAccess && !hasManagerAccess) {
-    return <Navigate to="/" replace />;
+  if (!isAuditor) {
+    return <Navigate to="/acesso-negado" replace />;
   }
 
-  // Check specific role requirements
-  if (allowedRoles && role && !allowedRoles.includes(role)) {
-    return <Navigate to="/" replace />;
-  }
-
-  return <>{children}</>;
+  return <ThemeProvider>{children}</ThemeProvider>;
 }

@@ -15,7 +15,7 @@ export function AdminProtectedRoute({
   allowedRoles 
 }: AdminProtectedRouteProps) {
   const { user, loading: authLoading } = useAuth();
-  const { role, loading: roleLoading, hasManagerAccess, isScholar } = useUserRole();
+  const { role, loading: roleLoading, hasManagerAccess, isScholar, isAuditor } = useUserRole();
   const location = useLocation();
 
   // Avoid race conditions: after auth resolves, role might still be unknown for one render
@@ -40,6 +40,11 @@ export function AdminProtectedRoute({
   // If user is a scholar, redirect them to scholar panel
   if (isScholar) {
     return <Navigate to="/bolsista/painel" replace />;
+  }
+
+  // If user is an auditor, redirect them to auditor panel
+  if (isAuditor) {
+    return <Navigate to="/auditor/dashboard" replace />;
   }
 
   // Check if user has manager access (admin or manager role)

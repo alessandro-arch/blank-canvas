@@ -1179,6 +1179,13 @@ export type Database = {
             referencedRelation: "payments"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "payment_status_log_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments_audit_view"
+            referencedColumns: ["id"]
+          },
         ]
       }
       payments: {
@@ -1897,6 +1904,41 @@ export type Database = {
         }
         Relationships: []
       }
+      payments_audit_view: {
+        Row: {
+          amount: number | null
+          created_at: string | null
+          enrollment_id: string | null
+          id: string | null
+          installment_number: number | null
+          paid_at: string | null
+          project_code: string | null
+          project_id: string | null
+          project_title: string | null
+          receipt_url: string | null
+          reference_month: string | null
+          scholar_name: string | null
+          status: Database["public"]["Enums"]["payment_status"] | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enrollments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "enrollments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       accept_org_invite: { Args: { p_token: string }; Returns: Json }
@@ -2022,7 +2064,7 @@ export type Database = {
       user_org_role: { Args: { p_org_id: string }; Returns: string }
     }
     Enums: {
-      app_role: "admin" | "manager" | "scholar"
+      app_role: "admin" | "manager" | "scholar" | "auditor"
       bank_validation_status:
         | "pending"
         | "under_review"
@@ -2170,7 +2212,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "manager", "scholar"],
+      app_role: ["admin", "manager", "scholar", "auditor"],
       bank_validation_status: [
         "pending",
         "under_review",
