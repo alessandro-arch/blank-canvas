@@ -51,6 +51,9 @@ verify_jwt = false
 [functions.ai-analyze-report]
 verify_jwt = false
 
+[functions.ai-evaluate-monthly-report]
+verify_jwt = false
+
 [functions.secure-bank-read]
 verify_jwt = false
 

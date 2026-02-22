@@ -852,7 +852,7 @@ export function MonthlyReportsReviewManagement() {
               { key: "resultados_alcancados", label: "Resultados Alcançados", icon: "📊" },
               { key: "dificuldades_encontradas", label: "Dificuldades Encontradas", icon: "⚠️" },
               { key: "proximos_passos", label: "Próximos Passos", icon: "🔜" },
-              { key: "horas_dedicadas", label: "Horas Dedicadas", icon: "⏱️" },
+              
               { key: "observacoes", label: "Observações", icon: "📝" },
             ].map(({ key, label, icon }) => {
               const value = fieldsPayload[key];
