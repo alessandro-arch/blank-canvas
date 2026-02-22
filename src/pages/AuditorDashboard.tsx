@@ -26,8 +26,7 @@ const AuditorDashboard = () => {
   const { currentOrganization, loading: orgLoading } = useOrganizationContext();
   const orgId = currentOrganization?.id;
 
-  const currentMonth = format(new Date(), "yyyy-MM");
-  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+  const [selectedMonth, setSelectedMonth] = useState("all");
 
   const monthOptions = useMemo(() => {
     const options: { value: string; label: string }[] = [
