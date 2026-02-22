@@ -651,6 +651,7 @@ export default function ThematicProjectDetail() {
                   planoNome={thematicProject.plano_trabalho_nome}
                   planoUploadedAt={thematicProject.plano_trabalho_uploaded_at}
                   onUpdate={() => queryClient.invalidateQueries({ queryKey: ['thematic-project', id] })}
+                  readOnly={isAuditor}
                 />
               </div>
             )}

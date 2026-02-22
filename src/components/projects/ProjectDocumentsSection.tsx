@@ -18,6 +18,7 @@ interface ProjectDocumentsSectionProps {
   planoNome: string | null;
   planoUploadedAt: string | null;
   onUpdate: () => void;
+  readOnly?: boolean;
 }
 
 export function ProjectDocumentsSection({
@@ -29,6 +30,7 @@ export function ProjectDocumentsSection({
   planoNome,
   planoUploadedAt,
   onUpdate,
+  readOnly = false,
 }: ProjectDocumentsSectionProps) {
   const [uploadingContrato, setUploadingContrato] = useState(false);
   const [uploadingPlano, setUploadingPlano] = useState(false);
@@ -108,17 +110,19 @@ export function ProjectDocumentsSection({
     <div className="border rounded-lg p-4 space-y-3">
       <div className="flex items-center justify-between">
         <h4 className="font-medium text-sm">{label}</h4>
-        <input
-          ref={inputRef}
-          type="file"
-          accept=".pdf"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) handleUpload(file, docType);
-            e.target.value = '';
-          }}
-        />
+        {!readOnly && (
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".pdf"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleUpload(file, docType);
+              e.target.value = '';
+            }}
+          />
+        )}
       </div>
 
       {url && nome ? (
@@ -138,30 +142,34 @@ export function ProjectDocumentsSection({
               <Eye className="h-4 w-4 mr-1" />
               Visualizar
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => inputRef.current?.click()}
-              disabled={uploading}
-            >
-              {uploading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Replace className="h-4 w-4 mr-1" />}
-              Substituir
-            </Button>
+            {!readOnly && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => inputRef.current?.click()}
+                disabled={uploading}
+              >
+                {uploading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Replace className="h-4 w-4 mr-1" />}
+                Substituir
+              </Button>
+            )}
           </div>
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center py-4 text-center">
           <FileText className="h-8 w-8 text-muted-foreground/40 mb-2" />
           <p className="text-sm text-muted-foreground mb-2">Nenhum arquivo enviado</p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => inputRef.current?.click()}
-            disabled={uploading}
-          >
-            {uploading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
-            Enviar PDF
-          </Button>
+          {!readOnly && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => inputRef.current?.click()}
+              disabled={uploading}
+            >
+              {uploading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
+              Enviar PDF
+            </Button>
+          )}
         </div>
       )}
     </div>
