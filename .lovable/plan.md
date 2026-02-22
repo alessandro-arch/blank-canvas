@@ -1,73 +1,52 @@
 
 
-# Selo de Verificada + Alerta de Rejeicao + E-mail
+## Correcao do Template de E-mail de Convite
 
-## Visao Geral
+### Problema Raiz
 
-Tres melhorias no fluxo de instituicoes:
+A variavel `APP_URL` (ou o header `origin`/`referer` usado como fallback) esta sendo resolvida **sem o protocolo `https://`**. Isso faz com que o `href` do botao fique como `bolsago.innovago.app/convite?token=...` em vez de `https://bolsago.innovago.app/convite?token=...`. Clientes de e-mail interpretam links sem protocolo como texto puro entre colchetes, nao como link clicavel.
 
-1. **Selo "Verificada"** nas instituicoes aprovadas (InstitutionCombobox e MyAccount)
-2. **Alerta na pagina Minha Conta** quando a instituicao do usuario foi rejeitada
-3. **E-mail ao usuario** quando sua instituicao e rejeitada pelo admin
+### Alteracoes no arquivo `supabase/functions/send-org-invite-email/index.ts`
 
----
+#### 1. Garantir protocolo HTTPS na URL (Problema 1)
 
-## 1. Selo de Verificada no InstitutionCombobox
+Apos resolver `appUrl` (linha ~129), adicionar normalizacao para garantir que sempre comece com `https://`:
 
-No componente `InstitutionCombobox`, ao exibir uma instituicao aprovada, mostrar um badge verde com icone de verificado:
+```text
+// Remove trailing slash and ensure https://
+appUrl = appUrl.replace(/\/+$/, '');
+if (!/^https?:\/\//i.test(appUrl)) {
+  appUrl = 'https://' + appUrl;
+}
+```
 
-- Status `approved` -> Badge verde "Verificada" com icone CheckCircle
-- Status `pending` -> Badge amarelo "Pendente" (ja existe)
-- Status `rejected` -> Badge vermelho "Rejeitada"
+#### 2. Adicionar link de fallback abaixo do botao (Problema 1 - seguranca extra)
 
-Arquivo: `src/components/my-account/InstitutionCombobox.tsx`
-- Linha ~372: adicionar badges para `approved` e `rejected` alem do `pending` existente
-- Na lista de resultados do combobox (~linha 397): exibir icone de verificado ao lado de instituicoes aprovadas
+Apos a tabela do botao (linha ~183), inserir paragrafo com link em texto puro:
 
-## 2. Alerta na pagina Minha Conta
+```text
+<p style="margin:16px 0 0;font-size:12px;color:#888888;text-align:center;">
+  Se o botao nao funcionar, copie e cole este link no navegador:<br/>
+  <a href="${inviteLink}" style="color:#003366;word-break:break-all;font-size:11px;">${inviteLink}</a>
+</p>
+```
 
-Na pagina `MyAccount.tsx`, apos carregar os dados do perfil, verificar o status da instituicao do usuario. Se `rejected`, exibir um banner de alerta vermelho acima dos cards, com:
-- Icone de alerta
-- Texto: "Sua instituicao/empresa foi rejeitada. Motivo: [motivo]"
-- Botao para cadastrar novamente
+#### 3. Revisar contraste de textos (Problema 2)
 
-Para isso, buscar tambem `rejection_reason` da tabela `institutions` quando carregar a instituicao do usuario.
+O template atual ja usa `color:#ffffff` nos textos sobre fundo azul. Nenhuma alteracao necessaria neste ponto -- o problema visual reportado decorre do link quebrado, nao de cores.
 
-Arquivo: `src/pages/MyAccount.tsx`
-- Adicionar estado para `rejectionReason`
-- Na query de instituicao (linha ~60), incluir `rejection_reason` no select
-- Renderizar banner de alerta quando `institutionData.status === "rejected"`
+#### 4. CSS inline (Problema 3)
 
-## 3. E-mail de rejeicao ao usuario
+O template atual ja usa 100% CSS inline e layout baseado em tabelas. Nenhuma alteracao necessaria.
 
-Quando o admin rejeita uma instituicao em `InstitutionsManagement.tsx`, enviar e-mail ao usuario que a cadastrou (campo `submitted_by`).
+### Resumo tecnico
 
-Fluxo:
-1. No `handleReject`, apos atualizar o status, buscar o e-mail e nome do usuario via `submitted_by`
-2. Criar uma notificacao na tabela `notifications` para o usuario
-3. Chamar a edge function `send-system-email` para enviar e-mail com motivo da rejeicao
+| Item | Acao |
+|------|------|
+| Protocolo HTTPS | Normalizar `appUrl` para sempre incluir `https://` |
+| Fallback textual | Adicionar link em texto puro abaixo do botao |
+| Contraste cores | Ja correto, sem alteracao |
+| CSS inline | Ja correto, sem alteracao |
 
-Arquivo: `src/pages/InstitutionsManagement.tsx`
-- Apos o update bem-sucedido no `handleReject`:
-  - Buscar perfil e e-mail do usuario (`submitted_by`)
-  - Inserir registro na tabela `notifications`
-  - Invocar `send-system-email` para envio de e-mail
-
-Tambem: na aprovacao (`handleApprove`), criar notificacao informando que foi aprovada.
-
-## 4. Notificacao in-app
-
-Inserir na tabela `notifications` tanto na aprovacao quanto na rejeicao para que o sino de notificacoes mostre o evento ao usuario.
-
----
-
-## Arquivos Modificados
-
-| Arquivo | Alteracao |
-|---|---|
-| `src/components/my-account/InstitutionCombobox.tsx` | Adicionar badges de "Verificada" e "Rejeitada" |
-| `src/pages/MyAccount.tsx` | Banner de alerta para instituicao rejeitada |
-| `src/pages/InstitutionsManagement.tsx` | Enviar notificacao + e-mail na aprovacao e rejeicao |
-
-Nenhuma migracao SQL necessaria (tabela `notifications` ja existe).
+Apos salvar, a Edge Function sera deployada automaticamente.
 
