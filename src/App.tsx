@@ -275,7 +275,7 @@ const App = () => (
               } />
               <Route path="/auditor/pagamentos" element={
                 <AuditorProtectedRoute>
-                  <PaymentsReports />
+                  <FinancialManagement />
                 </AuditorProtectedRoute>
               } />
               <Route path="/auditor/gestao-financeira" element={
