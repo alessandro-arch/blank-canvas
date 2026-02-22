@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    // Check if already fully imported (skip if appending)
+    // Parse request body once
     const body = await req.json().catch(() => ({}));
     const skipCheck = body.skip_check === true;
 
@@ -74,7 +74,6 @@ Deno.serve(async (req) => {
     }
 
     // Accept CSV either from URL or inline
-    const body = await req.json().catch(() => ({}));
     let csvText = "";
 
     if (body.csv_data) {
