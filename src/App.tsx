@@ -283,6 +283,11 @@ const App = () => (
                   <FinancialManagement />
                 </AuditorProtectedRoute>
               } />
+              <Route path="/auditor/operacao" element={
+                <AuditorProtectedRoute>
+                  <OperacaoBolsas />
+                </AuditorProtectedRoute>
+              } />
 
               {/* Legacy routes - redirect to new paths */}
               <Route path="/painel-gestor" element={<Navigate to="/admin/dashboard" replace />} />

@@ -149,7 +149,7 @@ const OperacaoBolsas = () => {
 
               {/* Tabs */}
               <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-                <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
+                <TabsList className={cn("grid w-full lg:w-auto lg:inline-grid", isAuditor ? "grid-cols-4" : "grid-cols-5")}>
                   <TabsTrigger value="relatorios" className="gap-2">
                     <FileText className="h-4 w-4" />
                     <span className="hidden sm:inline">Relatórios</span>
