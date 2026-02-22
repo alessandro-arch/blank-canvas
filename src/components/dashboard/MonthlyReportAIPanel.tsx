@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sparkles, Loader2, Copy, Check, Maximize2, AlertTriangle, ChevronDown, ChevronUp, ClipboardPaste } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +39,7 @@ interface AIParecerOutput {
 interface MonthlyReportAIPanelProps {
   reportId: string;
   projectId?: string;
+  reportStatus?: string;
   onInsertToFeedback?: (text: string) => void;
 }
 
@@ -123,13 +124,42 @@ function buildPlainTextParecer(data: AIParecerOutput): string {
   return lines.join("\n");
 }
 
-export function MonthlyReportAIPanel({ reportId, onInsertToFeedback }: MonthlyReportAIPanelProps) {
+export function MonthlyReportAIPanel({ reportId, reportStatus, onInsertToFeedback }: MonthlyReportAIPanelProps) {
   const [loading, setLoading] = useState(false);
+  const [loadingSaved, setLoadingSaved] = useState(false);
   const [result, setResult] = useState<AIParecerOutput | null>(null);
+  const [savedResult, setSavedResult] = useState<AIParecerOutput | null>(null);
   const [hasWorkPlan, setHasWorkPlan] = useState<boolean | null>(null);
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+
+  // Load saved parecer from monthly_report_ai_outputs on mount
+  useEffect(() => {
+    const fetchSaved = async () => {
+      setLoadingSaved(true);
+      try {
+        const { data } = await supabase
+          .from("monthly_report_ai_outputs")
+          .select("payload")
+          .eq("report_id", reportId)
+          .maybeSingle();
+        if (data?.payload) {
+          const saved = data.payload as unknown as AIParecerOutput;
+          setSavedResult(saved);
+          // Auto-display saved parecer for decided reports
+          if (reportStatus === "approved" || reportStatus === "returned") {
+            setResult(saved);
+          }
+        }
+      } catch {
+        // ignore
+      } finally {
+        setLoadingSaved(false);
+      }
+    };
+    fetchSaved();
+  }, [reportId, reportStatus]);
 
   const handleGenerate = async () => {
     setLoading(true);
@@ -293,16 +323,37 @@ export function MonthlyReportAIPanel({ reportId, onInsertToFeedback }: MonthlyRe
         </CardHeader>
         {!collapsed && (
           <CardContent className="space-y-3">
-            {!result && (
-              <Button
-                onClick={handleGenerate}
-                disabled={loading}
-                className="w-full gap-2"
-                size="sm"
-              >
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                {loading ? "Gerando parecer completo..." : "Gerar Parecer Completo"}
-              </Button>
+            {!result && !loadingSaved && (
+              <>
+                {savedResult ? (
+                  <Button
+                    onClick={() => setResult(savedResult)}
+                    className="w-full gap-2"
+                    size="sm"
+                    variant="outline"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    Ver Parecer Salvo
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleGenerate}
+                    disabled={loading}
+                    className="w-full gap-2"
+                    size="sm"
+                  >
+                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    {loading ? "Gerando parecer completo..." : "Gerar Parecer Completo"}
+                  </Button>
+                )}
+              </>
+            )}
+
+            {loadingSaved && !result && (
+              <div className="space-y-2">
+                <div className="h-4 w-3/4 rounded bg-muted animate-pulse" />
+                <div className="h-4 w-1/2 rounded bg-muted animate-pulse" />
+              </div>
             )}
 
             {result && (
