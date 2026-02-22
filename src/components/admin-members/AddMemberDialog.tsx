@@ -4,15 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Copy, Check, AlertTriangle } from "lucide-react";
+import { Copy, Check, AlertTriangle, Building2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { useOrganizationContext } from "@/contexts/OrganizationContext";
 import type { OrgInvite } from "@/types/admin-members";
 
 interface AddMemberDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (email: string, role: string, expiresDays: number) => Promise<{ invite_id: string; token: string } | null>;
+  onSubmit: (email: string, role: string, expiresDays: number, organizationId?: string) => Promise<{ invite_id: string; token: string } | null>;
   existingInvites?: OrgInvite[];
 }
 
@@ -20,10 +21,19 @@ export function AddMemberDialog({ open, onOpenChange, onSubmit, existingInvites 
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("manager");
   const [expiresDays, setExpiresDays] = useState("7");
+  const [selectedOrgId, setSelectedOrgId] = useState("");
   const [loading, setLoading] = useState(false);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
+  const { organizations, currentOrganization } = useOrganizationContext();
+
+  // Set default org when dialog opens
+  useEffect(() => {
+    if (open && currentOrganization && !selectedOrgId) {
+      setSelectedOrgId(currentOrganization.id);
+    }
+  }, [open, currentOrganization, selectedOrgId]);
 
   const trimmedEmail = email.trim().toLowerCase();
 
@@ -44,7 +54,7 @@ export function AddMemberDialog({ open, onOpenChange, onSubmit, existingInvites 
   const handleSubmit = async () => {
     if (!trimmedEmail) return;
     setLoading(true);
-    const result = await onSubmit(trimmedEmail, role, parseInt(expiresDays) || 7);
+    const result = await onSubmit(trimmedEmail, role, parseInt(expiresDays) || 7, selectedOrgId || undefined);
     if (result?.token) {
       setInviteToken(result.token);
     }
@@ -64,6 +74,7 @@ export function AddMemberDialog({ open, onOpenChange, onSubmit, existingInvites 
       setEmail("");
       setRole("manager");
       setExpiresDays("7");
+      setSelectedOrgId(currentOrganization?.id || "");
       setInviteToken(null);
       setCopied(false);
     }
@@ -96,6 +107,27 @@ export function AddMemberDialog({ open, onOpenChange, onSubmit, existingInvites 
           </div>
         ) : (
           <div className="space-y-4">
+            {organizations.length > 1 && (
+              <div className="space-y-2">
+                <Label>Organização</Label>
+                <Select value={selectedOrgId} onValueChange={setSelectedOrgId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecionar organização" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {organizations.map((org) => (
+                      <SelectItem key={org.id} value={org.id}>
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-3 w-3" />
+                          {org.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="invite-email">E-mail *</Label>
               <Input

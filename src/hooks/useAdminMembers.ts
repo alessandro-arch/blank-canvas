@@ -105,10 +105,11 @@ export function useAdminMembers() {
     return true;
   };
 
-  const createInvite = async (email: string, role: string, expiresDays: number = 7) => {
-    if (!orgId) return null;
+  const createInvite = async (email: string, role: string, expiresDays: number = 7, organizationId?: string) => {
+    const targetOrgId = organizationId || orgId;
+    if (!targetOrgId) return null;
     const { data, error } = await supabase.rpc("create_org_invite" as any, {
-      p_organization_id: orgId,
+      p_organization_id: targetOrgId,
       p_email: email,
       p_role: role,
       p_expires_days: expiresDays,
