@@ -1,68 +1,105 @@
 
 
-# Corrigir acesso do Auditor a Relatorios e PDFs
+# Corrigir Parecer IA e acesso a campos de relatorio para Auditor
 
-## Problema identificado
+## Problema
+O auditor consegue ver a lista de relatorios mensais, mas:
+1. **Parecer da IA nao aparece** - a tabela `monthly_report_ai_outputs` so tem politicas SELECT para admin/manager e bolsista. O auditor nao consegue ler os dados, e o painel mostra "Nenhum parecer disponivel".
+2. **Campos do relatorio nao carregam** - a tabela `monthly_report_fields` tambem nao tem politica SELECT para auditor, impedindo a visualizacao dos dados preenchidos pelo bolsista.
 
-Tres problemas impedem o auditor de ver dados e exportar PDFs:
+## Alteracoes
 
-1. **Edge functions bloqueiam auditor**: As funcoes `generate-executive-report-pdf`, `generate-scholarship-pdf` e `generate-thematic-project-pdf` verificam o papel do usuario e so permitem `admin` e `manager`. Auditores recebem erro 403 "Acesso restrito a gestores e administradores".
-
-2. **Tabela `pdf_logs` sem politica RLS para auditor**: A pagina "Relatorios" (`PdfReports`) consulta a tabela `pdf_logs`, que so tem politicas SELECT para admin, manager e usuario proprio. Auditor nao consegue ver nenhum registro.
-
-3. **Rota `/auditor/pagamentos` aponta para pagina errada**: O link "Pagamentos" na sidebar do auditor leva a `PaymentsReports`, que e a pagina do **bolsista** (mostra parcelas individuais). O auditor deveria ver a `FinancialManagement` (visao gerencial) ou acessar pagamentos pela aba dentro de Operacao de Bolsas.
-
-## Alteracoes planejadas
-
-### 1. Edge functions (3 arquivos)
-Adicionar `"auditor"` na lista de papeis permitidos em cada funcao:
-
-- `supabase/functions/generate-executive-report-pdf/index.ts`
-- `supabase/functions/generate-scholarship-pdf/index.ts`
-- `supabase/functions/generate-thematic-project-pdf/index.ts`
-
-Alterar de:
-```text
-if (!userRoles.includes("admin") && !userRoles.includes("manager"))
-```
-Para:
-```text
-if (!userRoles.includes("admin") && !userRoles.includes("manager") && !userRoles.includes("auditor"))
-```
-
-### 2. Politica RLS na tabela `pdf_logs`
-Criar nova politica SELECT para auditor, escopada pela organizacao:
+### 1. Politica RLS em `monthly_report_ai_outputs`
+Criar politica SELECT para auditor, escopada pela organizacao via `monthly_reports`:
 
 ```text
-CREATE POLICY "Auditor can view org pdf_logs"
-ON public.pdf_logs FOR SELECT
+CREATE POLICY "Auditor can view org ai_outputs"
+ON public.monthly_report_ai_outputs FOR SELECT
+TO authenticated
 USING (
   EXISTS (
-    SELECT 1 FROM organization_members om
-    WHERE om.user_id = auth.uid()
-    AND om.role = 'auditor'
-    AND om.is_active = true
-    AND (
-      pdf_logs.organization_id IS NULL
-      OR om.organization_id = pdf_logs.organization_id
-    )
+    SELECT 1
+    FROM monthly_reports mr
+    JOIN organization_members om
+      ON om.organization_id = mr.organization_id
+    WHERE mr.id = monthly_report_ai_outputs.report_id
+      AND om.user_id = auth.uid()
+      AND om.role = 'auditor'
+      AND om.is_active = true
   )
 );
 ```
 
-### 3. Rota `/auditor/pagamentos` (src/App.tsx)
-Trocar o componente de `PaymentsReports` para `FinancialManagement`, que e a visao gerencial de pagamentos (mesma usada por admins/managers).
+### 2. Politica RLS em `monthly_report_fields`
+Criar politica SELECT para auditor:
 
-### 4. Deploy das edge functions
-Redeployar as 3 edge functions atualizadas.
+```text
+CREATE POLICY "Auditor can view org report_fields"
+ON public.monthly_report_fields FOR SELECT
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1
+    FROM monthly_reports mr
+    JOIN organization_members om
+      ON om.organization_id = mr.organization_id
+    WHERE mr.id = monthly_report_fields.report_id
+      AND om.user_id = auth.uid()
+      AND om.role = 'auditor'
+      AND om.is_active = true
+  )
+);
+```
 
-## Resumo dos arquivos alterados
+### 3. Politica RLS em `monthly_report_documents` (para consistencia)
+Adicionar SELECT para auditor, caso algum fluxo futuro consulte esta tabela no client-side:
 
-| Arquivo | Alteracao |
-|---|---|
-| `supabase/functions/generate-executive-report-pdf/index.ts` | Adicionar auditor nos papeis permitidos |
-| `supabase/functions/generate-scholarship-pdf/index.ts` | Adicionar auditor nos papeis permitidos |
-| `supabase/functions/generate-thematic-project-pdf/index.ts` | Adicionar auditor nos papeis permitidos |
-| `src/App.tsx` | Trocar PaymentsReports por FinancialManagement na rota do auditor |
-| Migracao SQL | Politica RLS para auditor na tabela pdf_logs |
+```text
+CREATE POLICY "Auditor can view org report_documents"
+ON public.monthly_report_documents FOR SELECT
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1
+    FROM monthly_reports mr
+    JOIN organization_members om
+      ON om.organization_id = mr.organization_id
+    WHERE mr.id = monthly_report_documents.report_id
+      AND om.user_id = auth.uid()
+      AND om.role = 'auditor'
+      AND om.is_active = true
+  )
+);
+```
 
+### 4. Politica RLS em `monthly_report_versions` (para consistencia)
+Adicionar SELECT para auditor:
+
+```text
+CREATE POLICY "Auditor can view org report_versions"
+ON public.monthly_report_versions FOR SELECT
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1
+    FROM monthly_reports mr
+    JOIN organization_members om
+      ON om.organization_id = mr.organization_id
+    WHERE mr.id = monthly_report_versions.report_id
+      AND om.user_id = auth.uid()
+      AND om.role = 'auditor'
+      AND om.is_active = true
+  )
+);
+```
+
+## Resumo
+
+| Recurso | Tabela | Alteracao |
+|---|---|---|
+| Parecer IA | `monthly_report_ai_outputs` | Nova politica SELECT para auditor |
+| Campos do relatorio | `monthly_report_fields` | Nova politica SELECT para auditor |
+| Documentos PDF | `monthly_report_documents` | Nova politica SELECT para auditor |
+| Versoes | `monthly_report_versions` | Nova politica SELECT para auditor |
+
+Todas as politicas sao PERMISSIVE, somente leitura (SELECT), e escopadas pela organizacao do auditor.
