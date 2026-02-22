@@ -56,37 +56,46 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    // Check if already imported
-    const { count } = await supabase
-      .from("institutions_mec")
-      .select("*", { count: "exact", head: true });
+    // Check if already fully imported (skip if appending)
+    const body = await req.json().catch(() => ({}));
+    const skipCheck = body.skip_check === true;
 
-    if (count && count > 0) {
-      return new Response(
-        JSON.stringify({ message: `Already imported ${count} records` }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (!skipCheck) {
+      const { count } = await supabase
+        .from("institutions_mec")
+        .select("*", { count: "exact", head: true });
+
+      if (count && count > 4000) {
+        return new Response(
+          JSON.stringify({ message: `Already imported ${count} records` }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
-    // Fetch CSV from public URL
+    // Accept CSV either from URL or inline
     const body = await req.json().catch(() => ({}));
-    const csvUrl = body.csv_url;
-    if (!csvUrl) {
+    let csvText = "";
+
+    if (body.csv_data) {
+      csvText = body.csv_data;
+    } else if (body.csv_url) {
+      const csvResponse = await fetch(body.csv_url);
+      if (!csvResponse.ok) {
+        return new Response(
+          JSON.stringify({ error: `Failed to fetch CSV: ${csvResponse.status}` }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      csvText = await csvResponse.text();
+    } else {
       return new Response(
-        JSON.stringify({ error: "csv_url is required in body" }),
+        JSON.stringify({ error: "csv_url or csv_data is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const csvResponse = await fetch(csvUrl);
-    if (!csvResponse.ok) {
-      return new Response(
-        JSON.stringify({ error: `Failed to fetch CSV: ${csvResponse.status}` }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const csvText = (await csvResponse.text()).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    csvText = csvText.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
     const lines = csvText.split("\n").filter((l) => l.trim());
     const header = parseCSVLine(lines[0]);
 
