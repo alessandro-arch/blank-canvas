@@ -49,6 +49,7 @@ const scholarNavigation: NavItem[] = [
 
 const auditorNavigation: NavItem[] = [
   { name: "Painel do Auditor", icon: LayoutDashboard, href: "/auditor/dashboard" },
+  { name: "Operação de Bolsas", icon: Users, href: "/auditor/operacao" },
   { name: "Projetos Temáticos", icon: FolderOpen, href: "/auditor/projetos-tematicos" },
   { name: "Relatórios", icon: FileText, href: "/auditor/relatorios" },
   { name: "Pagamentos", icon: Receipt, href: "/auditor/pagamentos" },
