@@ -1,78 +1,173 @@
 
 
-# UX Improvements: AI Panel Text Readability, Resize, and Fullscreen
+# Modulo "Plano de Trabalho do Bolsista"
 
-## Summary
-Enhance the AI suggestions panel in `MonthlyReportAIPanel.tsx` with larger fonts, vertically resizable text areas, and an improved fullscreen dialog. The parent dialog in `MonthlyReportsReviewManagement.tsx` is already correctly structured (flex-col, scrollable body, sticky footer) and needs no changes.
+## Resumo
 
-## Changes
+Adicionar o modulo "Plano de Trabalho" ao BolsaGO como nova aba na tela "Meus Documentos" do bolsista, com upload pelo gestor/admin na area de subprojetos, e integracao com a IA na avaliacao de relatorios mensais.
 
-### File: `src/components/dashboard/MonthlyReportAIPanel.tsx`
+## Fase 1 -- Banco de Dados (Migracao SQL)
 
-#### A. Make AI text area resizable with larger font (inline results)
+### Tabela `work_plans`
 
-Replace the current `ScrollArea` + inner div pattern with a plain `div` that supports vertical resize:
+```text
+Colunas:
+- id (uuid PK)
+- organization_id (uuid FK organizations, NOT NULL)
+- project_id (uuid FK projects, NOT NULL)  -- subprojeto
+- scholar_user_id (uuid NOT NULL)
+- uploaded_by (uuid NOT NULL)
+- uploaded_at (timestamptz DEFAULT now())
+- status (text DEFAULT 'active', CHECK IN ('active','archived'))
+- file_name (text NOT NULL)
+- file_size (int8 NULL)
+- pdf_path (text NOT NULL)
+- checksum_sha256 (text NOT NULL)
+- extracted_json (jsonb NULL)
+- extracted_text (text NULL)
+- created_at (timestamptz DEFAULT now())
+- updated_at (timestamptz DEFAULT now())
 
-**Current (line 154-157):**
-```tsx
-<ScrollArea className={maxH}>
-  <div className="text-xs ... p-3 bg-background rounded border">
-    {text}
-  </div>
-</ScrollArea>
+Indices:
+- (organization_id, project_id)
+- (scholar_user_id)
+- Unique parcial: 1 registro active por (project_id, scholar_user_id)
 ```
 
-**New:**
-```tsx
-<div
-  className="resize-y overflow-auto min-h-[180px] max-h-[480px] rounded-md border
-             bg-background p-4 text-[15px] leading-relaxed
-             whitespace-pre-wrap break-words text-foreground/80"
-  style={{ resize: 'vertical' }}
->
-  {text}
-</div>
+### Bucket de Storage
+
+- Criar bucket privado `workplans` (is_public = false)
+- Politicas RLS de storage: leitura para bolsista (owner) e gestores/admins da org; escrita apenas gestor/admin
+
+### Politicas RLS na tabela `work_plans`
+
+- SELECT bolsista: `auth.uid() = scholar_user_id`
+- SELECT gestor/admin: via `has_role` + `get_user_organizations()`
+- INSERT/UPDATE/DELETE: apenas gestor/admin com acesso a org
+
+### Trigger
+
+- `update_updated_at_column` na tabela `work_plans`
+
+## Fase 2 -- Edge Function: `generate-workplan-signed-url`
+
+Nova Edge Function que:
+1. Recebe `{ workplan_id }` via POST
+2. Valida JWT e verifica role do usuario (bolsista so acessa o proprio; gestor/admin acessa da org)
+3. Busca `pdf_path` na tabela `work_plans`
+4. Gera signed URL do bucket `workplans` com TTL de 300s
+5. Retorna `{ signedUrl }`
+
+Arquivo: `supabase/functions/generate-workplan-signed-url/index.ts`
+
+Configuracao em `supabase/config.toml`:
+```text
+[functions.generate-workplan-signed-url]
+verify_jwt = false
 ```
 
-Key differences:
-- Font bumped from `text-xs` (12px) to `text-[15px]` (15px)
-- `leading-relaxed` for comfortable line-height (1.625)
-- `resize-y` + inline `style={{ resize: 'vertical' }}` for vertical resizing
-- `min-h-[180px]` / `max-h-[480px]` to keep it bounded
-- `overflow-auto` for internal scroll
-- Removes `ScrollArea` wrapper (unnecessary with native overflow)
+## Fase 3 -- Frontend: Aba "Plano de Trabalho" (Portal do Bolsista)
 
-#### B. Improve fullscreen dialog text
+### 3.1 Hook `useWorkPlans`
 
-**Current (line 200):**
-```tsx
-<div className="text-sm sm:text-xs ... p-4 ...">
-```
+Novo arquivo: `src/hooks/useWorkPlans.ts`
+- Busca `work_plans` filtrado por `scholar_user_id = auth.uid()`
+- Retorna lista ordenada por `uploaded_at DESC`
+- Funcoes para obter signed URL via edge function
 
-**New:**
-```tsx
-<div className="text-base leading-relaxed whitespace-pre-wrap break-words
-               text-foreground/80 p-6 bg-muted/50 rounded border min-h-[200px]">
-```
+### 3.2 Componente `WorkPlanTab`
 
-Key differences:
-- Font changed from `text-sm sm:text-xs` to `text-base` (16px) everywhere
-- Padding increased to `p-6`
-- Consistent `leading-relaxed`
+Novo arquivo: `src/components/scholar/documents/WorkPlanTab.tsx`
+- Segue o mesmo padrao visual do `GrantTermTab`
+- Exibe lista de planos (ativos e arquivados)
+- Metadados: nome, tamanho, data de envio, status (badge), "Enviado por"
+- Botoes "Visualizar" (abre `PdfViewerDialog`) e "Baixar"
+- Mensagem informativa: "Este documento esta disponivel para consulta a qualquer momento..."
+- Suporte a `searchQuery` (filtro por nome)
 
-#### C. Slightly enlarge action button labels for better touch targets
+### 3.3 Atualizar `ScholarDocuments.tsx`
 
-Bump the inline result action buttons from `h-6` to `h-7` and icon sizes from `h-3 w-3` to `h-3.5 w-3.5` for better accessibility.
+- Importar `WorkPlanTab`
+- Adicionar `TabsTrigger` "Plano de Trabalho" na barra de tabs
+- Adicionar `TabsContent` correspondente
 
-## What stays the same
+## Fase 4 -- Frontend: Upload pelo Gestor/Admin
 
-- The parent dialog (`MonthlyReportsReviewManagement.tsx` line 735) already has the correct flex-col layout with pinned header/footer and scrollable body -- no changes needed.
-- The fullscreen dialog structure (flex-col, shrink-0 header/footer, scrollable body) stays the same.
-- All four analysis types (summary, risks, indicators, opinion) get the same improvements.
-- All existing functionality (copy, insert, expand, analyze) is preserved.
+### 4.1 Componente `UploadWorkPlanDialog`
 
-## Technical notes
+Novo arquivo: `src/components/scholars/UploadWorkPlanDialog.tsx`
+- Segue padrao do `UploadGrantTermDialog`
+- Aceita apenas PDF (max 10MB)
+- Campos: arquivo PDF + formulario opcional de dados estruturados (objetivo geral, objetivos especificos, atividades, cronograma 1-24 meses)
+- Ao salvar:
+  - Calcula checksum SHA-256 do arquivo (via Web Crypto API)
+  - Faz upload ao bucket `workplans` no path `org/{org_id}/subproject/{project_id}/{uuid}.pdf`
+  - Arquiva plano anterior (UPDATE status='archived')
+  - Insere novo registro com status='active'
+  - Salva dados estruturados em `extracted_json` se preenchidos
+- Registra audit log
 
-- `resize-y` is a standard CSS property supported in all modern browsers. On mobile, it may not show a drag handle, but the content remains scrollable. The `style={{ resize: 'vertical' }}` is added as a fallback.
-- Removing `ScrollArea` (Radix) in favor of native `overflow-auto` simplifies the DOM and makes `resize` work correctly (Radix ScrollArea wraps content in a viewport div that interferes with CSS resize).
+### 4.2 Integrar na area de subprojetos
+
+- Em `ProjectDetailsDialog.tsx` ou `SubprojectsTable.tsx`, adicionar secao/botao "Plano de Trabalho" com:
+  - Indicador se existe plano ativo
+  - Botao "Enviar/Substituir Plano de Trabalho" que abre `UploadWorkPlanDialog`
+  - Botao "Visualizar" plano ativo (se existir)
+
+## Fase 5 -- Integracao com IA (Avaliacao de Relatorio Mensal)
+
+### 5.1 Atualizar `MonthlyReportAIPanel.tsx`
+
+- Adicionar botao/link "Ver Plano de Trabalho" no header do painel
+- Ao clicar, busca work_plan ativo do subprojeto e abre no `PdfViewerDialog`
+
+### 5.2 Atualizar Edge Function `ai-analyze-report`
+
+- Ao montar o contexto para a IA, buscar `work_plans` ativo para o `project_id` do relatorio
+- Incluir `extracted_text` e/ou `extracted_json` no prompt
+- Enriquecer os prompts de cada tipo de analise:
+  - **summary**: mencionar aderencia ao plano
+  - **risks**: comparar atividades realizadas vs. cronograma previsto
+  - **indicators**: aderencia ao plano (alta/media/baixa), lacunas, itens faltantes
+  - **opinion**: incluir recomendacoes baseadas no plano, sugestoes de comprovacao
+- Adicionar ao contexto: objetivo geral, objetivos especificos, atividades previstas, e destaque do mes correspondente no cronograma (mes 1-24)
+
+### 5.3 Novo botao "Aderencia ao Plano" (opcional)
+
+- Adicionar 5o tipo de analise `adherence` ao painel de IA
+- Prompt especifico que cruza relatorio x plano e retorna: aderencia (alta/media/baixa), lacunas, riscos, sugestoes de evidencias
+
+## Fase 6 -- Atualizar `MonthlyReportsReviewManagement.tsx`
+
+- No modal de avaliacao, adicionar botao "Ver Plano de Trabalho" proximo ao painel de IA
+- Busca o work_plan ativo do subprojeto do relatorio em analise
+- Abre em nova aba (via signed URL) para consulta simultanea
+
+## Arquivos a Criar
+
+| Arquivo | Descricao |
+|---|---|
+| `src/hooks/useWorkPlans.ts` | Hook para buscar planos de trabalho |
+| `src/components/scholar/documents/WorkPlanTab.tsx` | Aba do bolsista |
+| `src/components/scholars/UploadWorkPlanDialog.tsx` | Dialog de upload (gestor) |
+| `supabase/functions/generate-workplan-signed-url/index.ts` | Edge Function |
+
+## Arquivos a Editar
+
+| Arquivo | Mudanca |
+|---|---|
+| `src/pages/ScholarDocuments.tsx` | Adicionar tab "Plano de Trabalho" |
+| `src/components/projects/ProjectDetailsDialog.tsx` | Secao "Plano de Trabalho" na aba Acoes |
+| `src/components/dashboard/MonthlyReportAIPanel.tsx` | Botao "Ver Plano de Trabalho" |
+| `src/components/dashboard/MonthlyReportsReviewManagement.tsx` | Botao "Ver Plano" no modal |
+| `supabase/functions/ai-analyze-report/index.ts` | Incluir work_plan no contexto da IA |
+| `supabase/config.toml` | Registrar nova edge function |
+
+## Notas Tecnicas
+
+- O checksum SHA-256 sera calculado no navegador via `crypto.subtle.digest('SHA-256', arrayBuffer)` antes do upload
+- O bucket `workplans` e privado; todo acesso e via signed URL com TTL curto (300s) gerada pela edge function
+- O partial unique index garante que so existe 1 plano ativo por combinacao (project_id, scholar_user_id)
+- A extracao de texto do PDF e manual (formulario do gestor); nao sera implementada extracao automatica nesta versao
+- O aviso "Gerado por IA -- requer validacao do gestor" permanece em todas as analises
 
