@@ -13,7 +13,7 @@ import { format, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   FileText, DollarSign, Users, Calendar,
-  BarChart3, Eye, FolderOpen, AlertTriangle,
+  BarChart3, Eye, FolderOpen, AlertTriangle, Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
@@ -219,9 +219,16 @@ const AuditorDashboard = () => {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <Eye className="h-5 w-5 text-primary" />
                   <Badge variant="outline" className="text-xs">Somente Leitura</Badge>
+                  <Badge className="bg-yellow-500 text-white text-xs border-0 hover:bg-yellow-600">Auditor</Badge>
+                  {currentOrganization?.name && (
+                    <Badge variant="outline" className="text-xs gap-1">
+                      <Building2 className="h-3 w-3" />
+                      {currentOrganization.name}
+                    </Badge>
+                  )}
                 </div>
                 <h1 className="text-2xl font-bold tracking-tight">Painel do Auditor</h1>
                 <p className="text-muted-foreground">

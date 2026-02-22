@@ -143,7 +143,7 @@ export function SidebarContent({ collapsed, onToggleCollapse, isMobile }: Sideba
               <span
                 className={cn(
                   "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold",
-                  hasManagerAccess ? "bg-primary text-primary-foreground" : isAuditor ? "bg-accent text-accent-foreground" : "bg-info text-white"
+                  hasManagerAccess ? "bg-primary text-primary-foreground" : isAuditor ? "bg-yellow-500 text-white" : "bg-info text-white"
                 )}
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80" />
