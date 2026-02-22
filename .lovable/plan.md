@@ -1,35 +1,26 @@
 
 
-# Melhorar cores do Painel do Auditor
+# Adicionar Operacao de Bolsas para o Auditor
 
 ## Problema
-O dashboard do auditor esta visualmente apagado/claro comparado ao painel do Admin. Faltam cores nos KPI cards, badges e icones. O pill "Auditor" deve ser amarelo.
+O auditor nao tem acesso a pagina "Operacao de Bolsas". A pagina ja oculta a aba "Dados Bancarios" para auditores, mas faltam a rota e o item no menu lateral.
 
 ## Alteracoes
 
-### 1. `src/pages/AuditorDashboard.tsx`
-
-**KPI Cards** - Adicionar fundo colorido sutil nos cards (como no Admin), com borda esquerda colorida mais visivel:
-- Cada card tera `bg-{color}/5` para dar um tom de fundo sutil
-- Borda esquerda com `border-l-4` (mais grossa) em vez de `border-l-3`
-
-**Badge "Somente Leitura"** - Trocar de `variant="outline"` (cinza claro) para um estilo com fundo amarelo sutil (`bg-yellow-100 text-yellow-800 border-yellow-300`)
-
-**Badge "Auditor"** - Ja esta amarelo (`bg-yellow-500`), manter
-
-**Badge da Organizacao** - Dar mais destaque com fundo primario sutil (`bg-primary/10 text-primary border-primary/30`)
-
-**Icone Eye** - Trocar de `text-primary` para `text-yellow-600` para alinhar com a identidade do auditor
-
-**Titulo e subtitulo** - Manter como esta (ja esta bom)
-
-**Grafico** - Usar cor amarela/amber (`hsl(45, 93%, 47%)`) nas barras em vez de primary (azul escuro), para diferenciar do admin e dar mais vida
+### 1. `src/App.tsx`
+Adicionar rota `/auditor/operacao` protegida por `AuditorProtectedRoute`, reutilizando o componente `OperacaoBolsas`.
 
 ### 2. `src/components/layout/SidebarContent.tsx`
-O pill "Auditor" na sidebar ja esta correto (`bg-yellow-500 text-white`). Nenhuma alteracao necessaria.
+Adicionar "Operacao de Bolsas" no array `auditorNavigation`, com icone `Users` e href `/auditor/operacao`, posicionado apos "Painel do Auditor".
 
-### Resumo dos arquivos alterados
+### 3. `src/pages/OperacaoBolsas.tsx`
+Ajustar o grid do TabsList para `grid-cols-4` quando o auditor estiver logado (ja que a aba de Dados Bancarios e ocultada, ficam apenas 4 abas em vez de 5).
+
+### Resumo
 
 | Arquivo | Alteracao |
 |---|---|
-| `src/pages/AuditorDashboard.tsx` | Cores mais vibrantes nos KPIs, badges, grafico e icones |
+| `src/App.tsx` | Nova rota `/auditor/operacao` |
+| `src/components/layout/SidebarContent.tsx` | Item "Operacao de Bolsas" no menu do auditor |
+| `src/pages/OperacaoBolsas.tsx` | Grid responsivo 4 ou 5 colunas conforme role |
+
