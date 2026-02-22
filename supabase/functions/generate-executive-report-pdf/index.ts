@@ -417,6 +417,20 @@ function hexToRgb(hex: string) {
   return rgb(r, g, b);
 }
 
+function sanitize(text: string): string {
+  return text
+    .replace(/[\u2713\u2714]/g, "OK")
+    .replace(/\u2716/g, "X")
+    .replace(/\u2022/g, "-")
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/\u2013/g, "-")
+    .replace(/\u2014/g, "--")
+    .replace(/\u2026/g, "...")
+    .replace(/\u00A0/g, " ")
+    .replace(/[^\x20-\x7E\xA0-\xFF]/g, "");
+}
+
 async function buildExecutivePdf(data: ExecutiveData): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -441,8 +455,9 @@ async function buildExecutivePdf(data: ExecutiveData): Promise<Uint8Array> {
   let y = H - M;
 
   const txt = (text: string, x: number, yy: number, size = 9, f = font, color = darkText) => {
+    const safe = sanitize(text);
     const maxChars = Math.floor((W - x - M) / (size * 0.48));
-    const t = text.length > maxChars ? text.substring(0, maxChars - 2) + "…" : text;
+    const t = safe.length > maxChars ? safe.substring(0, maxChars - 2) + "..." : safe;
     page.drawText(t, { x, y: yy, size, font: f, color });
   };
 
@@ -463,7 +478,7 @@ async function buildExecutivePdf(data: ExecutiveData): Promise<Uint8Array> {
     const wText = data.watermarkText || "";
     if (!wText) return;
     // Draw diagonal watermark text across page
-    page.drawText(wText, {
+    page.drawText(sanitize(wText), {
       x: W / 2 - wText.length * 6,
       y: H / 2,
       size: 48,
