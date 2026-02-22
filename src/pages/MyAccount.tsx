@@ -9,7 +9,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, User, Briefcase, Save, Loader2 } from "lucide-react";
+import { ArrowLeft, User, Briefcase, Save, Loader2, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useNavigate } from "react-router-dom";
 import { InstitutionCombobox } from "@/components/my-account/InstitutionCombobox";
 import { ImportMecButton } from "@/components/my-account/ImportMecButton";
@@ -35,6 +36,7 @@ export default function MyAccount() {
     uf: "",
     isCustom: false,
   });
+  const [rejectionReason, setRejectionReason] = useState("");
 
   useEffect(() => {
     if (!user) return;
@@ -59,7 +61,7 @@ export default function MyAccount() {
           if (instId) {
             const { data: inst } = await (supabase as any)
               .from("institutions")
-              .select("id, name, acronym, uf, status")
+              .select("id, name, acronym, uf, status, rejection_reason")
               .eq("id", instId)
               .single();
             if (inst) {
@@ -72,6 +74,9 @@ export default function MyAccount() {
                 status: inst.status,
                 isCustom: inst.status !== "approved",
               });
+              if (inst.status === "rejected" && inst.rejection_reason) {
+                setRejectionReason(inst.rejection_reason);
+              }
             }
           } else {
             setInstitutionData({
@@ -162,6 +167,18 @@ export default function MyAccount() {
               </div>
             </div>
             <ImportMecButton />
+
+            {/* Alerta de instituição rejeitada */}
+            {institutionData.status === "rejected" && (
+              <Alert variant="destructive" className="border-destructive/50 bg-destructive/10">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Instituição/Empresa rejeitada</AlertTitle>
+                <AlertDescription className="space-y-2">
+                  <p>Sua instituição ou empresa foi rejeitada pela administração.{rejectionReason && ` Motivo: ${rejectionReason}`}</p>
+                  <p className="text-xs">Você pode cadastrar uma nova instituição na seção "Informações Profissionais" abaixo.</p>
+                </AlertDescription>
+              </Alert>
+            )}
 
             {/* Informações Pessoais */}
             <Card>

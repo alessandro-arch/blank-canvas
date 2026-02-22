@@ -105,6 +105,18 @@ export default function InstitutionsManagement() {
         details: { name: inst.name, acronym: inst.acronym },
       } as any);
 
+      // Notify user who submitted
+      if (inst.submitted_by) {
+        await supabase.from("notifications").insert({
+          user_id: inst.submitted_by,
+          title: "Instituição aprovada",
+          message: `Sua instituição "${inst.name}" foi aprovada e já está disponível no sistema.`,
+          type: "success",
+          entity_type: "institution",
+          entity_id: inst.id,
+        } as any);
+      }
+
       toast.success(`"${inst.name}" aprovada com sucesso!`);
       fetchInstitutions();
       fetchCounts();
@@ -132,6 +144,53 @@ export default function InstitutionsManagement() {
         entity_id: rejectDialog.id,
         details: { name: rejectDialog.name, reason: rejectReason.trim() },
       } as any);
+
+      // Notify user who submitted + send email
+      if (rejectDialog.submitted_by) {
+        await supabase.from("notifications").insert({
+          user_id: rejectDialog.submitted_by,
+          title: "Instituição rejeitada",
+          message: `Sua instituição "${rejectDialog.name}" foi rejeitada. Motivo: ${rejectReason.trim()}`,
+          type: "warning",
+          entity_type: "institution",
+          entity_id: rejectDialog.id,
+        } as any);
+
+        // Send rejection email
+        try {
+          const { data: profile } = await (supabase as any)
+            .from("profiles")
+            .select("full_name, email")
+            .eq("user_id", rejectDialog.submitted_by)
+            .single();
+
+          if (profile?.email) {
+            // Create message record for email tracking
+            const { data: msg } = await supabase.from("messages").insert({
+              recipient_id: rejectDialog.submitted_by,
+              sender_id: user?.id,
+              subject: "Instituição rejeitada",
+              body: `Sua instituição "${rejectDialog.name}" foi rejeitada.\n\nMotivo: ${rejectReason.trim()}\n\nVocê pode cadastrar uma nova instituição na página Minha Conta.`,
+              type: "system",
+              event_type: "INSTITUTION_REJECTED",
+            } as any).select("id").single();
+
+            if (msg) {
+              await supabase.functions.invoke("send-system-email", {
+                body: {
+                  message_id: msg.id,
+                  recipient_email: profile.email,
+                  recipient_name: profile.full_name || "Usuário",
+                  subject: "Instituição rejeitada",
+                  body: `Sua instituição "${rejectDialog.name}" foi rejeitada.\n\nMotivo: ${rejectReason.trim()}\n\nVocê pode cadastrar uma nova instituição na página Minha Conta.`,
+                },
+              });
+            }
+          }
+        } catch (emailErr) {
+          console.warn("Failed to send rejection email:", emailErr);
+        }
+      }
 
       toast.success(`"${rejectDialog.name}" rejeitada.`);
       setRejectDialog(null);
