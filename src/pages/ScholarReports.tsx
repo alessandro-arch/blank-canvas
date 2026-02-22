@@ -16,6 +16,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { useSecureReportPdf } from "@/hooks/useSecureReportPdf";
 
 // Unified report row combining digital (monthly_reports) and legacy (reports)
 interface UnifiedReportRow {
@@ -75,6 +76,8 @@ export default function ScholarReports() {
   const [reports, setReports] = useState<UnifiedReportRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [viewingId, setViewingId] = useState<string | null>(null);
+  const { fetchReportPdf } = useSecureReportPdf();
   const [pdfViewer, setPdfViewer] = useState<{ open: boolean; url: string | null; title: string }>({
     open: false, url: null, title: "",
   });
@@ -204,17 +207,29 @@ export default function ScholarReports() {
     fetchAll();
   }, [user]);
 
-  const getSignedUrl = async (bucket: string, path: string): Promise<string | null> => {
+  const getLegacySignedUrl = async (bucket: string, path: string): Promise<string | null> => {
     const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 900);
     if (error) { toast.error("Erro ao acessar arquivo"); return null; }
     return data?.signedUrl || null;
   };
 
+  const getPdfUrl = async (report: UnifiedReportRow, action: "view" | "download"): Promise<string | null> => {
+    if (report.source === "digital") {
+      // Digital reports use secure-report-pdf Edge Function (encrypted storage)
+      const url = await fetchReportPdf(report.id, action);
+      if (!url) { toast.error("Erro ao acessar arquivo"); return null; }
+      return url;
+    }
+    // Legacy reports use direct signed URLs
+    if (!report.pdf_storage_path) { toast.error("PDF não disponível"); return null; }
+    return getLegacySignedUrl(report.pdf_bucket, report.pdf_storage_path);
+  };
+
   const handleDownloadPdf = async (report: UnifiedReportRow) => {
-    if (!report.pdf_storage_path) { toast.error("PDF não disponível"); return; }
+    if (report.source === "legacy" && !report.pdf_storage_path) { toast.error("PDF não disponível"); return; }
     setDownloadingId(report.id);
     try {
-      const url = await getSignedUrl(report.pdf_bucket, report.pdf_storage_path);
+      const url = await getPdfUrl(report, "download");
       if (url) {
         const link = document.createElement("a");
         link.href = url;
@@ -228,9 +243,10 @@ export default function ScholarReports() {
   };
 
   const handleViewPdf = async (report: UnifiedReportRow) => {
-    if (!report.pdf_storage_path) { toast.error("PDF não disponível"); return; }
+    if (report.source === "legacy" && !report.pdf_storage_path) { toast.error("PDF não disponível"); return; }
+    setViewingId(report.id);
     try {
-      const url = await getSignedUrl(report.pdf_bucket, report.pdf_storage_path);
+      const url = await getPdfUrl(report, "view");
       if (url) {
         setPdfViewer({
           open: true,
@@ -239,6 +255,7 @@ export default function ScholarReports() {
         });
       }
     } catch { toast.error("Erro ao abrir PDF"); }
+    finally { setViewingId(null); }
   };
 
   const renderStatusBadge = (report: UnifiedReportRow) => {
@@ -282,24 +299,30 @@ export default function ScholarReports() {
       );
     }
 
-    // View PDF (any report with a PDF)
-    if (report.pdf_storage_path && report.status !== "draft") {
+    // View PDF (digital reports always have secure PDF, legacy needs pdf_storage_path)
+    const canViewPdf = report.status !== "draft" && (report.source === "digital" || report.pdf_storage_path);
+    if (canViewPdf) {
       actions.push(
         <Button
           key="view"
           size="sm"
           variant="ghost"
           className="gap-1.5 text-primary"
+          disabled={viewingId === report.id}
           onClick={() => handleViewPdf(report)}
         >
-          <Eye className="w-4 h-4" />
+          {viewingId === report.id ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Eye className="w-4 h-4" />
+          )}
           <span className="hidden sm:inline">Visualizar</span>
         </Button>
       );
     }
 
     // Download PDF
-    if (report.pdf_storage_path && report.status !== "draft") {
+    if (canViewPdf) {
       actions.push(
         <Button
           key="download"
