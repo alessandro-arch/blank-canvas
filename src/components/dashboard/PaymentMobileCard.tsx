@@ -29,6 +29,7 @@ const statusConfig: Record<string, { label: string; icon: typeof Clock; classNam
   eligible: { label: "Liberado", icon: CheckCircle, className: "bg-success/10 text-success border-success/20" },
   paid: { label: "Pago", icon: CreditCard, className: "bg-primary/10 text-primary border-primary/20" },
   cancelled: { label: "Cancelado", icon: Lock, className: "bg-destructive/10 text-destructive border-destructive/20" },
+  blocked: { label: "Bloqueado", icon: Lock, className: "bg-destructive/10 text-destructive border-destructive/20" },
 };
 
 function formatCurrency(value: number): string {
