@@ -1,173 +1,172 @@
 
 
-# Modulo "Plano de Trabalho do Bolsista"
+# Overhaul da IA de Avaliacao de Relatorio Mensal
 
 ## Resumo
 
-Adicionar o modulo "Plano de Trabalho" ao BolsaGO como nova aba na tela "Meus Documentos" do bolsista, com upload pelo gestor/admin na area de subprojetos, e integracao com a IA na avaliacao de relatorios mensais.
+Reescrever o sistema de avaliacao por IA para produzir pareceres tecnicos rigorosos em formato JSON estruturado, sem Markdown, usando obrigatoriamente o Plano de Trabalho e o historico de relatorios anteriores. Inclui nova Edge Function, nova tabela de outputs, novo componente de renderizacao e sanitizacao de saida.
 
-## Fase 1 -- Banco de Dados (Migracao SQL)
+## Fase 1 -- Nova Edge Function: `ai-evaluate-monthly-report`
 
-### Tabela `work_plans`
+Substituir a logica atual da `ai-analyze-report` por uma nova Edge Function unificada que:
+
+1. Recebe `{ report_id }` (sem `type` -- gera tudo de uma vez)
+2. Busca:
+   - Relatorio mensal atual (campos + metadados)
+   - Perfil do bolsista (nome, instituicao, nivel)
+   - Plano de Trabalho ativo (`extracted_text`, `extracted_json`) via `work_plans`
+   - Historico dos ultimos 6 relatorios (status, parecer do gestor, resumo de entregas)
+   - Metadados do projeto (titulo, codigo, periodo, vigencia)
+3. Monta prompt com regras estritas:
+   - Idioma: pt-BR obrigatorio
+   - Formato: JSON puro (schema definido no prompt)
+   - Sem Markdown, sem asteriscos
+   - Sem mencao a "horas dedicadas"
+   - Regra anti-elogio: penalizar relatos genericos sem evidencias
+   - Citar ao menos 2 elementos do Plano e 1 comparacao historica
+   - Metricas 0-5: aderencia_plano, evidencia_verificabilidade, progresso_vs_historico, qualidade_tecnica_clareza
+   - Decisao sugerida: aprovar / aprovar_com_ressalvas / devolver
+4. Chama LLM via Lovable AI Gateway
+5. Valida retorno com `JSON.parse` + sanitizacao (remove caracteres CJK, garante schema)
+6. Salva em `monthly_report_ai_outputs`
+7. Retorna o JSON parseado
+
+### Prompt system (resumo):
+
+```text
+Voce e um avaliador tecnico de relatorios mensais de bolsistas de pesquisa.
+Regras:
+- Responda EXCLUSIVAMENTE em JSON valido, sem Markdown.
+- Idioma: pt-BR.
+- NAO use asteriscos, hashtags ou formatacao Markdown.
+- NAO mencione "horas dedicadas vs esperado".
+- Se o relatorio for curto/generico/sem evidencias, reduza fortemente as notas.
+- Elogios so com evidencias explicitas (numeros, datasets, resultados).
+- Cite ao menos 2 elementos do Plano de Trabalho.
+- Compare com historico quando disponivel.
+- Schema JSON obrigatorio: { parecer: { ... }, indicadores: { ... }, ... }
+```
+
+### Sanitizacao pos-LLM:
+
+- Extrair JSON de dentro de code fences se a LLM envolver em ```json
+- `JSON.parse` + fallback
+- Regex para remover caracteres CJK: `/[\u4e00-\u9fff\u3400-\u4dbf]/g`
+- Remover asteriscos remanescentes
+- Validar campos obrigatorios do schema
+
+Arquivo: `supabase/functions/ai-evaluate-monthly-report/index.ts`
+
+## Fase 2 -- Nova Tabela: `monthly_report_ai_outputs`
 
 ```text
 Colunas:
 - id (uuid PK)
-- organization_id (uuid FK organizations, NOT NULL)
-- project_id (uuid FK projects, NOT NULL)  -- subprojeto
-- scholar_user_id (uuid NOT NULL)
-- uploaded_by (uuid NOT NULL)
-- uploaded_at (timestamptz DEFAULT now())
-- status (text DEFAULT 'active', CHECK IN ('active','archived'))
-- file_name (text NOT NULL)
-- file_size (int8 NULL)
-- pdf_path (text NOT NULL)
-- checksum_sha256 (text NOT NULL)
-- extracted_json (jsonb NULL)
-- extracted_text (text NULL)
+- report_id (uuid NOT NULL, FK monthly_reports)
+- organization_id (uuid NOT NULL)
+- payload (jsonb NOT NULL) -- JSON completo do parecer
+- model (text)
+- prompt_version (text DEFAULT 'v1')
+- generated_by (uuid NULL) -- user que disparou
 - created_at (timestamptz DEFAULT now())
-- updated_at (timestamptz DEFAULT now())
 
 Indices:
-- (organization_id, project_id)
-- (scholar_user_id)
-- Unique parcial: 1 registro active por (project_id, scholar_user_id)
+- (report_id) unique
+- (organization_id)
+
+RLS:
+- SELECT gestor/admin: org scoped
+- INSERT/UPDATE/DELETE: bloqueado via RLS (apenas service_role na Edge Function)
 ```
 
-### Bucket de Storage
+Migracao SQL a ser proposta via ferramenta de banco.
 
-- Criar bucket privado `workplans` (is_public = false)
-- Politicas RLS de storage: leitura para bolsista (owner) e gestores/admins da org; escrita apenas gestor/admin
+## Fase 3 -- Atualizar `MonthlyReportAIPanel.tsx` (reescrita)
 
-### Politicas RLS na tabela `work_plans`
+Mudancas principais:
 
-- SELECT bolsista: `auth.uid() = scholar_user_id`
-- SELECT gestor/admin: via `has_role` + `get_user_organizations()`
-- INSERT/UPDATE/DELETE: apenas gestor/admin com acesso a org
+1. Substituir os 5 botoes individuais por um unico botao "Gerar Parecer Completo" que chama `ai-evaluate-monthly-report`
+2. O resultado e um objeto JSON tipado, nao texto livre
+3. Renderizar o JSON em componentes visuais:
+   - Card de identificacao (bolsista, projeto, periodo)
+   - Secoes de avaliacao tecnica com titulos e texto limpo
+   - 4 metricas com barras de progresso (0-5)
+   - Listas de evidencias, lacunas, riscos, perguntas
+   - Badge de decisao sugerida (aprovar=verde, ressalvas=amarelo, devolver=vermelho)
+   - Justificativa da decisao
+4. Botoes "Inserir no parecer" (insere justificativa_decisao limpa) e "Copiar parecer" (copia texto formatado sem Markdown)
+5. Manter botao "Expandir" para fullscreen
+6. Alerta "Gerado por IA -- requer validacao do gestor"
+7. Se plano de trabalho nao existir, exibir alerta amarelo antes de gerar
 
-### Trigger
+### Tipos TypeScript:
 
-- `update_updated_at_column` na tabela `work_plans`
-
-## Fase 2 -- Edge Function: `generate-workplan-signed-url`
-
-Nova Edge Function que:
-1. Recebe `{ workplan_id }` via POST
-2. Valida JWT e verifica role do usuario (bolsista so acessa o proprio; gestor/admin acessa da org)
-3. Busca `pdf_path` na tabela `work_plans`
-4. Gera signed URL do bucket `workplans` com TTL de 300s
-5. Retorna `{ signedUrl }`
-
-Arquivo: `supabase/functions/generate-workplan-signed-url/index.ts`
-
-Configuracao em `supabase/config.toml`:
 ```text
-[functions.generate-workplan-signed-url]
+interface AIParecerOutput {
+  parecer: {
+    titulo: string;
+    identificacao: { bolsista: string; instituicao: string; nivel: string; projeto: string; periodo: string };
+    sumario: string[];
+    avaliacao_tecnica: { secao: string; texto: string }[];
+    metricas: {
+      aderencia_plano_0a5: number;
+      evidencia_verificabilidade_0a5: number;
+      progresso_vs_historico_0a5: number;
+      qualidade_tecnica_clareza_0a5: number;
+    };
+    evidencias: string[];
+    lacunas: string[];
+    riscos_pendencias: string[];
+    perguntas_ao_bolsista: string[];
+    decisao_sugerida: "aprovar" | "aprovar_com_ressalvas" | "devolver";
+    justificativa_decisao: string;
+  };
+  indicadores: Record<string, unknown>;
+  analise_riscos: { riscos: string[]; mitigacoes: string[] };
+  resumo_executivo: { texto: string };
+}
+```
+
+## Fase 4 -- Atualizar `MonthlyReportsReviewManagement.tsx`
+
+- Remover referencia a "horas_dedicadas" no dialog de campos (linha 855)
+- O painel de IA ja e renderizado dentro do review dialog (linha 797), apenas garantir que a nova versao funcione
+
+## Fase 5 -- Atualizar `supabase/config.toml`
+
+Adicionar:
+```text
+[functions.ai-evaluate-monthly-report]
 verify_jwt = false
 ```
 
-## Fase 3 -- Frontend: Aba "Plano de Trabalho" (Portal do Bolsista)
+## Fase 6 -- Manter Edge Function antiga
 
-### 3.1 Hook `useWorkPlans`
-
-Novo arquivo: `src/hooks/useWorkPlans.ts`
-- Busca `work_plans` filtrado por `scholar_user_id = auth.uid()`
-- Retorna lista ordenada por `uploaded_at DESC`
-- Funcoes para obter signed URL via edge function
-
-### 3.2 Componente `WorkPlanTab`
-
-Novo arquivo: `src/components/scholar/documents/WorkPlanTab.tsx`
-- Segue o mesmo padrao visual do `GrantTermTab`
-- Exibe lista de planos (ativos e arquivados)
-- Metadados: nome, tamanho, data de envio, status (badge), "Enviado por"
-- Botoes "Visualizar" (abre `PdfViewerDialog`) e "Baixar"
-- Mensagem informativa: "Este documento esta disponivel para consulta a qualquer momento..."
-- Suporte a `searchQuery` (filtro por nome)
-
-### 3.3 Atualizar `ScholarDocuments.tsx`
-
-- Importar `WorkPlanTab`
-- Adicionar `TabsTrigger` "Plano de Trabalho" na barra de tabs
-- Adicionar `TabsContent` correspondente
-
-## Fase 4 -- Frontend: Upload pelo Gestor/Admin
-
-### 4.1 Componente `UploadWorkPlanDialog`
-
-Novo arquivo: `src/components/scholars/UploadWorkPlanDialog.tsx`
-- Segue padrao do `UploadGrantTermDialog`
-- Aceita apenas PDF (max 10MB)
-- Campos: arquivo PDF + formulario opcional de dados estruturados (objetivo geral, objetivos especificos, atividades, cronograma 1-24 meses)
-- Ao salvar:
-  - Calcula checksum SHA-256 do arquivo (via Web Crypto API)
-  - Faz upload ao bucket `workplans` no path `org/{org_id}/subproject/{project_id}/{uuid}.pdf`
-  - Arquiva plano anterior (UPDATE status='archived')
-  - Insere novo registro com status='active'
-  - Salva dados estruturados em `extracted_json` se preenchidos
-- Registra audit log
-
-### 4.2 Integrar na area de subprojetos
-
-- Em `ProjectDetailsDialog.tsx` ou `SubprojectsTable.tsx`, adicionar secao/botao "Plano de Trabalho" com:
-  - Indicador se existe plano ativo
-  - Botao "Enviar/Substituir Plano de Trabalho" que abre `UploadWorkPlanDialog`
-  - Botao "Visualizar" plano ativo (se existir)
-
-## Fase 5 -- Integracao com IA (Avaliacao de Relatorio Mensal)
-
-### 5.1 Atualizar `MonthlyReportAIPanel.tsx`
-
-- Adicionar botao/link "Ver Plano de Trabalho" no header do painel
-- Ao clicar, busca work_plan ativo do subprojeto e abre no `PdfViewerDialog`
-
-### 5.2 Atualizar Edge Function `ai-analyze-report`
-
-- Ao montar o contexto para a IA, buscar `work_plans` ativo para o `project_id` do relatorio
-- Incluir `extracted_text` e/ou `extracted_json` no prompt
-- Enriquecer os prompts de cada tipo de analise:
-  - **summary**: mencionar aderencia ao plano
-  - **risks**: comparar atividades realizadas vs. cronograma previsto
-  - **indicators**: aderencia ao plano (alta/media/baixa), lacunas, itens faltantes
-  - **opinion**: incluir recomendacoes baseadas no plano, sugestoes de comprovacao
-- Adicionar ao contexto: objetivo geral, objetivos especificos, atividades previstas, e destaque do mes correspondente no cronograma (mes 1-24)
-
-### 5.3 Novo botao "Aderencia ao Plano" (opcional)
-
-- Adicionar 5o tipo de analise `adherence` ao painel de IA
-- Prompt especifico que cruza relatorio x plano e retorna: aderencia (alta/media/baixa), lacunas, riscos, sugestoes de evidencias
-
-## Fase 6 -- Atualizar `MonthlyReportsReviewManagement.tsx`
-
-- No modal de avaliacao, adicionar botao "Ver Plano de Trabalho" proximo ao painel de IA
-- Busca o work_plan ativo do subprojeto do relatorio em analise
-- Abre em nova aba (via signed URL) para consulta simultanea
+A `ai-analyze-report` existente sera mantida para compatibilidade, mas o painel usara a nova `ai-evaluate-monthly-report`.
 
 ## Arquivos a Criar
 
 | Arquivo | Descricao |
 |---|---|
-| `src/hooks/useWorkPlans.ts` | Hook para buscar planos de trabalho |
-| `src/components/scholar/documents/WorkPlanTab.tsx` | Aba do bolsista |
-| `src/components/scholars/UploadWorkPlanDialog.tsx` | Dialog de upload (gestor) |
-| `supabase/functions/generate-workplan-signed-url/index.ts` | Edge Function |
+| `supabase/functions/ai-evaluate-monthly-report/index.ts` | Nova Edge Function unificada |
 
 ## Arquivos a Editar
 
 | Arquivo | Mudanca |
 |---|---|
-| `src/pages/ScholarDocuments.tsx` | Adicionar tab "Plano de Trabalho" |
-| `src/components/projects/ProjectDetailsDialog.tsx` | Secao "Plano de Trabalho" na aba Acoes |
-| `src/components/dashboard/MonthlyReportAIPanel.tsx` | Botao "Ver Plano de Trabalho" |
-| `src/components/dashboard/MonthlyReportsReviewManagement.tsx` | Botao "Ver Plano" no modal |
-| `supabase/functions/ai-analyze-report/index.ts` | Incluir work_plan no contexto da IA |
+| `src/components/dashboard/MonthlyReportAIPanel.tsx` | Reescrita completa para JSON estruturado |
+| `src/components/dashboard/MonthlyReportsReviewManagement.tsx` | Remover campo "horas_dedicadas" |
 | `supabase/config.toml` | Registrar nova edge function |
+
+## Migracao SQL (a propor)
+
+- Criar tabela `monthly_report_ai_outputs` com RLS
 
 ## Notas Tecnicas
 
-- O checksum SHA-256 sera calculado no navegador via `crypto.subtle.digest('SHA-256', arrayBuffer)` antes do upload
-- O bucket `workplans` e privado; todo acesso e via signed URL com TTL curto (300s) gerada pela edge function
-- O partial unique index garante que so existe 1 plano ativo por combinacao (project_id, scholar_user_id)
-- A extracao de texto do PDF e manual (formulario do gestor); nao sera implementada extracao automatica nesta versao
-- O aviso "Gerado por IA -- requer validacao do gestor" permanece em todas as analises
+- A sanitizacao de caracteres CJK e feita no backend apos receber resposta da LLM, antes de salvar
+- O prompt inclui o schema JSON completo como exemplo para a LLM seguir
+- O front-end faz `JSON.parse` no retorno e renderiza componentes; se falhar, mostra texto bruto como fallback
+- A decisao sugerida e apenas sugestao; os botoes "Aprovar" e "Devolver" continuam sendo acao do gestor
+- O campo "horas_dedicadas" e removido tanto do prompt quanto da UI de campos
 
