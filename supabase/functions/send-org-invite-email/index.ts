@@ -174,17 +174,13 @@ Ola! Voce foi convidado(a) para acessar a plataforma <strong>BolsaGo</strong> co
 <p style="margin:0 0 24px;font-size:15px;color:#333333;line-height:1.7;">
 Clique no botao abaixo para aceitar o convite e criar sua conta (caso ainda nao tenha).
 </p>
-<div style="text-align:center;margin:32px 0;">
-<!--[if mso]>
-<v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${inviteLink}" style="height:50px;v-text-anchor:middle;width:250px;" arcsize="12%" stroke="f" fillcolor="#003366">
-<w:anchorlock/>
-<center style="color:#ffffff;font-family:sans-serif;font-size:15px;font-weight:bold;">Aceitar Convite</center>
-</v:roundrect>
-<![endif]-->
-<!--[if !mso]><!-->
-<a href="${inviteLink}" target="_blank" style="background-color:#003366;border-radius:6px;color:#ffffff;display:inline-block;font-size:15px;font-weight:600;line-height:50px;text-align:center;text-decoration:none;width:250px;-webkit-text-size-adjust:none;mso-hide:all;">Aceitar Convite</a>
-<!--<![endif]-->
-</div>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:32px auto;">
+<tr>
+<td align="center" style="background-color:#003366;border-radius:6px;">
+<a href="${inviteLink}" target="_blank" style="background-color:#003366;border-radius:6px;color:#ffffff;display:inline-block;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:15px;font-weight:600;padding:14px 40px;text-align:center;text-decoration:none;">Aceitar Convite</a>
+</td>
+</tr>
+</table>
 <p style="margin:0 0 8px;font-size:13px;color:#666666;">Este convite expira em: <strong>${expiresDate}</strong></p>
 <hr style="border:none;border-top:1px solid #eeeeee;margin:16px 0;" />
 <p style="margin:0 0 4px;font-size:12px;color:#999999;">Se voce nao solicitou este convite, pode ignorar este e-mail com seguranca.</p>
