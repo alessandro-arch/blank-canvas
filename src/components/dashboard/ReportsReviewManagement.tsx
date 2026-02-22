@@ -117,6 +117,7 @@ export function ReportsReviewManagement() {
         { data: reportsData, error: repErr },
         { data: enrollments, error: enrErr },
         { data: bankAccounts, error: bankErr },
+        { data: monthlyReportsData, error: mrErr },
       ] = await Promise.all([
         supabase.from("thematic_projects").select("*").order("created_at", { ascending: false }),
         supabase.from("reports").select("*").order("submitted_at", { ascending: false }),
@@ -125,11 +126,13 @@ export function ReportsReviewManagement() {
           project:projects(id, title, code, thematic_project_id)
         `).eq("status", "active"),
         supabase.from("bank_accounts").select("user_id"),
+        supabase.from("monthly_reports").select("*").neq("status", "draft").order("created_at", { ascending: false }),
       ]);
 
       if (tpErr) throw tpErr;
       if (repErr) throw repErr;
       if (enrErr) throw enrErr;
+      if (mrErr) throw mrErr;
 
       // Get unique user IDs from enrollments
       const enrolledUserIds = [...new Set((enrollments || []).map(e => e.user_id))];
@@ -148,7 +151,7 @@ export function ReportsReviewManagement() {
       // Build thematic map
       const thematicMap = new Map((thematicProjects || []).map(tp => [tp.id, tp]));
 
-      // Build reports map per user
+      // Build reports map per user (legacy)
       const reportsByUser = new Map<string, ReportRecord[]>();
       (reportsData || []).forEach(r => {
         const list = reportsByUser.get(r.user_id) || [];
@@ -156,8 +159,57 @@ export function ReportsReviewManagement() {
         reportsByUser.set(r.user_id, list);
       });
 
-      // Get available months from reports
-      const allMonths = [...new Set((reportsData || []).map(r => r.reference_month))].sort().reverse();
+      // Convert monthly_reports to ReportRecord format and merge
+      const monthlyStatusMap: Record<string, string> = {
+        submitted: "under_review",
+        approved: "approved",
+        returned: "rejected",
+      };
+
+      (monthlyReportsData || []).forEach(mr => {
+        const refMonth = `${mr.period_year}-${String(mr.period_month).padStart(2, "0")}`;
+        const userId = mr.beneficiary_user_id;
+        const list = reportsByUser.get(userId) || [];
+
+        // Skip if legacy report already exists for this month (linked via monthly_report_id)
+        const hasLinkedLegacy = list.some(r => r.reference_month === refMonth && (r as any).monthly_report_id === mr.id);
+        if (hasLinkedLegacy) return;
+
+        // Also skip if there's already an approved legacy report for this month
+        const hasApprovedLegacy = list.some(r => r.reference_month === refMonth && r.status === "approved" && !(r as any).monthly_report_id);
+        if (hasApprovedLegacy) return;
+
+        const digitalReport: ReportRecord = {
+          id: `mr_${mr.id}`,
+          user_id: userId,
+          reference_month: refMonth,
+          installment_number: 0,
+          file_url: "",
+          file_name: "Relatório Digital",
+          observations: null,
+          status: monthlyStatusMap[mr.status] || mr.status,
+          feedback: mr.return_reason || null,
+          submitted_at: mr.submitted_at || mr.created_at,
+          reviewed_at: mr.approved_at || mr.returned_at || null,
+          reviewed_by: mr.approved_by_user_id || mr.returned_by_user_id || null,
+          resubmission_deadline: null,
+          old_file_url: null,
+          replaced_at: null,
+          replaced_by: null,
+          replace_reason: null,
+        };
+
+        list.push(digitalReport);
+        reportsByUser.set(userId, list);
+      });
+
+      // Get available months from all reports
+      const allMonthsSet = new Set<string>();
+      (reportsData || []).forEach(r => allMonthsSet.add(r.reference_month));
+      (monthlyReportsData || []).forEach(mr => {
+        allMonthsSet.add(`${mr.period_year}-${String(mr.period_month).padStart(2, "0")}`);
+      });
+      const allMonths = [...allMonthsSet].sort().reverse();
 
       // Build scholar rows from enrollments
       const scholarRows: ScholarRow[] = [];
@@ -283,31 +335,44 @@ export function ReportsReviewManagement() {
     setReviewDialogOpen(true);
   };
 
+  const isDigitalReport = (report: ReportRecord | null) => report?.id.startsWith("mr_");
+  const getDigitalReportId = (report: ReportRecord) => report.id.replace("mr_", "");
+
   const handleApprove = async () => {
     if (!selectedReport || !user) return;
     setSubmitting(true);
     try {
-      const now = new Date().toISOString();
-      const { error: reportError } = await supabase
-        .from("reports")
-        .update({
-          status: "approved",
-          reviewed_at: now,
-          reviewed_by: user.id,
-          feedback: feedback || null,
-        })
-        .eq("id", selectedReport.id);
-      if (reportError) throw reportError;
+      if (isDigitalReport(selectedReport)) {
+        // Use RPC for digital monthly reports
+        const { error } = await supabase.rpc("approve_monthly_report", {
+          p_report_id: getDigitalReportId(selectedReport),
+          p_feedback: feedback || null,
+        });
+        if (error) throw error;
+      } else {
+        const now = new Date().toISOString();
+        const { error: reportError } = await supabase
+          .from("reports")
+          .update({
+            status: "approved",
+            reviewed_at: now,
+            reviewed_by: user.id,
+            feedback: feedback || null,
+          })
+          .eq("id", selectedReport.id);
+        if (reportError) throw reportError;
+      }
 
       await logAction({
         action: "approve_report",
-        entityType: "report",
-        entityId: selectedReport.id,
+        entityType: isDigitalReport(selectedReport) ? "monthly_report" : "report",
+        entityId: isDigitalReport(selectedReport) ? getDigitalReportId(selectedReport) : selectedReport.id,
         details: {
           scholar_id: selectedReport.user_id,
           scholar_name: selectedScholar?.full_name,
           reference_month: selectedReport.reference_month,
           feedback: feedback || null,
+          digital: isDigitalReport(selectedReport),
         },
       });
 
@@ -330,30 +395,38 @@ export function ReportsReviewManagement() {
     }
     setSubmitting(true);
     try {
-      const now = new Date();
-      const deadline = addDays(now, 5);
-      const { error: reportError } = await supabase
-        .from("reports")
-        .update({
-          status: "rejected",
-          reviewed_at: now.toISOString(),
-          reviewed_by: user.id,
-          feedback,
-          resubmission_deadline: deadline.toISOString(),
-        })
-        .eq("id", selectedReport.id);
-      if (reportError) throw reportError;
+      if (isDigitalReport(selectedReport)) {
+        const { error } = await supabase.rpc("return_monthly_report", {
+          p_report_id: getDigitalReportId(selectedReport),
+          p_reason: feedback,
+        });
+        if (error) throw error;
+      } else {
+        const now = new Date();
+        const deadline = addDays(now, 5);
+        const { error: reportError } = await supabase
+          .from("reports")
+          .update({
+            status: "rejected",
+            reviewed_at: now.toISOString(),
+            reviewed_by: user.id,
+            feedback,
+            resubmission_deadline: deadline.toISOString(),
+          })
+          .eq("id", selectedReport.id);
+        if (reportError) throw reportError;
+      }
 
       await logAction({
         action: "reject_report",
-        entityType: "report",
-        entityId: selectedReport.id,
+        entityType: isDigitalReport(selectedReport) ? "monthly_report" : "report",
+        entityId: isDigitalReport(selectedReport) ? getDigitalReportId(selectedReport) : selectedReport.id,
         details: {
           scholar_id: selectedReport.user_id,
           scholar_name: selectedScholar?.full_name,
           reference_month: selectedReport.reference_month,
           feedback,
-          resubmission_deadline: deadline.toISOString(),
+          digital: isDigitalReport(selectedReport),
         },
       });
 

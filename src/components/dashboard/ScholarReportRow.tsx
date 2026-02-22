@@ -275,10 +275,18 @@ export function ScholarReportRow({
                       {scholar.all_reports.map((r) => {
                         const rConfig = statusConfig[r.status] || statusConfig.under_review;
                         const RIcon = rConfig.icon;
+                        const isDigital = r.id.startsWith("mr_");
                         return (
                           <TableRow key={r.id}>
                             <TableCell className="text-sm font-medium">
-                              {formatMonth(r.reference_month)}
+                              <div className="flex items-center gap-1.5">
+                                {formatMonth(r.reference_month)}
+                                {isDigital && (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary border border-primary/20">
+                                    Digital
+                                  </span>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell>
                               <span className={cn(
@@ -301,25 +309,31 @@ export function ScholarReportRow({
                               }
                             </TableCell>
                             <TableCell>
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="gap-1 text-xs h-7 px-2"
-                                  onClick={() => onViewPdf(r.file_url)}
-                                >
-                                  <Eye className="w-3 h-3" />
-                                  Ver
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="gap-1 text-xs h-7 px-2"
-                                  onClick={() => onViewPdf(r.file_url)}
-                                >
-                                  <Download className="w-3 h-3" />
-                                </Button>
-                              </div>
+                              {isDigital ? (
+                                <span className="text-xs text-muted-foreground italic">
+                                  Via formulário
+                                </span>
+                              ) : (
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="gap-1 text-xs h-7 px-2"
+                                    onClick={() => onViewPdf(r.file_url)}
+                                  >
+                                    <Eye className="w-3 h-3" />
+                                    Ver
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="gap-1 text-xs h-7 px-2"
+                                    onClick={() => onViewPdf(r.file_url)}
+                                  >
+                                    <Download className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              )}
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-1 flex-wrap">
@@ -333,25 +347,29 @@ export function ScholarReportRow({
                                     Analisar
                                   </Button>
                                 )}
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="gap-1 text-xs h-7 px-2"
-                                  onClick={() => onReplaceFile(r, scholar)}
-                                >
-                                  <FileUp className="w-3 h-3" />
-                                  Substituir
-                                </Button>
-                                {onRequestDigitalResubmit && r.status !== "approved" && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="gap-1 text-xs h-7 px-2 border-warning/30 text-warning hover:bg-warning/10"
-                                    onClick={() => onRequestDigitalResubmit(r, scholar)}
-                                  >
-                                    <RefreshCw className="w-3 h-3" />
-                                    Reenvio digital
-                                  </Button>
+                                {!isDigital && (
+                                  <>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="gap-1 text-xs h-7 px-2"
+                                      onClick={() => onReplaceFile(r, scholar)}
+                                    >
+                                      <FileUp className="w-3 h-3" />
+                                      Substituir
+                                    </Button>
+                                    {onRequestDigitalResubmit && r.status !== "approved" && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-1 text-xs h-7 px-2 border-warning/30 text-warning hover:bg-warning/10"
+                                        onClick={() => onRequestDigitalResubmit(r, scholar)}
+                                      >
+                                        <RefreshCw className="w-3 h-3" />
+                                        Reenvio digital
+                                      </Button>
+                                    )}
+                                  </>
                                 )}
                               </div>
                             </TableCell>
