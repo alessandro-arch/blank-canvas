@@ -61,6 +61,7 @@ import InviteAccept from "./pages/InviteAccept";
 import Settings from "./pages/Settings";
 import PdfReports from "./pages/PdfReports";
 import AuditorDashboard from "./pages/AuditorDashboard";
+import AuditorHelp from "./pages/AuditorHelp";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -287,6 +288,11 @@ const App = () => (
               <Route path="/auditor/operacao" element={
                 <AuditorProtectedRoute>
                   <OperacaoBolsas />
+                </AuditorProtectedRoute>
+              } />
+              <Route path="/auditor/ajuda" element={
+                <AuditorProtectedRoute>
+                  <AuditorHelp />
                 </AuditorProtectedRoute>
               } />
 
