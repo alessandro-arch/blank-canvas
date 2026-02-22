@@ -7,7 +7,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-request-id, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-type AnalysisType = "summary" | "risks" | "indicators" | "opinion";
+type AnalysisType = "summary" | "risks" | "indicators" | "opinion" | "adherence";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -46,7 +46,7 @@ serve(async (req) => {
     const { report_id, type } = await req.json() as { report_id: string; type: AnalysisType };
 
     if (!report_id || !type) throw new Error("report_id e type são obrigatórios");
-    if (!["summary", "risks", "indicators", "opinion"].includes(type)) {
+    if (!["summary", "risks", "indicators", "opinion", "adherence"].includes(type)) {
       throw new Error("type inválido");
     }
 
@@ -108,18 +108,41 @@ serve(async (req) => {
       ? "\n\n=== HISTÓRICO (últimos meses) ===\n" + historyLines.join("\n")
       : "";
 
+    // Fetch active work plan for this project
+    let workPlanContext = "";
+    const reportProjectId = report.project_id;
+    if (reportProjectId) {
+      const { data: workPlan } = await supabase
+        .from("work_plans")
+        .select("extracted_text, extracted_json")
+        .eq("project_id", reportProjectId)
+        .eq("status", "active")
+        .maybeSingle();
+
+      if (workPlan) {
+        const wpJson = workPlan.extracted_json as Record<string, string> | null;
+        const wpParts: string[] = ["\n\n=== PLANO DE TRABALHO ==="];
+        if (wpJson?.objetivo_geral) wpParts.push(`Objetivo geral: ${wpJson.objetivo_geral}`);
+        if (wpJson?.objetivos_especificos) wpParts.push(`Objetivos específicos: ${wpJson.objetivos_especificos}`);
+        if (wpJson?.atividades) wpParts.push(`Atividades e cronograma: ${wpJson.atividades}`);
+        if (workPlan.extracted_text && !wpJson) wpParts.push(workPlan.extracted_text);
+        if (wpParts.length > 1) workPlanContext = wpParts.join("\n");
+      }
+    }
+
     // Prompts per type
     const prompts: Record<AnalysisType, string> = {
       summary: `Analise o relatório mensal abaixo e gere um resumo executivo conciso (3-5 parágrafos) destacando:
 1. Principais atividades e entregas do período
 2. Resultados mais relevantes
 3. Pontos de atenção
+${workPlanContext ? "4. Aderência ao plano de trabalho" : ""}
 Seja objetivo e profissional. Escreva em português do Brasil.`,
 
       risks: `Analise o relatório mensal abaixo e identifique:
 1. Riscos potenciais (atrasos, baixa produtividade, falta de entregas)
 2. Inconsistências com relatórios anteriores (se disponível)
-3. Pontos que merecem atenção do gestor
+${workPlanContext ? "3. Desvios em relação ao plano de trabalho e cronograma previsto" : "3. Pontos que merecem atenção do gestor"}
 4. Sugestões de perguntas para o bolsista
 Liste em formato de tópicos. Seja analítico mas justo. Escreva em português do Brasil.`,
 
@@ -129,17 +152,30 @@ Liste em formato de tópicos. Seja analítico mas justo. Escreva em português d
 3. Qualidade das entregas descritas
 4. Tendência comparada ao histórico (melhora/estável/declínio)
 5. Horas dedicadas vs. esperado
+${workPlanContext ? "6. Itens do cronograma atendidos e pendentes" : ""}
 Retorne em formato estruturado. Escreva em português do Brasil.`,
 
-      opinion: `Com base no relatório mensal e no histórico do bolsista, elabore um rascunho de parecer técnico do gestor contendo:
-1. Análise das atividades realizadas
+      opinion: `Com base no relatório mensal${workPlanContext ? ", no plano de trabalho" : ""} e no histórico do bolsista, elabore um rascunho de parecer técnico do gestor contendo:
+1. Análise das atividades realizadas${workPlanContext ? " em relação ao plano de trabalho" : ""}
 2. Avaliação dos resultados
 3. Recomendação (aprovar / devolver para ajustes)
 4. Observações e sugestões ao bolsista
+${workPlanContext ? "5. Sugestões de comprovação (documentos, evidências)" : ""}
 O parecer deve ser formal, objetivo e fundamentado. Escreva em português do Brasil. Inclua a ressalva: "Este é um rascunho gerado por IA e deve ser revisado pelo gestor antes de uso."`,
+
+      adherence: `Com base no relatório mensal e no plano de trabalho do bolsista, analise a aderência ao plano:
+1. Nível de aderência geral (alta/média/baixa)
+2. Atividades previstas no cronograma para este período que foram realizadas
+3. Atividades previstas que NÃO foram realizadas (lacunas)
+4. Atividades realizadas que NÃO estavam no plano (extras)
+5. Riscos de atraso no cronograma geral
+6. Recomendações objetivas para o próximo período
+7. Sugestões de documentos/evidências que comprovem as atividades
+${!workPlanContext ? "\nATENÇÃO: Nenhum plano de trabalho foi encontrado para este bolsista. Informe que a análise de aderência requer o plano de trabalho cadastrado." : ""}
+Escreva em português do Brasil.`,
     };
 
-    const systemPrompt = `Você é um analista de programas de bolsas de pesquisa. Sua tarefa é auxiliar gestores na avaliação de relatórios mensais de bolsistas. Seja profissional, objetivo e construtivo.`;
+    const systemPrompt = `Você é um analista de programas de bolsas de pesquisa. Sua tarefa é auxiliar gestores na avaliação de relatórios mensais de bolsistas, incluindo a comparação com o plano de trabalho quando disponível. Seja profissional, objetivo e construtivo.`;
 
     // Call Lovable AI Gateway
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -152,7 +188,7 @@ O parecer deve ser formal, objetivo e fundamentado. Escreva em português do Bra
         model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `${prompts[type]}\n\n${reportContext}${historyContext}` },
+          { role: "user", content: `${prompts[type]}\n\n${reportContext}${historyContext}${workPlanContext}` },
         ],
         stream: false,
       }),

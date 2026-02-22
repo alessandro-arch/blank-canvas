@@ -9,10 +9,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-type AnalysisType = "summary" | "risks" | "indicators" | "opinion";
+type AnalysisType = "summary" | "risks" | "indicators" | "opinion" | "adherence";
 
 interface MonthlyReportAIPanelProps {
   reportId: string;
+  projectId?: string;
   onInsertToFeedback?: (text: string) => void;
 }
 
@@ -21,15 +22,17 @@ const analysisOptions: { type: AnalysisType; label: string; icon: React.ElementT
   { type: "risks", label: "Análise de riscos", icon: AlertTriangle, description: "Riscos e inconsistências identificados" },
   { type: "indicators", label: "Indicadores", icon: BarChart3, description: "Métricas de produtividade e aderência" },
   { type: "opinion", label: "Rascunho de parecer", icon: Scale, description: "Sugestão de parecer técnico" },
+  { type: "adherence", label: "Aderência ao Plano", icon: FileText, description: "Comparação relatório x plano de trabalho" },
 ];
 
-export function MonthlyReportAIPanel({ reportId, onInsertToFeedback }: MonthlyReportAIPanelProps) {
+export function MonthlyReportAIPanel({ reportId, projectId, onInsertToFeedback }: MonthlyReportAIPanelProps) {
   const [loading, setLoading] = useState<AnalysisType | null>(null);
   const [results, setResults] = useState<Record<AnalysisType, string>>({
     summary: "",
     risks: "",
     indicators: "",
     opinion: "",
+    adherence: "",
   });
   const [copied, setCopied] = useState<AnalysisType | null>(null);
   const [expandedType, setExpandedType] = useState<AnalysisType | null>(null);

@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GrantTermTab } from "@/components/scholar/documents/GrantTermTab";
 import { InstitutionalDocsTab } from "@/components/scholar/documents/InstitutionalDocsTab";
 import { ReportsTab } from "@/components/scholar/documents/ReportsTab";
+import { WorkPlanTab } from "@/components/scholar/documents/WorkPlanTab";
 
 const ScholarDocuments = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -58,6 +59,9 @@ const ScholarDocuments = () => {
               <TabsTrigger value="documentos" className="flex-1 min-w-[120px]">
                 Documentos Institucionais
               </TabsTrigger>
+              <TabsTrigger value="plano" className="flex-1 min-w-[120px]">
+                Plano de Trabalho
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="termo">
@@ -70,6 +74,10 @@ const ScholarDocuments = () => {
 
             <TabsContent value="documentos">
               <InstitutionalDocsTab searchQuery={searchQuery} />
+            </TabsContent>
+
+            <TabsContent value="plano">
+              <WorkPlanTab searchQuery={searchQuery} />
             </TabsContent>
           </Tabs>
         </main>

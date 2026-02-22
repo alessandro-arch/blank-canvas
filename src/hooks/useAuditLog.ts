@@ -38,7 +38,9 @@ export type AuditAction =
   | "report_pdf_generated"
   | "report_approved"
   | "report_returned"
-  | "bank_data_read";
+  | "bank_data_read"
+  | "upload_work_plan"
+  | "update_work_plan";
 
 export type EntityType = 
   | "user"
@@ -50,7 +52,8 @@ export type EntityType =
   | "bank_account"
   | "thematic_project"
   | "grant_term"
-  | "monthly_report";
+  | "monthly_report"
+  | "work_plan";
 
 interface AuditLogParams {
   action: AuditAction;

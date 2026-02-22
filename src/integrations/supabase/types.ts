@@ -1604,6 +1604,75 @@ export type Database = {
         }
         Relationships: []
       }
+      work_plans: {
+        Row: {
+          checksum_sha256: string
+          created_at: string
+          extracted_json: Json | null
+          extracted_text: string | null
+          file_name: string
+          file_size: number | null
+          id: string
+          organization_id: string
+          pdf_path: string
+          project_id: string
+          scholar_user_id: string
+          status: string
+          updated_at: string
+          uploaded_at: string
+          uploaded_by: string
+        }
+        Insert: {
+          checksum_sha256: string
+          created_at?: string
+          extracted_json?: Json | null
+          extracted_text?: string | null
+          file_name: string
+          file_size?: number | null
+          id?: string
+          organization_id: string
+          pdf_path: string
+          project_id: string
+          scholar_user_id: string
+          status?: string
+          updated_at?: string
+          uploaded_at?: string
+          uploaded_by: string
+        }
+        Update: {
+          checksum_sha256?: string
+          created_at?: string
+          extracted_json?: Json | null
+          extracted_text?: string | null
+          file_name?: string
+          file_size?: number | null
+          id?: string
+          organization_id?: string
+          pdf_path?: string
+          project_id?: string
+          scholar_user_id?: string
+          status?: string
+          updated_at?: string
+          uploaded_at?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_plans_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_plans_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       bank_accounts_public: {
