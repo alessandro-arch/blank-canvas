@@ -1,57 +1,62 @@
 
 
-# Fix: Auditor access to Grant Terms and Work Plans
+# Configurar E-mail de Confirmação Personalizado (BolsaGO)
 
-## Problem
-The auditor can see the tabs for "Termo de Outorga" and "Plano de Trabalho" in the project details dialog, but the data doesn't load because:
-1. The database Row Level Security (RLS) policies on `grant_terms` and `work_plans` tables don't include auditor read access
-2. The `generate-workplan-signed-url` edge function explicitly blocks non-admin/manager/scholar users
+## Problema
+O Supabase está enviando o e-mail de confirmação de conta padrão (em inglês, sem branding, vindo de noreply@mail.app.supabase.io). O projeto já possui uma Edge Function `send-confirmation-email` com um template profissional alinhado à marca InnovaGO, mas ela não está sendo acionada.
 
-## Changes Required
+## Causa Raiz
+O **Auth Email Hook** do Supabase não está configurado para direcionar os e-mails de autenticação para a Edge Function customizada.
 
-### 1. Add RLS SELECT policy on `grant_terms` for auditors
-- Create a new policy `grant_terms_select_auditor_org_scoped` that allows auditors to SELECT grant terms for scholars within their organization
-- Scoped via `organization_members` to ensure multi-tenant isolation
+## Solução
 
-### 2. Add RLS SELECT policy on `work_plans` for auditors
-- Create a new policy `work_plans_select_auditor_org` that allows auditors to SELECT work plans within their organization
-- Scoped via `organization_id` matching the auditor's active organization memberships
+### Passo 1 — Configurar o Auth Hook no Supabase Dashboard (ação manual do usuário)
 
-### 3. Update `generate-workplan-signed-url` edge function
-- Add `isAuditor` role check (line 75)
-- Add org-scoping verification for auditors (similar to the existing manager check)
-- Redeploy the edge function
+Acessar o painel do Supabase e configurar o hook:
 
-## Technical Details
+1. Ir para **Authentication > Hooks** no dashboard do Supabase
+2. Localizar o hook **"Send Email"** (ou "Custom Email Sender")
+3. Ativar o hook e configurar:
+   - **Type**: HTTP Request
+   - **URL**: `https://rykbyzediigwcstuzvnf.supabase.co/functions/v1/send-confirmation-email`
+   - **HTTP Headers**: Adicionar o header `Authorization: Bearer` com a chave `service_role` do projeto (encontrada em Settings > API)
+4. Salvar
 
-### RLS Policy for `grant_terms`
-```text
-CREATE POLICY "grant_terms_select_auditor_org_scoped"
-  ON public.grant_terms FOR SELECT
-  USING (
-    has_role(auth.uid(), 'auditor'::app_role)
-    AND EXISTS (
-      SELECT 1 FROM profiles p
-      WHERE p.user_id = grant_terms.user_id
-      AND p.organization_id IN (SELECT get_user_organizations())
-    )
-  );
-```
+### Passo 2 — Ajustar a Edge Function para lidar com o formato do Auth Hook
 
-### RLS Policy for `work_plans`
-```text
-CREATE POLICY "work_plans_select_auditor_org"
-  ON public.work_plans FOR SELECT
-  USING (
-    has_role(auth.uid(), 'auditor'::app_role)
-    AND organization_id IN (SELECT get_user_organizations())
-  );
-```
+O Auth Hook do Supabase envia o payload com uma assinatura de webhook (usando `standardwebhooks`). A função `send-confirmation-email` atual faz parse simples do JSON sem verificar a assinatura. Precisamos:
 
-### Edge function update
-Add `auditor` to the allowed roles list in the access check, with org-scoping validation identical to the manager pattern.
+- Adicionar suporte ao header de verificação do webhook (usando a secret `SEND_EMAIL_HOOK_SECRET` que o Supabase configura)
+- Alternativamente, manter o parse simples de JSON se a verificação de assinatura não for obrigatória (depende da configuração do hook)
 
-## Impact
-- Auditors will be able to view and download grant terms and work plans for scholars in their organization
-- Read-only access only (no INSERT/UPDATE/DELETE policies added)
-- No changes needed for admin or manager flows
+A função atual já está preparada para o payload correto (`user.email`, `email_data.token_hash`, etc.), então o ajuste é mínimo.
+
+### Passo 3 — Garantir que a secret SEND_EMAIL_HOOK_SECRET está configurada
+
+Verificar se a secret está presente nas configurações das Edge Functions do Supabase. Se não estiver, será necessário adicioná-la (o valor é gerado automaticamente pelo Supabase ao ativar o hook).
+
+### Passo 4 — Expandir o suporte a outros tipos de e-mail
+
+A função atual só trata `signup` e `email_change`. Para cobrir todos os cenários de autenticação do auditor (e outros perfis), expandir para incluir:
+- `recovery` (redefinição de senha)
+- `magic_link` (se aplicável)
+
+Criar templates HTML adicionais para cada tipo, mantendo o mesmo padrão visual.
+
+## Resultado Esperado
+- E-mails de confirmação enviados com a marca BolsaGO/InnovaGO
+- Template em português (PT-BR)
+- Remetente: `InnovaGO <noreply@bolsaconecta.com.br>` (via Resend)
+- Design institucional com logo, cores e rodapé da plataforma
+
+## Resumo Técnico
+
+| Item | Detalhe |
+|------|---------|
+| Função existente | `send-confirmation-email` (já deployada, verify_jwt = false) |
+| Template | HTML institucional com logo InnovaGO, cores #003366, em PT-BR |
+| Serviço de envio | Resend (RESEND_API_KEY já configurada) |
+| Remetente | noreply@bolsaconecta.com.br |
+| Ação necessária do usuário | Configurar Auth Hook no dashboard do Supabase |
+| Ajuste no código | Adicionar suporte a verificacao webhook e templates para `recovery` |
+
