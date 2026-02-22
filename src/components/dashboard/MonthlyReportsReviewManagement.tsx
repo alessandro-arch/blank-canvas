@@ -59,6 +59,7 @@ import { cn } from "@/lib/utils";
 import { MonthlyReportStatusBadge } from "@/components/scholar/monthly-report/MonthlyReportStatusBadge";
 import { MonthlyReportAIPanel } from "@/components/dashboard/MonthlyReportAIPanel";
 import type { MonthlyReportStatus } from "@/hooks/useMonthlyReport";
+import { useUserRole } from "@/hooks/useUserRole";
 
 
 interface MonthlyReportRow {
@@ -88,6 +89,7 @@ interface ScholarInfo {
 }
 
 export function MonthlyReportsReviewManagement() {
+  const { isAuditor } = useUserRole();
   const { user } = useAuth();
 
   const [statusFilter, setStatusFilter] = useState("all");
@@ -640,7 +642,7 @@ export function MonthlyReportsReviewManagement() {
                                 <FileSearch className="h-4 w-4" />
                               </Button>
                             )}
-                            {canReview && (
+                            {canReview && !isAuditor && (
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -765,9 +767,11 @@ export function MonthlyReportsReviewManagement() {
           <DialogHeader className="px-6 pt-6 pb-3 shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <FileSearch className="w-5 h-5 text-primary" />
-              Avaliar Relatório Mensal
+              {isAuditor ? "Ver Parecer do Relatório" : "Avaliar Relatório Mensal"}
             </DialogTitle>
-            <DialogDescription>Analise o relatório e forneça seu parecer</DialogDescription>
+            <DialogDescription>
+              {isAuditor ? "Visualização do parecer e dados do relatório" : "Analise o relatório e forneça seu parecer"}
+            </DialogDescription>
           </DialogHeader>
 
           <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
@@ -821,29 +825,32 @@ export function MonthlyReportsReviewManagement() {
                   reportId={selectedReport.id}
                   projectId={selectedReport.project_id}
                   reportStatus={selectedReport.status}
-                  onInsertToFeedback={(text) => setFeedback(prev => prev ? prev + "\n\n" + text : text)}
+                  onInsertToFeedback={isAuditor ? undefined : (text) => setFeedback(prev => prev ? prev + "\n\n" + text : text)}
+                  readOnly={isAuditor}
                 />
 
-                <div className="space-y-2">
-                  <Label htmlFor="mr-feedback">Parecer / Observações</Label>
-                  <Textarea
-                    id="mr-feedback"
-                    placeholder="Adicione seu parecer sobre o relatório..."
-                    value={feedback}
-                    onChange={e => setFeedback(e.target.value)}
-                    rows={4}
-                  />
-                  <p className="text-xs text-muted-foreground">* Obrigatório para devolução</p>
-                </div>
+                {!isAuditor && (
+                  <div className="space-y-2">
+                    <Label htmlFor="mr-feedback">Parecer / Observações</Label>
+                    <Textarea
+                      id="mr-feedback"
+                      placeholder="Adicione seu parecer sobre o relatório..."
+                      value={feedback}
+                      onChange={e => setFeedback(e.target.value)}
+                      rows={4}
+                    />
+                    <p className="text-xs text-muted-foreground">* Obrigatório para devolução</p>
+                  </div>
+                )}
               </div>
             )}
           </div>
 
           <DialogFooter className="px-6 pb-6 pt-3 border-t shrink-0 gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setReviewDialogOpen(false)} disabled={submitting}>
-              {selectedReport && ["approved", "returned"].includes(selectedReport.status) ? "Fechar" : "Cancelar"}
+              {isAuditor || (selectedReport && ["approved", "returned"].includes(selectedReport.status)) ? "Fechar" : "Cancelar"}
             </Button>
-            {selectedReport && !["approved", "returned"].includes(selectedReport.status) && (
+            {!isAuditor && selectedReport && !["approved", "returned"].includes(selectedReport.status) && (
               <>
                 <Button variant="destructive" onClick={handleReturn} disabled={submitting} className="gap-2">
                   {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Undo2 className="w-4 h-4" />}
