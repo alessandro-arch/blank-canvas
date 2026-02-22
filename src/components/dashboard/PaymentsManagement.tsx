@@ -200,6 +200,8 @@ export function PaymentsManagement() {
           paid_at: p.paid_at,
           report_id: p.report_id,
           receipt_url: p.receipt_url,
+          status_reason: (p as any).status_reason ?? null,
+          status_gate_snapshot: (p as any).status_gate_snapshot ?? null,
         };
 
         const list = paymentsByUser.get(p.user_id) || [];
@@ -305,7 +307,7 @@ export function PaymentsManagement() {
 
   // Stats for the selected period
   const monthStats = useMemo(() => {
-    if (!data) return { pending: 0, eligible: 0, paid: 0, cancelled: 0, total: 0, totalAmount: 0 };
+    if (!data) return { pending: 0, eligible: 0, paid: 0, cancelled: 0, blocked: 0, total: 0, totalAmount: 0 };
     
     // Collect all payments in the period across all scholars
     const allPeriodPayments = data.scholars.flatMap(s =>
@@ -317,10 +319,11 @@ export function PaymentsManagement() {
     const eligible = allPeriodPayments.filter(p => p.status === "eligible").length;
     const paid = allPeriodPayments.filter(p => p.status === "paid").length;
     const cancelled = allPeriodPayments.filter(p => p.status === "cancelled").length;
+    const blocked = allPeriodPayments.filter(p => p.status === "blocked").length;
     const totalAmount = allPeriodPayments
       .filter(p => p.status === "eligible")
       .reduce((sum, p) => sum + (p.amount || 0), 0);
-    return { pending, eligible, paid, cancelled, total, totalAmount };
+    return { pending, eligible, paid, cancelled, blocked, total, totalAmount };
   }, [data, isInPeriod]);
 
   // Actions
@@ -457,6 +460,7 @@ export function PaymentsManagement() {
       eligible: "Liberado",
       paid: "Pago",
       cancelled: "Cancelado",
+      blocked: "Bloqueado",
     };
 
     const headers = ["Bolsista", "Email", "Projeto", "Código", "Projeto Temático", "Mês Ref.", "Valor", "Status", "Pago em"];
@@ -518,7 +522,7 @@ export function PaymentsManagement() {
       <CardContent className="space-y-6">
         {/* KPI Stats */}
         {!isLoading && (
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <div className="p-3 rounded-lg bg-muted/50 text-center">
               <p className="text-2xl font-bold text-foreground">{monthStats.total}</p>
               <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
@@ -544,8 +548,14 @@ export function PaymentsManagement() {
               </p>
             </div>
             <div className="p-3 rounded-lg bg-destructive/10 text-center">
-              <p className="text-2xl font-bold text-destructive">{monthStats.cancelled}</p>
+              <p className="text-2xl font-bold text-destructive">{monthStats.blocked}</p>
               <p className="text-xs text-destructive flex items-center justify-center gap-1">
+                <Lock className="w-3 h-3" /> Bloqueados
+              </p>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/50 text-center">
+              <p className="text-2xl font-bold text-muted-foreground">{monthStats.cancelled}</p>
+              <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
                 <Lock className="w-3 h-3" /> Cancelados
               </p>
             </div>
@@ -607,6 +617,7 @@ export function PaymentsManagement() {
                       <SelectItem value="eligible">Liberados</SelectItem>
                       <SelectItem value="paid">Pagos</SelectItem>
                       <SelectItem value="cancelled">Cancelados</SelectItem>
+                      <SelectItem value="blocked">Bloqueados</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -663,6 +674,7 @@ export function PaymentsManagement() {
                 <SelectItem value="eligible">Liberados</SelectItem>
                 <SelectItem value="paid">Pagos</SelectItem>
                 <SelectItem value="cancelled">Cancelados</SelectItem>
+                <SelectItem value="blocked">Bloqueados</SelectItem>
               </SelectContent>
             </Select>
 

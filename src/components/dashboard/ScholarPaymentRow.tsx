@@ -36,6 +36,8 @@ export interface PaymentRecord {
   paid_at: string | null;
   report_id: string | null;
   receipt_url: string | null;
+  status_reason: string | null;
+  status_gate_snapshot: Record<string, unknown> | null;
 }
 
 export interface ScholarPaymentRow {
@@ -64,6 +66,15 @@ const statusConfig: Record<string, { label: string; icon: typeof Clock; classNam
   eligible: { label: "Liberado", icon: CheckCircle, className: "bg-success/10 text-success border-success/20" },
   paid: { label: "Pago", icon: CreditCard, className: "bg-primary/10 text-primary border-primary/20" },
   cancelled: { label: "Cancelado", icon: Lock, className: "bg-destructive/10 text-destructive border-destructive/20" },
+  blocked: { label: "Bloqueado", icon: Lock, className: "bg-destructive/10 text-destructive border-destructive/20" },
+};
+
+const reasonLabels: Record<string, string> = {
+  all_ok: "Compliance OK",
+  report_not_approved: "Aguardando aprovação do relatório",
+  report_returned: "Relatório devolvido",
+  scholarship_inactive: "Bolsa inativa",
+  bank_not_verified: "Dados bancários não verificados",
 };
 
 function formatCurrency(value: number): string {
@@ -135,13 +146,20 @@ export function ScholarPaymentRowComponent({
 
         {/* Status badge */}
         <TableCell>
-          <span className={cn(
-            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border",
-            config.className
-          )}>
-            <StatusIcon className="w-3 h-3" />
-            {config.label}
-          </span>
+          <div>
+            <span className={cn(
+              "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border",
+              config.className
+            )}>
+              <StatusIcon className="w-3 h-3" />
+              {config.label}
+            </span>
+            {payment?.status_reason && payment.status_reason !== 'all_ok' && (
+              <p className="text-[10px] text-muted-foreground mt-1 max-w-[180px]">
+                {reasonLabels[payment.status_reason] || payment.status_reason}
+              </p>
+            )}
+          </div>
         </TableCell>
 
         {/* Paid date */}
@@ -245,13 +263,20 @@ export function ScholarPaymentRowComponent({
                               {formatCurrency(p.amount)}
                             </TableCell>
                             <TableCell>
-                              <span className={cn(
-                                "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border",
-                                pConfig.className
-                              )}>
-                                <PIcon className="w-3 h-3" />
-                                {pConfig.label}
-                              </span>
+                              <div>
+                                <span className={cn(
+                                  "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border",
+                                  pConfig.className
+                                )}>
+                                  <PIcon className="w-3 h-3" />
+                                  {pConfig.label}
+                                </span>
+                                {(p as any).status_reason && (p as any).status_reason !== 'all_ok' && (
+                                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                                    {reasonLabels[(p as any).status_reason] || (p as any).status_reason}
+                                  </p>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell className="text-xs text-muted-foreground">
                               {p.paid_at
