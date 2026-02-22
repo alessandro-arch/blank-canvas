@@ -1,4 +1,4 @@
-import { Search, ChevronDown, LogOut, Shield, User, Camera, Loader2, KeyRound } from "lucide-react";
+import { Search, ChevronDown, LogOut, Shield, User, Camera, Loader2, KeyRound, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import {
@@ -9,20 +9,27 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
-import { useUserRole } from "@/hooks/useUserRole";
+import { useOrganizationContext } from "@/contexts/OrganizationContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAvatarUpload } from "@/hooks/useAvatarUpload";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
-import { Button } from "@/components/ui/button";
 import { useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { getLoginRouteForPath } from "@/lib/login-redirect";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileSidebar } from "./MobileSidebar";
 
+const orgRoleLabels: Record<string, string> = {
+  admin: "Administrador",
+  manager: "Gestor",
+  auditor: "Auditor",
+  reviewer: "Avaliador",
+  beneficiary: "Bolsista",
+};
+
 export function Header() {
   const { user, signOut } = useAuth();
-  const { hasManagerAccess, role } = useUserRole();
+  const { currentMembership } = useOrganizationContext();
   const navigate = useNavigate();
   const location = useLocation();
   const { avatarUrl, uploading, uploadAvatar, refreshAvatar } = useAvatarUpload();
@@ -46,10 +53,12 @@ export function Header() {
   };
 
   const getRoleLabel = () => {
-    if (role === "admin") return "Administrador";
-    if (role === "manager") return "Gestor";
+    const role = currentMembership?.role;
+    if (role && orgRoleLabels[role]) return orgRoleLabels[role];
     return "Bolsista";
   };
+
+  const isManagerOrAdmin = currentMembership?.role === "admin" || currentMembership?.role === "manager";
 
   const handleAvatarClick = () => {
     fileInputRef.current?.click();
@@ -63,6 +72,15 @@ export function Header() {
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+  };
+
+  const handleLogout = async () => {
+    const loginRoute = getLoginRouteForPath(location.pathname);
+    // Limpar caches de organização
+    localStorage.removeItem("bolsa_conecta_current_org");
+    localStorage.removeItem("lastOrganizationId");
+    await signOut();
+    navigate(loginRoute, { replace: true });
   };
 
   return (
@@ -81,24 +99,16 @@ export function Header() {
 
       {/* Right side */}
       <div className="flex items-center gap-2 md:gap-4">
-        {/* Change Password — hidden on mobile */}
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-2 hidden md:inline-flex"
-          onClick={() => navigate("/alterar-senha")}
-        >
-          <KeyRound className="w-4 h-4" />
-          Alterar senha
-        </Button>
-
         {/* Notifications */}
         <NotificationBell />
 
         {/* User Menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-2 min-h-[44px] p-1.5 rounded-lg hover:bg-muted transition-colors">
+            <button
+              className="flex items-center gap-2 min-h-[44px] p-1.5 rounded-lg hover:bg-muted transition-colors"
+              aria-haspopup="menu"
+            >
               <Avatar className="w-8 h-8">
                 {avatarUrl && <AvatarImage src={avatarUrl} alt="Foto de perfil" />}
                 <AvatarFallback className="bg-primary/10 text-primary text-sm">
@@ -108,7 +118,7 @@ export function Header() {
               <ChevronDown className="w-4 h-4 text-muted-foreground hidden md:block" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuContent align="end" className="w-56 bg-popover z-50" role="menu">
             {/* Avatar upload section */}
             <div className="px-2 py-2 flex items-center gap-3">
               <div className="relative group">
@@ -139,10 +149,10 @@ export function Header() {
                   <span
                     className={cn(
                       "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold",
-                      hasManagerAccess ? "bg-primary text-primary-foreground" : "bg-info text-white"
+                      isManagerOrAdmin ? "bg-primary text-primary-foreground" : "bg-info text-white"
                     )}
                   >
-                    {hasManagerAccess ? <Shield className="w-3 h-3" /> : <User className="w-3 h-3" />}
+                    {isManagerOrAdmin ? <Shield className="w-3 h-3" /> : <User className="w-3 h-3" />}
                     {getRoleLabel()}
                   </span>
                 </div>
@@ -150,20 +160,22 @@ export function Header() {
             </div>
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
             <DropdownMenuSeparator />
-            {/* Mobile-only: change password link */}
-            {isMobile && (
-              <DropdownMenuItem onClick={() => navigate("/alterar-senha")}>
-                <KeyRound className="w-4 h-4 mr-2" />
-                Alterar senha
-              </DropdownMenuItem>
-            )}
+            {/* Alterar senha */}
+            <DropdownMenuItem onClick={() => navigate("/alterar-senha")} role="menuitem">
+              <KeyRound className="w-4 h-4 mr-2" />
+              Alterar senha
+            </DropdownMenuItem>
+            {/* Minha Conta */}
+            <DropdownMenuItem onClick={() => navigate("/minha-conta")} role="menuitem">
+              <Settings className="w-4 h-4 mr-2" />
+              Minha Conta
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            {/* Sair */}
             <DropdownMenuItem
-              onClick={async () => {
-                const loginRoute = getLoginRouteForPath(location.pathname);
-                await signOut();
-                navigate(loginRoute, { replace: true });
-              }}
-              className="text-destructive focus:text-destructive"
+              onClick={handleLogout}
+              role="menuitem"
+              className="bg-gray-800 dark:bg-gray-900 text-yellow-400 font-bold hover:!bg-gray-700 dark:hover:!bg-gray-800 focus:!bg-gray-700 focus:!text-yellow-400 rounded-md"
             >
               <LogOut className="w-4 h-4 mr-2" />
               Sair
