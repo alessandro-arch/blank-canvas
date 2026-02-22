@@ -1,43 +1,73 @@
 
 
-# Corrigir Visibilidade de Instituicoes Pendentes + Melhorias
+# Selo de Verificada + Alerta de Rejeicao + E-mail
 
-## Problema Identificado
+## Visao Geral
 
-A politica de RLS (Row Level Security) da tabela `institutions` so permite SELECT de registros com `status='approved'` OU `submitted_by = auth.uid()`. Isso significa que o admin **nao consegue ver** instituicoes pendentes cadastradas por outros usuarios (bolsistas). Esse e o motivo principal de nao aparecerem em "Pendentes".
+Tres melhorias no fluxo de instituicoes:
 
-## Correcoes Necessarias
+1. **Selo "Verificada"** nas instituicoes aprovadas (InstitutionCombobox e MyAccount)
+2. **Alerta na pagina Minha Conta** quando a instituicao do usuario foi rejeitada
+3. **E-mail ao usuario** quando sua instituicao e rejeitada pelo admin
 
-### 1. Migração SQL -- Corrigir politica RLS de SELECT
+---
 
-Substituir a politica `institutions_select` para permitir que admins e managers vejam **todas** as instituicoes independente do status:
+## 1. Selo de Verificada no InstitutionCombobox
 
-```sql
-DROP POLICY IF EXISTS "institutions_select" ON public.institutions;
-CREATE POLICY "institutions_select" ON public.institutions
-  FOR SELECT USING (
-    status = 'approved'
-    OR submitted_by = auth.uid()
-    OR has_role(auth.uid(), 'admin'::app_role)
-    OR has_role(auth.uid(), 'manager'::app_role)
-  );
-```
+No componente `InstitutionCombobox`, ao exibir uma instituicao aprovada, mostrar um badge verde com icone de verificado:
 
-Politica PERMISSIVE conforme padrao do projeto.
+- Status `approved` -> Badge verde "Verificada" com icone CheckCircle
+- Status `pending` -> Badge amarelo "Pendente" (ja existe)
+- Status `rejected` -> Badge vermelho "Rejeitada"
 
-### 2. Corrigir mapa de tipos em InstitutionsManagement.tsx
+Arquivo: `src/components/my-account/InstitutionCombobox.tsx`
+- Linha ~372: adicionar badges para `approved` e `rejected` alem do `pending` existente
+- Na lista de resultados do combobox (~linha 397): exibir icone de verificado ao lado de instituicoes aprovadas
 
-Adicionar `instituto_pesquisa: "Instituto de Pesquisa"` ao mapa `typeLabel` (linha 149), que atualmente nao inclui esse tipo.
+## 2. Alerta na pagina Minha Conta
 
-### 3. Corrigir bug de duplicatas no InstitutionCombobox
+Na pagina `MyAccount.tsx`, apos carregar os dados do perfil, verificar o status da instituicao do usuario. Se `rejected`, exibir um banner de alerta vermelho acima dos cards, com:
+- Icone de alerta
+- Texto: "Sua instituicao/empresa foi rejeitada. Motivo: [motivo]"
+- Botao para cadastrar novamente
 
-Na funcao `handleManualSubmit`, ha um bug logico: na primeira vez que duplicatas sao encontradas, `duplicates` ainda esta vazio (o state nao atualizou), entao o retorno precoce nao funciona como esperado. Corrigir para usar o retorno de `checkDuplicates` diretamente.
+Para isso, buscar tambem `rejection_reason` da tabela `institutions` quando carregar a instituicao do usuario.
+
+Arquivo: `src/pages/MyAccount.tsx`
+- Adicionar estado para `rejectionReason`
+- Na query de instituicao (linha ~60), incluir `rejection_reason` no select
+- Renderizar banner de alerta quando `institutionData.status === "rejected"`
+
+## 3. E-mail de rejeicao ao usuario
+
+Quando o admin rejeita uma instituicao em `InstitutionsManagement.tsx`, enviar e-mail ao usuario que a cadastrou (campo `submitted_by`).
+
+Fluxo:
+1. No `handleReject`, apos atualizar o status, buscar o e-mail e nome do usuario via `submitted_by`
+2. Criar uma notificacao na tabela `notifications` para o usuario
+3. Chamar a edge function `send-system-email` para enviar e-mail com motivo da rejeicao
+
+Arquivo: `src/pages/InstitutionsManagement.tsx`
+- Apos o update bem-sucedido no `handleReject`:
+  - Buscar perfil e e-mail do usuario (`submitted_by`)
+  - Inserir registro na tabela `notifications`
+  - Invocar `send-system-email` para envio de e-mail
+
+Tambem: na aprovacao (`handleApprove`), criar notificacao informando que foi aprovada.
+
+## 4. Notificacao in-app
+
+Inserir na tabela `notifications` tanto na aprovacao quanto na rejeicao para que o sino de notificacoes mostre o evento ao usuario.
+
+---
 
 ## Arquivos Modificados
 
 | Arquivo | Alteracao |
 |---|---|
-| Migracao SQL | Corrigir RLS SELECT para admins/managers verem todas as instituicoes |
-| `src/pages/InstitutionsManagement.tsx` | Adicionar "Instituto de Pesquisa" ao mapa de tipos |
-| `src/components/my-account/InstitutionCombobox.tsx` | Corrigir logica de verificacao de duplicatas |
+| `src/components/my-account/InstitutionCombobox.tsx` | Adicionar badges de "Verificada" e "Rejeitada" |
+| `src/pages/MyAccount.tsx` | Banner de alerta para instituicao rejeitada |
+| `src/pages/InstitutionsManagement.tsx` | Enviar notificacao + e-mail na aprovacao e rejeicao |
+
+Nenhuma migracao SQL necessaria (tabela `notifications` ja existe).
 
