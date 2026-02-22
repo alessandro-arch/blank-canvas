@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { UserPlus, Search, Pencil, UserX, UserCheck, Clock, Mail, Users, XCircle, ShieldCheck, RefreshCw, AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
+import { UserPlus, Search, Pencil, UserX, UserCheck, Clock, Mail, Users, XCircle, ShieldCheck, RefreshCw, AlertTriangle, CheckCircle2, Loader2, Globe } from "lucide-react";
 import { useAdminMembers } from "@/hooks/useAdminMembers";
 import { AddMemberDialog } from "./AddMemberDialog";
 import { EditMemberDialog } from "./EditMemberDialog";
@@ -269,7 +269,16 @@ export function AdminMembersManagement() {
                   <TableRow key={m.id} className={!m.is_active ? "opacity-50" : ""}>
                     <TableCell className="font-medium">{m.full_name || "—"}</TableCell>
                     <TableCell>{m.email || "—"}</TableCell>
-                    <TableCell className="text-sm">{m.organization_name || "—"}</TableCell>
+                    <TableCell className="text-sm">
+                      {m.organization_name === "Todas" ? (
+                        <Badge className="bg-yellow-500 text-white border-0 gap-1">
+                          <Globe className="h-3 w-3" />
+                          Todas
+                        </Badge>
+                      ) : (
+                        m.organization_name || "—"
+                      )}
+                    </TableCell>
                     <TableCell>{roleBadge(m.role)}</TableCell>
                     <TableCell>
                       {m.is_active ? (

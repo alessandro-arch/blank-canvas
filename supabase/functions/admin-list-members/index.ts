@@ -115,6 +115,15 @@ Deno.serve(async (req) => {
       .select('user_id, full_name, avatar_url')
       .in('user_id', userIds);
 
+    // Check which users are system admins
+    const { data: systemAdmins } = await supabaseAdmin
+      .from('user_roles')
+      .select('user_id')
+      .eq('role', 'admin')
+      .in('user_id', userIds);
+
+    const systemAdminSet = new Set((systemAdmins || []).map(r => r.user_id));
+
     // Fetch emails from auth.users (service role only)
     const { data: authUsersData } = await supabaseAdmin.auth.admin.listUsers({
       perPage: 1000,
@@ -138,7 +147,7 @@ Deno.serve(async (req) => {
       id: m.id,
       user_id: m.user_id,
       organization_id: m.organization_id,
-      organization_name: orgName,
+      organization_name: systemAdminSet.has(m.user_id) ? "Todas" : orgName,
       role: m.role,
       is_active: m.is_active,
       permissions: m.permissions,
