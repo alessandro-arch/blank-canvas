@@ -62,6 +62,7 @@ import Settings from "./pages/Settings";
 import PdfReports from "./pages/PdfReports";
 import AuditorDashboard from "./pages/AuditorDashboard";
 import AuditorHelp from "./pages/AuditorHelp";
+import MyAccount from "./pages/MyAccount";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -152,6 +153,13 @@ const App = () => (
               <Route path="/alterar-senha" element={
                 <ProtectedRoute>
                   <ChangePassword />
+                </ProtectedRoute>
+              } />
+              
+              {/* My Account - accessible by all authenticated users */}
+              <Route path="/minha-conta" element={
+                <ProtectedRoute>
+                  <MyAccount />
                 </ProtectedRoute>
               } />
               
