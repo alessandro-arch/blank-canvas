@@ -17,6 +17,10 @@ import {
   FileUp,
   CreditCard,
   Users,
+  Eye,
+  ExternalLink,
+  FileDown,
+  FileX,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,6 +51,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAuditLog } from "@/hooks/useAuditLog";
+import { useUserRole } from "@/hooks/useUserRole";
+import { downloadPaymentReceipt } from "@/hooks/useSignedUrl";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -68,6 +74,7 @@ function formatCurrency(value: number): string {
 export function PaymentsManagement() {
   const { user } = useAuth();
   const { logAction } = useAuditLog();
+  const { isAuditor } = useUserRole();
   const isMobile = useIsMobile();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -96,6 +103,12 @@ export function PaymentsManagement() {
   const [attachScholar, setAttachScholar] = useState<ScholarPaymentRow | null>(null);
   const [attachReceiptUrl, setAttachReceiptUrl] = useState<string | null>(null);
   const [attachSubmitting, setAttachSubmitting] = useState(false);
+
+  // View receipt dialog (read-only for auditor)
+  const [viewReceiptDialogOpen, setViewReceiptDialogOpen] = useState(false);
+  const [viewReceiptPayment, setViewReceiptPayment] = useState<PaymentRecord | null>(null);
+  const [viewReceiptScholar, setViewReceiptScholar] = useState<ScholarPaymentRow | null>(null);
+  const [viewReceiptLoading, setViewReceiptLoading] = useState(false);
 
   // Helper to update query params
   const updateQueryParams = (updates: Record<string, string>) => {
@@ -343,6 +356,36 @@ export function PaymentsManagement() {
 
   const handleSendReminder = (scholar: ScholarPaymentRow) => {
     toast.info(`Lembrete enviado para ${scholar.full_name}`);
+  };
+
+  const handleViewReceipt = (payment: PaymentRecord, scholar: ScholarPaymentRow) => {
+    setViewReceiptPayment(payment);
+    setViewReceiptScholar(scholar);
+    setViewReceiptDialogOpen(true);
+  };
+
+  const handleOpenReceiptFile = async () => {
+    if (!viewReceiptPayment?.receipt_url) return;
+    setViewReceiptLoading(true);
+    try {
+      const { data, error } = await supabase.storage
+        .from("payment-receipts")
+        .createSignedUrl(viewReceiptPayment.receipt_url, 300);
+      if (error || !data?.signedUrl) {
+        toast.error("Erro ao gerar link do comprovante");
+        return;
+      }
+      window.open(data.signedUrl, "_blank");
+    } catch {
+      toast.error("Erro ao abrir comprovante");
+    } finally {
+      setViewReceiptLoading(false);
+    }
+  };
+
+  const handleDownloadReceiptFile = async () => {
+    if (!viewReceiptPayment?.receipt_url) return;
+    await downloadPaymentReceipt(viewReceiptPayment.receipt_url, `comprovante-${viewReceiptPayment.reference_month}.pdf`);
   };
 
   const handleReceiptUploaded = (url: string) => {
@@ -744,6 +787,8 @@ export function PaymentsManagement() {
                   onMarkAsPaid={handleOpenConfirm}
                   onAttachReceipt={handleOpenAttachReceipt}
                   onSendReminder={handleSendReminder}
+                  readOnly={isAuditor}
+                  onViewReceipt={handleViewReceipt}
                 />
               ))}
             </div>
@@ -767,6 +812,8 @@ export function PaymentsManagement() {
                     onMarkAsPaid={handleOpenConfirm}
                     onAttachReceipt={handleOpenAttachReceipt}
                     onSendReminder={handleSendReminder}
+                    readOnly={isAuditor}
+                    onViewReceipt={handleViewReceipt}
                   />
                 ))}
               </TableBody>
@@ -919,6 +966,95 @@ export function PaymentsManagement() {
             >
               {attachSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
               Salvar Comprovante
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Receipt Dialog (Read-Only for Auditor) */}
+      <Dialog open={viewReceiptDialogOpen} onOpenChange={setViewReceiptDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="w-5 h-5 text-primary" />
+              Ver Comprovante
+            </DialogTitle>
+            <DialogDescription>
+              Detalhes do pagamento e comprovante anexado
+            </DialogDescription>
+          </DialogHeader>
+
+          {viewReceiptPayment && viewReceiptScholar && (
+            <div className="space-y-4">
+              <div className="p-4 bg-muted/50 rounded-lg space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Bolsista</span>
+                  <span className="font-medium">{viewReceiptScholar.full_name}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Projeto</span>
+                  <span className="font-medium">{viewReceiptScholar.project_code}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Referência</span>
+                  <span className="font-medium">{formatMonthLabel(viewReceiptPayment.reference_month)}</span>
+                </div>
+                <div className="flex items-center justify-between pt-2 border-t border-border">
+                  <span className="text-sm font-medium">Valor</span>
+                  <span className="text-lg font-bold text-primary">
+                    {formatCurrency(viewReceiptPayment.amount)}
+                  </span>
+                </div>
+                {viewReceiptPayment.paid_at && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Pago em</span>
+                    <span className="text-sm font-medium flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      {format(parseISO(viewReceiptPayment.paid_at), "dd/MM/yyyy")}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {viewReceiptPayment.receipt_url ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 p-2 bg-success/10 rounded-lg text-success text-sm">
+                    <CheckCircle className="w-4 h-4" />
+                    <span>Comprovante anexado</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1 gap-2"
+                      onClick={handleOpenReceiptFile}
+                      disabled={viewReceiptLoading}
+                    >
+                      {viewReceiptLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
+                      Abrir
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1 gap-2"
+                      onClick={handleDownloadReceiptFile}
+                    >
+                      <FileDown className="w-4 h-4" />
+                      Baixar
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2 py-6 text-muted-foreground">
+                  <FileX className="w-10 h-10 text-muted-foreground/50" />
+                  <p className="text-sm font-medium">Sem comprovante anexado</p>
+                  <p className="text-xs text-center">Nenhum comprovante foi anexado a este pagamento.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewReceiptDialogOpen(false)}>
+              Fechar
             </Button>
           </DialogFooter>
         </DialogContent>

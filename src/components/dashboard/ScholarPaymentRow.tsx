@@ -10,6 +10,7 @@ import {
   DollarSign,
   Paperclip,
   Send,
+  Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -59,6 +60,8 @@ interface ScholarPaymentRowProps {
   onMarkAsPaid: (payment: PaymentRecord, scholar: ScholarPaymentRow) => void;
   onAttachReceipt: (payment: PaymentRecord, scholar: ScholarPaymentRow) => void;
   onSendReminder: (scholar: ScholarPaymentRow) => void;
+  readOnly?: boolean;
+  onViewReceipt?: (payment: PaymentRecord, scholar: ScholarPaymentRow) => void;
 }
 
 const statusConfig: Record<string, { label: string; icon: typeof Clock; className: string }> = {
@@ -99,6 +102,8 @@ export function ScholarPaymentRowComponent({
   onMarkAsPaid,
   onAttachReceipt,
   onSendReminder,
+  readOnly = false,
+  onViewReceipt,
 }: ScholarPaymentRowProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -224,15 +229,17 @@ export function ScholarPaymentRowComponent({
                   <p className="text-sm text-muted-foreground mb-3">
                     Sem pagamento nesta competência
                   </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5"
-                    onClick={() => onSendReminder(scholar)}
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    Enviar lembrete
-                  </Button>
+                  {!readOnly && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => onSendReminder(scholar)}
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      Enviar lembrete
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <div className="rounded-lg border overflow-hidden bg-background">
@@ -286,7 +293,7 @@ export function ScholarPaymentRowComponent({
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-1 flex-wrap">
-                                {p.status === "eligible" && (
+                                {!readOnly && p.status === "eligible" && (
                                   <Button
                                     size="sm"
                                     className="gap-1 text-xs h-7 px-2"
@@ -296,7 +303,18 @@ export function ScholarPaymentRowComponent({
                                     Pagar
                                   </Button>
                                 )}
-                                {p.status === "paid" && (
+                                {p.status === "paid" && readOnly && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="gap-1 text-xs h-7 px-2"
+                                    onClick={() => onViewReceipt?.(p, scholar)}
+                                  >
+                                    <Eye className="w-3 h-3" />
+                                    Ver Comprovante
+                                  </Button>
+                                )}
+                                {p.status === "paid" && !readOnly && (
                                   <Button
                                     variant="outline"
                                     size="sm"
