@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ChevronsUpDown, Check, Plus, X, Clock, AlertTriangle } from "lucide-react";
+import { ChevronsUpDown, Check, Plus, X, Clock, AlertTriangle, CheckCircle, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCNPJ, unformatCNPJ, validateCNPJ } from "@/lib/cnpj-validator";
 import { toast } from "sonner";
@@ -369,9 +369,19 @@ export function InstitutionCombobox({ value, onChange, disabled }: InstitutionCo
             {displayValue ? (
               <span className="truncate text-sm flex items-center gap-2">
                 {displayValue}
+                {value.status === "approved" && (
+                  <Badge variant="outline" className="text-green-600 border-green-500/50 text-[10px] gap-1">
+                    <CheckCircle className="w-3 h-3" /> Verificada
+                  </Badge>
+                )}
                 {value.status === "pending" && (
                   <Badge variant="outline" className="text-yellow-600 border-yellow-500/50 text-[10px] gap-1">
                     <Clock className="w-3 h-3" /> Pendente
+                  </Badge>
+                )}
+                {value.status === "rejected" && (
+                  <Badge variant="outline" className="text-destructive border-destructive/50 text-[10px] gap-1">
+                    <XCircle className="w-3 h-3" /> Rejeitada
                   </Badge>
                 )}
               </span>
@@ -394,7 +404,10 @@ export function InstitutionCombobox({ value, onChange, disabled }: InstitutionCo
                   {results.map((inst) => (
                     <CommandItem key={inst.id} value={inst.id} onSelect={() => handleSelect(inst)} className="cursor-pointer">
                       <Check className={cn("mr-2 h-4 w-4", value.id === inst.id ? "opacity-100" : "opacity-0")} />
-                      <span className="text-sm">{inst.name}{inst.acronym && ` (${inst.acronym})`} — {inst.uf}</span>
+                      <span className="text-sm flex items-center gap-1.5">
+                        {inst.name}{inst.acronym && ` (${inst.acronym})`} — {inst.uf}
+                        {inst.status === "approved" && <CheckCircle className="w-3.5 h-3.5 text-green-600 shrink-0" />}
+                      </span>
                     </CommandItem>
                   ))}
                 </CommandGroup>
