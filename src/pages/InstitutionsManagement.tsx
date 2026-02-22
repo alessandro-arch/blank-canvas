@@ -146,7 +146,7 @@ export default function InstitutionsManagement() {
   };
 
   const typeLabel = (t: string | null) => {
-    const map: Record<string, string> = { ies: "IES", empresa: "Empresa", ong: "ONG", orgao_publico: "Órgão Público" };
+    const map: Record<string, string> = { ies: "IES", empresa: "Empresa", ong: "ONG", orgao_publico: "Órgão Público", instituto_pesquisa: "Instituto de Pesquisa" };
     return t ? map[t] || t : "—";
   };
 
