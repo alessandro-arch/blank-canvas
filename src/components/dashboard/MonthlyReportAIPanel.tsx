@@ -41,6 +41,7 @@ interface MonthlyReportAIPanelProps {
   projectId?: string;
   reportStatus?: string;
   onInsertToFeedback?: (text: string) => void;
+  readOnly?: boolean;
 }
 
 const METRIC_LABELS: Record<string, string> = {
@@ -124,7 +125,7 @@ function buildPlainTextParecer(data: AIParecerOutput): string {
   return lines.join("\n");
 }
 
-export function MonthlyReportAIPanel({ reportId, reportStatus, onInsertToFeedback }: MonthlyReportAIPanelProps) {
+export function MonthlyReportAIPanel({ reportId, reportStatus, onInsertToFeedback, readOnly }: MonthlyReportAIPanelProps) {
   const [loading, setLoading] = useState(false);
   const [loadingSaved, setLoadingSaved] = useState(false);
   const [result, setResult] = useState<AIParecerOutput | null>(null);
@@ -349,7 +350,7 @@ export function MonthlyReportAIPanel({ reportId, reportStatus, onInsertToFeedbac
                     <Sparkles className="h-4 w-4" />
                     Ver Parecer Salvo
                   </Button>
-                ) : (
+                ) : !readOnly ? (
                   <Button
                     onClick={handleGenerate}
                     disabled={loading}
@@ -359,6 +360,8 @@ export function MonthlyReportAIPanel({ reportId, reportStatus, onInsertToFeedbac
                     {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                     {loading ? "Gerando parecer completo..." : "Gerar Parecer Completo"}
                   </Button>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-2">Nenhum parecer disponível para este relatório.</p>
                 )}
               </>
             )}
@@ -386,10 +389,12 @@ export function MonthlyReportAIPanel({ reportId, reportStatus, onInsertToFeedbac
                       <ClipboardPaste className="h-3 w-3" /> Inserir no parecer
                     </Button>
                   )}
-                  <Button variant="ghost" size="sm" className="h-7 text-xs gap-1.5 ml-auto" onClick={handleGenerate} disabled={loading}>
-                    {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                    Regenerar
-                  </Button>
+                  {!readOnly && (
+                    <Button variant="ghost" size="sm" className="h-7 text-xs gap-1.5 ml-auto" onClick={handleGenerate} disabled={loading}>
+                      {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                      Regenerar
+                    </Button>
+                  )}
                 </div>
 
                 {renderContent(false)}
