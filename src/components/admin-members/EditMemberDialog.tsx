@@ -50,6 +50,7 @@ export function EditMemberDialog({ open, onOpenChange, member, onUpdateRole, onT
                 <SelectItem value="admin">Admin</SelectItem>
                 <SelectItem value="manager">Manager</SelectItem>
                 <SelectItem value="reviewer">Reviewer</SelectItem>
+                <SelectItem value="auditor">Auditor</SelectItem>
               </SelectContent>
             </Select>
           </div>
