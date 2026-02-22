@@ -1,59 +1,39 @@
 
+# Fix: Add 'auditor' to database CHECK constraints
 
-# Patch: Auditor Onboarding via Membros Admin
+## Problem
+When creating an invite with role "Auditor" via Membros Admin, the database rejects the insert because two CHECK constraints don't include 'auditor':
 
-## Summary
-Adjust the Auditor entry flow so it exclusively uses the "Membros Admin > Convidar Membro" path (already functional), and fix missing pieces: redirect mapping, role labels, and ensure the scholar signup flow does NOT allow auditor creation.
+1. `organization_invites_role_check` -- only allows ('admin', 'manager', 'reviewer', 'beneficiary')
+2. `org_members_role_check` on `organization_members` -- same list, also missing 'auditor'
 
-## Current State (already working)
-- AddMemberDialog already includes "Auditor" role option
-- OrgMemberSignup page collects only Name/Email/Password (no CPF) -- suitable for auditors
-- InviteAccept page handles invite token validation and auto-accept
-- AuditorProtectedRoute and AuditorDashboard exist
-- Auditor login at /auditor/login exists
+## Solution
+A single database migration that:
 
-## Changes Required
+1. Drops and recreates `organization_invites_role_check` to include 'auditor'
+2. Drops and recreates `org_members_role_check` to include 'auditor'
 
-### 1. Fix InviteAccept role redirect and label for Auditor
-**File:** `src/pages/InviteAccept.tsx`
-- Add `auditor: "/auditor/dashboard"` to `roleRedirects` map (currently missing)
-- Add "Auditor" to the `roleLabel` mapping in the accepted state so it shows "Auditor" instead of "Proponente"
+```sql
+ALTER TABLE organization_invites
+  DROP CONSTRAINT IF EXISTS organization_invites_role_check;
+ALTER TABLE organization_invites
+  ADD CONSTRAINT organization_invites_role_check
+  CHECK (role IN ('admin','manager','reviewer','auditor','beneficiary'));
 
-### 2. Ensure Scholar signup does NOT create auditors
-**File:** `src/pages/ScholarSignup.tsx`
-- Verify this page only creates `scholar` roles (it should already be the case since it uses invite codes, not org invites). No changes expected, just verification.
-
-### 3. No database changes needed
-- The `accept_org_invite` RPC was already updated in a previous migration to handle `auditor` role in both `organization_members` and `user_roles`.
-- RLS policies already exclude auditor from `bank_accounts` and `profiles_sensitive`.
-
-### 4. Minor UX polish in InviteAccept for auditor-specific messaging
-When an auditor receives an invite and is not logged in, the page currently directs to `/admin/login`. This is correct since the OrgMemberSignup flow also works. No change needed here.
-
-## Technical Details
-
-### InviteAccept.tsx changes
-```typescript
-// Add auditor to roleRedirects
-const roleRedirects: Record<string, string> = {
-  admin: "/admin/dashboard",
-  manager: "/admin/dashboard",
-  reviewer: "/admin/dashboard",
-  auditor: "/auditor/dashboard",       // NEW
-  beneficiary: "/bolsista/painel",
-  proponente: "/bolsista/painel",
-};
-
-// Fix roleLabel to include Auditor
-const roleLabel = acceptedRole === "admin" ? "Administrador" 
-  : acceptedRole === "manager" ? "Gestor" 
-  : acceptedRole === "reviewer" ? "Avaliador" 
-  : acceptedRole === "auditor" ? "Auditor"   // NEW
-  : "Proponente";
+ALTER TABLE organization_members
+  DROP CONSTRAINT IF EXISTS org_members_role_check;
+ALTER TABLE organization_members
+  ADD CONSTRAINT org_members_role_check
+  CHECK (role IN ('admin','manager','reviewer','auditor','beneficiary'));
 ```
 
-### Scope
-- 1 file modified (InviteAccept.tsx)
-- 0 database migrations
-- 0 new files
+## What this fixes
+- Creating auditor invites from "Membros Admin > Convidar Membro" will work
+- Accepting auditor invites (which inserts into organization_members) will work
 
+## No frontend changes needed
+All frontend code already supports the auditor role from previous implementation steps.
+
+## Scope
+- 1 database migration
+- 0 file changes
