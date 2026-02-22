@@ -1,172 +1,117 @@
 
+# Notificacoes Automaticas para Decisao de Relatorio Mensal
 
-# Overhaul da IA de Avaliacao de Relatorio Mensal
+## Contexto Atual
 
-## Resumo
+O sistema ja possui:
+- Trigger `notify_report_status_change` na tabela **legacy** `reports` (cria notificacao + mensagem inbox + dispara e-mail via `send-system-email`)
+- Trigger `queue_system_message_email` na tabela `messages` que chama a Edge Function `send-system-email` via `net.http_post`
+- Coluna `email_notifications_enabled` na tabela `organizations` para controle por org
+- Funcoes RPC `approve_monthly_report` e `return_monthly_report` que ja gravam audit_logs mas **nao criam notificacoes**
 
-Reescrever o sistema de avaliacao por IA para produzir pareceres tecnicos rigorosos em formato JSON estruturado, sem Markdown, usando obrigatoriamente o Plano de Trabalho e o historico de relatorios anteriores. Inclui nova Edge Function, nova tabela de outputs, novo componente de renderizacao e sanitizacao de saida.
+O que falta: um trigger equivalente na tabela `monthly_reports` para gerar notificacao, mensagem inbox (que automaticamente dispara e-mail) e log de auditoria de notificacao.
 
-## Fase 1 -- Nova Edge Function: `ai-evaluate-monthly-report`
+## Plano de Implementacao
 
-Substituir a logica atual da `ai-analyze-report` por uma nova Edge Function unificada que:
+### Fase 1: Migration SQL (trigger + tabela de log)
 
-1. Recebe `{ report_id }` (sem `type` -- gera tudo de uma vez)
-2. Busca:
-   - Relatorio mensal atual (campos + metadados)
-   - Perfil do bolsista (nome, instituicao, nivel)
-   - Plano de Trabalho ativo (`extracted_text`, `extracted_json`) via `work_plans`
-   - Historico dos ultimos 6 relatorios (status, parecer do gestor, resumo de entregas)
-   - Metadados do projeto (titulo, codigo, periodo, vigencia)
-3. Monta prompt com regras estritas:
-   - Idioma: pt-BR obrigatorio
-   - Formato: JSON puro (schema definido no prompt)
-   - Sem Markdown, sem asteriscos
-   - Sem mencao a "horas dedicadas"
-   - Regra anti-elogio: penalizar relatos genericos sem evidencias
-   - Citar ao menos 2 elementos do Plano e 1 comparacao historica
-   - Metricas 0-5: aderencia_plano, evidencia_verificabilidade, progresso_vs_historico, qualidade_tecnica_clareza
-   - Decisao sugerida: aprovar / aprovar_com_ressalvas / devolver
-4. Chama LLM via Lovable AI Gateway
-5. Valida retorno com `JSON.parse` + sanitizacao (remove caracteres CJK, garante schema)
-6. Salva em `monthly_report_ai_outputs`
-7. Retorna o JSON parseado
+Criar uma migration com:
 
-### Prompt system (resumo):
+1. **Tabela `notification_delivery_logs`** para auditoria de entregas:
+   - `id` uuid PK
+   - `user_id` uuid NOT NULL
+   - `report_id` uuid NOT NULL (ref monthly_reports)
+   - `status` text NOT NULL (approved, returned)
+   - `sent_in_app` boolean DEFAULT false
+   - `sent_email` boolean DEFAULT false
+   - `created_at` timestamptz DEFAULT now()
+   - Indice unico em `(report_id, status)` para prevenir duplicidade
+   - RLS: leitura para admins/managers da org
 
-```text
-Voce e um avaliador tecnico de relatorios mensais de bolsistas de pesquisa.
-Regras:
-- Responda EXCLUSIVAMENTE em JSON valido, sem Markdown.
-- Idioma: pt-BR.
-- NAO use asteriscos, hashtags ou formatacao Markdown.
-- NAO mencione "horas dedicadas vs esperado".
-- Se o relatorio for curto/generico/sem evidencias, reduza fortemente as notas.
-- Elogios so com evidencias explicitas (numeros, datasets, resultados).
-- Cite ao menos 2 elementos do Plano de Trabalho.
-- Compare com historico quando disponivel.
-- Schema JSON obrigatorio: { parecer: { ... }, indicadores: { ... }, ... }
-```
+2. **Funcao `notify_monthly_report_decision()`** (trigger AFTER UPDATE em monthly_reports):
+   - Dispara quando `OLD.status != NEW.status` e `NEW.status IN ('approved', 'returned')`
+   - Verifica duplicidade: se ja existe log para `(report_id, status)`, retorna sem agir
+   - Monta titulo e mensagem com periodo formatado (ex: "Fevereiro/2026")
+   - Insere na tabela `notifications` (notificacao bell)
+   - Insere na tabela `messages` com `type = 'SYSTEM'` e `event_type` adequado (isso automaticamente aciona o trigger `queue_system_message_email` existente, que chama `send-system-email` via Resend)
+   - Insere log na `notification_delivery_logs`
+   - Respeita `organizations.email_notifications_enabled`
 
-### Sanitizacao pos-LLM:
+3. **Trigger** `trigger_notify_monthly_report_decision` AFTER UPDATE em `monthly_reports`
 
-- Extrair JSON de dentro de code fences se a LLM envolver em ```json
-- `JSON.parse` + fallback
-- Regex para remover caracteres CJK: `/[\u4e00-\u9fff\u3400-\u4dbf]/g`
-- Remover asteriscos remanescentes
-- Validar campos obrigatorios do schema
+### Fase 2: Template de e-mail diferenciado (Edge Function)
 
-Arquivo: `supabase/functions/ai-evaluate-monthly-report/index.ts`
+Atualizar a Edge Function `send-system-email` para detectar `event_type` de relatorio mensal e usar templates HTML especificos:
 
-## Fase 2 -- Nova Tabela: `monthly_report_ai_outputs`
+- `MONTHLY_REPORT_APPROVED`: template verde com icone de aprovacao, link para `/bolsista/relatorios`
+- `MONTHLY_REPORT_RETURNED`: template com alerta, exibindo motivo da devolucao, link para `/bolsista/relatorios`
+
+Os dados dinamicos (nome do bolsista, periodo, projeto, comentarios do gestor) serao passados via campos da mensagem.
+
+### Fase 3: Nenhuma alteracao no frontend
+
+O componente `NotificationBell` ja consome a tabela `notifications` com real-time subscription, entao as notificacoes aparecerao automaticamente no sino do bolsista sem alteracao de codigo.
+
+## Detalhes Tecnicos
+
+### Trigger SQL (pseudocodigo)
 
 ```text
-Colunas:
-- id (uuid PK)
-- report_id (uuid NOT NULL, FK monthly_reports)
-- organization_id (uuid NOT NULL)
-- payload (jsonb NOT NULL) -- JSON completo do parecer
-- model (text)
-- prompt_version (text DEFAULT 'v1')
-- generated_by (uuid NULL) -- user que disparou
-- created_at (timestamptz DEFAULT now())
-
-Indices:
-- (report_id) unique
-- (organization_id)
-
-RLS:
-- SELECT gestor/admin: org scoped
-- INSERT/UPDATE/DELETE: bloqueado via RLS (apenas service_role na Edge Function)
+FUNCTION notify_monthly_report_decision()
+  -- Skip if no status change
+  IF OLD.status = NEW.status THEN RETURN NEW
+  
+  -- Only for final decisions
+  IF NEW.status NOT IN ('approved', 'returned') THEN RETURN NEW
+  
+  -- Dedup check
+  IF EXISTS(SELECT 1 FROM notification_delivery_logs 
+            WHERE report_id = NEW.id AND status = NEW.status) THEN RETURN NEW
+  
+  -- Build message
+  periodo = nome_mes(NEW.period_month) || '/' || NEW.period_year
+  
+  IF NEW.status = 'approved':
+    titulo = 'Relatorio Mensal Aprovado'
+    mensagem = 'Seu relatorio de {periodo} foi aprovado!'
+    tipo_notif = 'success'
+    event_type = 'MONTHLY_REPORT_APPROVED'
+  ELSE: -- returned
+    titulo = 'Relatorio Devolvido para Ajustes'
+    mensagem = 'Seu relatorio de {periodo} foi devolvido. Motivo: {return_reason}'
+    tipo_notif = 'warning'
+    event_type = 'MONTHLY_REPORT_RETURNED'
+  
+  -- Bell notification
+  INSERT INTO notifications (user_id, title, message, type, entity_type, entity_id)
+  VALUES (NEW.beneficiary_user_id, titulo, mensagem, tipo_notif, 'monthly_report', NEW.id)
+  
+  -- Inbox message (triggers email automatically via queue_system_message_email)
+  INSERT INTO messages (recipient_id, sender_id, subject, body, type, event_type, 
+                        link_url, organization_id)
+  VALUES (NEW.beneficiary_user_id, NULL, titulo, mensagem, 'SYSTEM', event_type,
+          '/bolsista/relatorios', NEW.organization_id)
+  
+  -- Delivery log
+  INSERT INTO notification_delivery_logs (user_id, report_id, status, sent_in_app, sent_email)
+  VALUES (NEW.beneficiary_user_id, NEW.id, NEW.status, true, v_email_enabled)
 ```
 
-Migracao SQL a ser proposta via ferramenta de banco.
+### Edge Function send-system-email
 
-## Fase 3 -- Atualizar `MonthlyReportAIPanel.tsx` (reescrita)
+Adicionar deteccao do `event_type` via lookup na tabela `messages` para personalizar o template HTML quando for `MONTHLY_REPORT_APPROVED` ou `MONTHLY_REPORT_RETURNED`.
 
-Mudancas principais:
+### Arquivos Modificados
 
-1. Substituir os 5 botoes individuais por um unico botao "Gerar Parecer Completo" que chama `ai-evaluate-monthly-report`
-2. O resultado e um objeto JSON tipado, nao texto livre
-3. Renderizar o JSON em componentes visuais:
-   - Card de identificacao (bolsista, projeto, periodo)
-   - Secoes de avaliacao tecnica com titulos e texto limpo
-   - 4 metricas com barras de progresso (0-5)
-   - Listas de evidencias, lacunas, riscos, perguntas
-   - Badge de decisao sugerida (aprovar=verde, ressalvas=amarelo, devolver=vermelho)
-   - Justificativa da decisao
-4. Botoes "Inserir no parecer" (insere justificativa_decisao limpa) e "Copiar parecer" (copia texto formatado sem Markdown)
-5. Manter botao "Expandir" para fullscreen
-6. Alerta "Gerado por IA -- requer validacao do gestor"
-7. Se plano de trabalho nao existir, exibir alerta amarelo antes de gerar
+| Arquivo | Alteracao |
+|---------|-----------|
+| Nova migration SQL | Tabela + funcao + trigger |
+| `supabase/functions/send-system-email/index.ts` | Templates diferenciados por event_type |
 
-### Tipos TypeScript:
+### Sem alteracoes necessarias
 
-```text
-interface AIParecerOutput {
-  parecer: {
-    titulo: string;
-    identificacao: { bolsista: string; instituicao: string; nivel: string; projeto: string; periodo: string };
-    sumario: string[];
-    avaliacao_tecnica: { secao: string; texto: string }[];
-    metricas: {
-      aderencia_plano_0a5: number;
-      evidencia_verificabilidade_0a5: number;
-      progresso_vs_historico_0a5: number;
-      qualidade_tecnica_clareza_0a5: number;
-    };
-    evidencias: string[];
-    lacunas: string[];
-    riscos_pendencias: string[];
-    perguntas_ao_bolsista: string[];
-    decisao_sugerida: "aprovar" | "aprovar_com_ressalvas" | "devolver";
-    justificativa_decisao: string;
-  };
-  indicadores: Record<string, unknown>;
-  analise_riscos: { riscos: string[]; mitigacoes: string[] };
-  resumo_executivo: { texto: string };
-}
-```
-
-## Fase 4 -- Atualizar `MonthlyReportsReviewManagement.tsx`
-
-- Remover referencia a "horas_dedicadas" no dialog de campos (linha 855)
-- O painel de IA ja e renderizado dentro do review dialog (linha 797), apenas garantir que a nova versao funcione
-
-## Fase 5 -- Atualizar `supabase/config.toml`
-
-Adicionar:
-```text
-[functions.ai-evaluate-monthly-report]
-verify_jwt = false
-```
-
-## Fase 6 -- Manter Edge Function antiga
-
-A `ai-analyze-report` existente sera mantida para compatibilidade, mas o painel usara a nova `ai-evaluate-monthly-report`.
-
-## Arquivos a Criar
-
-| Arquivo | Descricao |
-|---|---|
-| `supabase/functions/ai-evaluate-monthly-report/index.ts` | Nova Edge Function unificada |
-
-## Arquivos a Editar
-
-| Arquivo | Mudanca |
-|---|---|
-| `src/components/dashboard/MonthlyReportAIPanel.tsx` | Reescrita completa para JSON estruturado |
-| `src/components/dashboard/MonthlyReportsReviewManagement.tsx` | Remover campo "horas_dedicadas" |
-| `supabase/config.toml` | Registrar nova edge function |
-
-## Migracao SQL (a propor)
-
-- Criar tabela `monthly_report_ai_outputs` com RLS
-
-## Notas Tecnicas
-
-- A sanitizacao de caracteres CJK e feita no backend apos receber resposta da LLM, antes de salvar
-- O prompt inclui o schema JSON completo como exemplo para a LLM seguir
-- O front-end faz `JSON.parse` no retorno e renderiza componentes; se falhar, mostra texto bruto como fallback
-- A decisao sugerida e apenas sugestao; os botoes "Aprovar" e "Devolver" continuam sendo acao do gestor
-- O campo "horas_dedicadas" e removido tanto do prompt quanto da UI de campos
-
+| Arquivo | Motivo |
+|---------|--------|
+| `NotificationBell.tsx` | Ja consome notifications com real-time |
+| `useNotifications.ts` | Ja funciona com qualquer notificacao |
+| `MonthlyReportsReviewManagement.tsx` | Ja chama RPCs que alteram status |
