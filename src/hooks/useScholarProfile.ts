@@ -79,12 +79,21 @@ export function useScholarProfile(): UseScholarProfileReturn {
         .eq("user_id", user.id)
         .maybeSingle();
 
-      // Fetch sensitive data (cpf/phone) from profiles_sensitive
-      const { data: sensitiveData, error: sensitiveError } = await supabase
-        .from("profiles_sensitive")
-        .select("cpf, phone")
-        .eq("user_id", user.id)
-        .maybeSingle();
+      // Fetch sensitive data (cpf/phone) via secure Edge Function
+      let sensitiveData: { cpf: string | null; phone: string | null; cpf_locked: boolean } | null = null;
+      let sensitiveError: Error | null = null;
+      try {
+        const { data: piiResult, error: piiError } = await supabase.functions.invoke("secure-pii-read", {
+          body: { target_user_id: user.id },
+        });
+        if (piiError) {
+          sensitiveError = piiError;
+        } else {
+          sensitiveData = piiResult;
+        }
+      } catch (e) {
+        sensitiveError = e instanceof Error ? e : new Error("Failed to fetch PII");
+      }
 
       if (profileError) {
         console.error("Error fetching profile:", profileError);
@@ -100,7 +109,7 @@ export function useScholarProfile(): UseScholarProfileReturn {
           lattesUrl: profileData.lattes_url || "",
         });
         setLastUpdated(profileData.updated_at);
-        setCpfLocked(!!sensitiveData?.cpf && sensitiveData.cpf.length > 0);
+        setCpfLocked(sensitiveData?.cpf_locked ?? (!!sensitiveData?.cpf && sensitiveData.cpf.length > 0));
       } else {
         setPersonalData({
           ...emptyPersonalData,
@@ -181,23 +190,25 @@ export function useScholarProfile(): UseScholarProfileReturn {
         return { success: false, error: "Erro ao salvar dados pessoais. Tente novamente." };
       }
 
-      // Save PII (cpf/phone) to profiles_sensitive via RPC
+      // Save PII (cpf/phone) via secure Edge Function
       const hasCpfChange = !cpfLocked && data.cpf;
       const hasPhoneChange = data.phone !== undefined;
 
       if (hasCpfChange || hasPhoneChange) {
-        const rpcParams: Record<string, string | undefined> = {};
+        const piiBody: Record<string, string | undefined> = {};
         if (hasCpfChange && data.cpf) {
-          rpcParams.p_cpf = unformatCPF(data.cpf);
+          piiBody.cpf = unformatCPF(data.cpf);
         }
         if (hasPhoneChange) {
-          rpcParams.p_phone = data.phone?.replace(/\D/g, "") || undefined;
+          piiBody.phone = data.phone?.replace(/\D/g, "") || undefined;
         }
 
-        const { error: sensitiveError } = await supabase.rpc("upsert_sensitive_profile", rpcParams);
+        const { error: piiError } = await supabase.functions.invoke("secure-pii-write", {
+          body: piiBody,
+        });
 
-        if (sensitiveError) {
-          console.error("Error saving sensitive data:", sensitiveError);
+        if (piiError) {
+          console.error("Error saving sensitive data:", piiError);
           return { success: false, error: "Erro ao salvar dados sensíveis. Tente novamente." };
         }
       }
