@@ -19,6 +19,7 @@ const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
   manager: "Manager",
   reviewer: "Reviewer",
+  auditor: "Auditor",
   beneficiary: "Beneficiário",
 };
 
@@ -57,6 +58,7 @@ export function AdminMembersManagement() {
       admin: "bg-primary text-primary-foreground",
       manager: "bg-info text-white",
       reviewer: "bg-accent text-accent-foreground",
+      auditor: "bg-warning text-warning-foreground",
       beneficiary: "bg-muted text-muted-foreground",
     };
     return (
@@ -229,6 +231,7 @@ export function AdminMembersManagement() {
                 <SelectItem value="admin">Admin</SelectItem>
                 <SelectItem value="manager">Manager</SelectItem>
                 <SelectItem value="reviewer">Reviewer</SelectItem>
+                <SelectItem value="auditor">Auditor</SelectItem>
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
