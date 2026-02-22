@@ -77,3 +77,6 @@ verify_jwt = false
 
 [functions.secure-pii-write]
 verify_jwt = false
+
+[functions.import-institutions-mec]
+verify_jwt = false
