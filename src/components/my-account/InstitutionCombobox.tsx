@@ -183,12 +183,14 @@ export function InstitutionCombobox({ value, onChange, disabled }: InstitutionCo
     setSubmitting(true);
 
     try {
-      // Check duplicates first
-      const hasDups = await checkDuplicates();
-      if (hasDups && duplicates.length === 0) {
-        // First time showing duplicates - let user review
-        setSubmitting(false);
-        return;
+      // Check duplicates first - only block if user hasn't seen them yet
+      if (duplicates.length === 0) {
+        const hasDups = await checkDuplicates();
+        if (hasDups) {
+          // First time: show duplicates for review
+          setSubmitting(false);
+          return;
+        }
       }
 
       const normalized = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
