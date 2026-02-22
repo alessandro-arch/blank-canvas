@@ -236,76 +236,28 @@ export function InstitutionalOverviewTab() {
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Organizações Ativas
-            </CardTitle>
-            <Building2 className="h-5 w-5 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-primary">
-              {kpis?.activeOrganizations || 0}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-info/10 to-info/5 border-info/20">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Projetos Temáticos
-            </CardTitle>
-            <FolderOpen className="h-5 w-5 text-info" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-info">
-              {kpis?.activeThematicProjects || 0}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-success/10 to-success/5 border-success/20">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Subprojetos em Execução
-            </CardTitle>
-            <Layers className="h-5 w-5 text-success" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-success">
-              {kpis?.activeSubprojects || 0}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-warning/10 to-warning/5 border-warning/20">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Bolsistas Ativos
-            </CardTitle>
-            <GraduationCap className="h-5 w-5 text-warning" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-warning">
-              {kpis?.activeScholars || 0}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-destructive/10 to-destructive/5 border-destructive/20">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Pendências Críticas
-            </CardTitle>
-            <AlertTriangle className="h-5 w-5 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-destructive">
-              {kpis?.criticalPendencies || 0}
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-5">
+        {[
+          { label: "Organizações Ativas", value: kpis?.activeOrganizations || 0, icon: Building2, color: "primary" },
+          { label: "Projetos Temáticos", value: kpis?.activeThematicProjects || 0, icon: FolderOpen, color: "info" },
+          { label: "Subprojetos em Execução", value: kpis?.activeSubprojects || 0, icon: Layers, color: "success" },
+          { label: "Bolsistas Ativos", value: kpis?.activeScholars || 0, icon: GraduationCap, color: "warning" },
+          { label: "Pendências Críticas", value: kpis?.criticalPendencies || 0, icon: AlertTriangle, color: "destructive" },
+        ].map((kpi) => (
+          <Card key={kpi.label} className={`border-l-3 border-l-${kpi.color} bg-${kpi.color}/5`}>
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-xl font-bold text-${kpi.color} leading-none`}>{kpi.value}</p>
+                  <p className="text-[11px] font-medium text-muted-foreground mt-1">{kpi.label}</p>
+                </div>
+                <div className={`w-7 h-7 rounded flex items-center justify-center shrink-0 bg-${kpi.color}/10 text-${kpi.color}`}>
+                  <kpi.icon className="w-3.5 h-3.5" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {/* Charts Row */}

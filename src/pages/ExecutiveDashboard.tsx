@@ -297,25 +297,25 @@ const ExecutiveDashboard = () => {
               </div>
 
               {/* KPIs */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {kpis.map((kpi) => (
-                  <Card key={kpi.label} className={cn("border-l-4", `border-l-${kpi.color}`)}>
-                    <CardContent className="p-5">
+                  <Card key={kpi.label} className={cn("border-l-3", `border-l-${kpi.color}`)}>
+                    <CardContent className="p-3">
                       {isLoading ? (
-                        <div className="space-y-2">
-                          <Skeleton className="h-4 w-24" />
-                          <Skeleton className="h-8 w-16" />
+                        <div className="space-y-1">
+                          <Skeleton className="h-3 w-20" />
+                          <Skeleton className="h-5 w-10" />
                         </div>
                       ) : (
-                        <>
-                          <div className="flex items-center gap-3 mb-3">
-                            <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center", colorClasses[kpi.color].split(" ").slice(0, 2).join(" "))}>
-                              <kpi.icon className="w-4 h-4" />
-                            </div>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xl font-bold text-foreground leading-none">{kpi.value}</p>
+                            <p className="text-[11px] font-medium text-muted-foreground mt-1">{kpi.label}</p>
                           </div>
-                          <p className="text-3xl font-bold text-foreground">{kpi.value}</p>
-                          <p className="text-sm font-medium text-muted-foreground mt-1">{kpi.label}</p>
-                        </>
+                          <div className={cn("w-7 h-7 rounded flex items-center justify-center shrink-0", colorClasses[kpi.color].split(" ").slice(0, 2).join(" "))}>
+                            <kpi.icon className="w-3.5 h-3.5" />
+                          </div>
+                        </div>
                       )}
                     </CardContent>
                   </Card>
