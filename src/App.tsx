@@ -253,6 +253,7 @@ const App = () => (
               {/* ==================== */}
               {/* Auditor Portal Routes */}
               {/* ==================== */}
+              <Route path="/auditor" element={<Navigate to="/auditor/dashboard" replace />} />
               <Route path="/auditor/dashboard" element={
                 <AuditorProtectedRoute>
                   <AuditorDashboard />
