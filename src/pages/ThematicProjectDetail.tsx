@@ -63,6 +63,7 @@ import type { Database } from '@/integrations/supabase/types';
 import { FinancialInfoSection } from '@/components/projects/FinancialInfoSection';
 import { ProjectDocumentsSection } from '@/components/projects/ProjectDocumentsSection';
 import { MobileFiltersDrawer } from '@/components/dashboard/MobileFiltersDrawer';
+import { useUserRole } from '@/hooks/useUserRole';
 
 
 type ProjectStatus = Database['public']['Enums']['project_status'];
@@ -120,6 +121,7 @@ export default function ThematicProjectDetail() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
+  const { isAuditor } = useUserRole();
   const [searchTerm, setSearchTerm] = useState(isMobile ? (searchParams.get("q") || "") : "");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>((isMobile ? searchParams.get("status") as StatusFilter : null) || "all");
   const [selectedProject, setSelectedProject] = useState<SubprojectWithScholar | null>(null);
@@ -544,7 +546,7 @@ export default function ThematicProjectDetail() {
           <div className="max-w-7xl mx-auto space-y-6">
             {/* Back Button & Header */}
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" onClick={() => navigate('/projetos-tematicos')}>
+              <Button variant="ghost" size="icon" onClick={() => navigate(isAuditor ? '/auditor/projetos-tematicos' : '/admin/projetos-tematicos')}>
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <div className="flex-1">
@@ -586,10 +588,12 @@ export default function ThematicProjectDetail() {
                   <Download className="h-4 w-4 mr-2" />
                   Exportar
                 </Button>
-                <Button onClick={() => setCreateDialogOpen(true)} disabled={!thematicProject}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Novo Subprojeto
-                </Button>
+                {!isAuditor && (
+                  <Button onClick={() => setCreateDialogOpen(true)} disabled={!thematicProject}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Novo Subprojeto
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -822,69 +826,73 @@ export default function ThematicProjectDetail() {
                                 >
                                   <Eye className="h-4 w-4" />
                                 </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleEditProject(project)}
-                                  title="Editar"
-                                  disabled={project.status === 'archived'}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                {!project.scholar_name && project.status === 'active' && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleAssignScholar(project)}
-                                    title="Atribuir Bolsista"
-                                    className="text-primary hover:text-primary"
-                                  >
-                                    <UserPlus className="h-4 w-4" />
-                                  </Button>
+                                {!isAuditor && (
+                                  <>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleEditProject(project)}
+                                      title="Editar"
+                                      disabled={project.status === 'archived'}
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                    {!project.scholar_name && project.status === 'active' && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => handleAssignScholar(project)}
+                                        title="Atribuir Bolsista"
+                                        className="text-primary hover:text-primary"
+                                      >
+                                        <UserPlus className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                    {/* Cancel scholarship: only if active enrollment exists */}
+                                    {project.enrollment_id && project.enrollment_status === 'active' && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => handleCancelScholarship(project)}
+                                        title="Cancelar Bolsa"
+                                        className="text-destructive hover:text-destructive"
+                                      >
+                                        <Ban className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                    {/* Replace scholar: only if cancelled and not yet replaced */}
+                                    {project.enrollment_id && project.enrollment_status === 'cancelled' && !project.enrollment_replaced_by && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => handleReplaceScholar(project)}
+                                        title="Indicar Substituto"
+                                        className="text-primary hover:text-primary"
+                                      >
+                                        <UserPlus className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                    {project.status === 'active' && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => handleArchiveProject(project)}
+                                        title="Arquivar"
+                                      >
+                                        <Archive className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleDeleteProject(project)}
+                                      title="Excluir"
+                                      className="text-destructive hover:text-destructive"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </>
                                 )}
-                                {/* Cancel scholarship: only if active enrollment exists */}
-                                {project.enrollment_id && project.enrollment_status === 'active' && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleCancelScholarship(project)}
-                                    title="Cancelar Bolsa"
-                                    className="text-destructive hover:text-destructive"
-                                  >
-                                    <Ban className="h-4 w-4" />
-                                  </Button>
-                                )}
-                                {/* Replace scholar: only if cancelled and not yet replaced */}
-                                {project.enrollment_id && project.enrollment_status === 'cancelled' && !project.enrollment_replaced_by && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleReplaceScholar(project)}
-                                    title="Indicar Substituto"
-                                    className="text-primary hover:text-primary"
-                                  >
-                                    <UserPlus className="h-4 w-4" />
-                                  </Button>
-                                )}
-                                {project.status === 'active' && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleArchiveProject(project)}
-                                    title="Arquivar"
-                                  >
-                                    <Archive className="h-4 w-4" />
-                                  </Button>
-                                )}
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleDeleteProject(project)}
-                                  title="Excluir"
-                                  className="text-destructive hover:text-destructive"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
                               </div>
                             </TableCell>
                           </TableRow>

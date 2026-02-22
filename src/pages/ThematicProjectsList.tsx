@@ -45,6 +45,7 @@ import { DeleteThematicProjectDialog } from '@/components/thematic-projects/Dele
 import { format } from 'date-fns';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useOrganizationContext } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ThematicProjectWithStats {
   id: string;
@@ -64,7 +65,7 @@ type StatusFilter = 'all' | 'active' | 'archived';
 export default function ThematicProjectsList() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { isAdmin } = useUserRole();
+  const { isAdmin, isAuditor } = useUserRole();
   const { currentOrganization } = useOrganizationContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -183,7 +184,8 @@ export default function ThematicProjectsList() {
   };
 
   const handleOpenProject = (projectId: string) => {
-    navigate(`/admin/projetos-tematicos/${projectId}`);
+    const prefix = isAuditor ? '/auditor' : '/admin';
+    navigate(`${prefix}/projetos-tematicos/${projectId}`);
   };
 
   const handleEditProject = (project: ThematicProjectWithStats) => {
@@ -254,10 +256,12 @@ export default function ThematicProjectsList() {
                   <Download className="h-4 w-4 mr-2" />
                   Exportar
                 </Button>
-                <Button onClick={() => setCreateDialogOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Novo Projeto Temático
-                </Button>
+                {!isAuditor && (
+                  <Button onClick={() => setCreateDialogOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Novo Projeto Temático
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -343,37 +347,39 @@ export default function ThematicProjectsList() {
                         {/* Header */}
                         <div className="flex items-start justify-between">
                           {getStatusBadge(project.status)}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditProject(project); }}>
-                                <Edit className="h-4 w-4 mr-2" />
-                                Editar Projeto Temático
-                              </DropdownMenuItem>
-                              {isAdmin && project.status === 'active' && (
-                                <DropdownMenuItem 
-                                  onClick={(e) => { e.stopPropagation(); handleArchiveProject(project); }}
-                                  className="text-destructive"
-                                >
-                                  <Archive className="h-4 w-4 mr-2" />
-                                  Arquivar
+                          {!isAuditor && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditProject(project); }}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Editar Projeto Temático
                                 </DropdownMenuItem>
-                              )}
-                              {isAdmin && (
-                                <DropdownMenuItem 
-                                  onClick={(e) => { e.stopPropagation(); handleDeleteProject(project); }}
-                                  className="text-destructive"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Excluir
-                                </DropdownMenuItem>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                                {isAdmin && project.status === 'active' && (
+                                  <DropdownMenuItem 
+                                    onClick={(e) => { e.stopPropagation(); handleArchiveProject(project); }}
+                                    className="text-destructive"
+                                  >
+                                    <Archive className="h-4 w-4 mr-2" />
+                                    Arquivar
+                                  </DropdownMenuItem>
+                                )}
+                                {isAdmin && (
+                                  <DropdownMenuItem 
+                                    onClick={(e) => { e.stopPropagation(); handleDeleteProject(project); }}
+                                    className="text-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Excluir
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
                         </div>
 
                         {/* Title */}
