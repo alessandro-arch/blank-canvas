@@ -220,11 +220,11 @@ const AuditorDashboard = () => {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <Eye className="h-5 w-5 text-primary" />
-                  <Badge variant="outline" className="text-xs">Somente Leitura</Badge>
+                  <Eye className="h-5 w-5 text-yellow-600" />
+                  <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300 text-xs">Somente Leitura</Badge>
                   <Badge className="bg-yellow-500 text-white text-xs border-0 hover:bg-yellow-600">Auditor</Badge>
                   {currentOrganization?.name && (
-                    <Badge variant="outline" className="text-xs gap-1">
+                    <Badge className="bg-primary/10 text-primary border-primary/30 text-xs gap-1">
                       <Building2 className="h-3 w-3" />
                       {currentOrganization.name}
                     </Badge>
@@ -255,7 +255,7 @@ const AuditorDashboard = () => {
             {/* KPIs */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {kpis.map((kpi) => (
-                <Card key={kpi.label} className={cn("border-l-3", `border-l-${kpi.color}`)}>
+                <Card key={kpi.label} className={cn("border-l-4", `border-l-${kpi.color}`, `bg-${kpi.color}/5`)}>
                   <CardContent className="p-3">
                     {isLoading || orgLoading ? (
                       <div className="space-y-1">
@@ -301,7 +301,7 @@ const AuditorDashboard = () => {
                         formatter={(value: number) => [formatCurrency(value), "Pago"]}
                         contentStyle={{ borderRadius: 8, fontSize: 13 }}
                       />
-                      <Bar dataKey="paid" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="paid" fill="hsl(45, 93%, 47%)" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
