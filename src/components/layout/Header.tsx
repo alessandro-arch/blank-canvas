@@ -175,7 +175,7 @@ export function Header() {
             <DropdownMenuItem
               onClick={handleLogout}
               role="menuitem"
-              className="bg-gray-800 dark:bg-gray-900 text-yellow-400 font-bold hover:!bg-gray-700 dark:hover:!bg-gray-800 focus:!bg-gray-700 focus:!text-yellow-400 rounded-md"
+              className="bg-primary text-primary-foreground font-bold hover:!bg-primary/90 focus:!bg-primary/90 focus:!text-primary-foreground rounded-md"
             >
               <LogOut className="w-4 h-4 mr-2" />
               Sair
