@@ -24,6 +24,7 @@ const INSTITUTION_TYPES = [
   { value: "empresa", label: "Empresa" },
   { value: "ong", label: "ONG" },
   { value: "orgao_publico", label: "Órgão Público" },
+  { value: "instituto_pesquisa", label: "Instituto de Pesquisa" },
 ];
 
 export interface InstitutionData {
