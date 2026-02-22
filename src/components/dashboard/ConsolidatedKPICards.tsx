@@ -175,9 +175,9 @@ function KPICard({ kpi, isExpanded, onToggle }: KPICardProps) {
       )}>
         <CollapsibleTrigger asChild disabled={!hasDrilldown}>
           <div className="w-full">
-            <div className="flex items-start justify-between mb-3">
-              <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center", colorClasses[kpi.color])}>
-                <kpi.icon className="w-5 h-5" />
+            <div className="flex items-start justify-between mb-2">
+              <div className={cn("w-8 h-8 rounded-md flex items-center justify-center", colorClasses[kpi.color])}>
+                <kpi.icon className="w-4 h-4" />
               </div>
               {hasDrilldown && (
                 <div className="text-muted-foreground">
@@ -186,8 +186,8 @@ function KPICard({ kpi, isExpanded, onToggle }: KPICardProps) {
               )}
             </div>
             
-            <div className="flex items-end gap-2 mb-1">
-              <p className="text-3xl font-bold text-foreground">
+            <div className="flex items-end gap-2 mb-0.5">
+              <p className="text-2xl font-bold text-foreground">
                 {formatValue(kpi.value, kpi.format)}
               </p>
               {trend && (

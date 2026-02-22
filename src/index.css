@@ -189,7 +189,7 @@ html.theme-ready *::after {
   }
 
   .card-stat {
-    @apply bg-card rounded-lg border border-border p-5 transition-all duration-200;
+    @apply bg-card rounded-lg border border-border p-3 transition-all duration-200;
     box-shadow: var(--shadow-card);
   }
 
