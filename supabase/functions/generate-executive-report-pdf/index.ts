@@ -50,8 +50,8 @@ serve(async (req) => {
     // Check role
     const { data: roles } = await db.from("user_roles").select("role").eq("user_id", userId);
     const userRoles = (roles || []).map((r: any) => r.role);
-    if (!userRoles.includes("admin") && !userRoles.includes("manager")) {
-      return jsonResponse({ error: "Acesso restrito a gestores e administradores" }, 403);
+    if (!userRoles.includes("admin") && !userRoles.includes("manager") && !userRoles.includes("auditor")) {
+      return jsonResponse({ error: "Acesso restrito a gestores, administradores e auditores" }, 403);
     }
 
     // ─── Parse input ───
