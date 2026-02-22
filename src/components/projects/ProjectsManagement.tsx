@@ -138,15 +138,35 @@ export function ProjectsManagement() {
       
       const userIdsWithEnrollments = Object.values(enrollmentsMap).map(e => e.user_id);
       if (userIdsWithEnrollments.length > 0) {
-        const { data: reports, error: reportsError } = await supabase
+        // Parse selected month into year/month for monthly_reports query
+        const [selYear, selMonth] = referenceMonth.split('-').map(Number);
+
+        // Fetch from legacy reports table
+        const { data: legacyReports, error: reportsError } = await supabase
           .from('reports')
           .select('user_id, status, reference_month')
           .in('user_id', userIdsWithEnrollments)
           .eq('reference_month', referenceMonth);
 
-        if (!reportsError && reports) {
-          reports.forEach(r => {
+        if (!reportsError && legacyReports) {
+          legacyReports.forEach(r => {
             reportsMap[r.user_id] = r.status;
+          });
+        }
+
+        // Fetch from digital monthly_reports table (takes priority)
+        const { data: digitalReports, error: digitalError } = await supabase
+          .from('monthly_reports')
+          .select('beneficiary_user_id, status')
+          .in('beneficiary_user_id', userIdsWithEnrollments)
+          .eq('period_year', selYear)
+          .eq('period_month', selMonth)
+          .neq('status', 'draft');
+
+        if (!digitalError && digitalReports) {
+          digitalReports.forEach(r => {
+            // Digital report status takes priority over legacy
+            reportsMap[r.beneficiary_user_id] = r.status === 'submitted' ? 'under_review' : r.status;
           });
         }
       }

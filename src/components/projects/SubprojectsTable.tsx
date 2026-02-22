@@ -111,10 +111,12 @@ export function SubprojectsTable({
     switch (status) {
       case 'approved':
         return <Badge className="bg-success text-success-foreground">Aprovado</Badge>;
+      case 'submitted':
       case 'under_review':
         return <Badge variant="secondary">Em análise</Badge>;
+      case 'returned':
       case 'rejected':
-        return <Badge variant="destructive">Recusado</Badge>;
+        return <Badge variant="destructive">Devolvido</Badge>;
       case 'pending':
         return <Badge variant="outline" className="border-warning text-warning">Pendente</Badge>;
       default:
