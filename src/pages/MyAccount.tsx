@@ -207,11 +207,6 @@ export default function MyAccount() {
                     disabled={loading}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cargo">Cargo / Função</Label>
-                  <Input id="cargo" disabled placeholder="Em breve" className="bg-muted/50" />
-                  <p className="text-xs text-muted-foreground">Em breve — campo será salvo quando disponível no banco.</p>
-                </div>
               </CardContent>
             </Card>
 
