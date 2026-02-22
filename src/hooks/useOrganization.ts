@@ -21,7 +21,7 @@ export interface OrganizationMember {
   id: string;
   organization_id: string;
   user_id: string;
-  role: "owner" | "admin" | "manager" | "member";
+  role: "owner" | "admin" | "manager" | "member" | "auditor";
   created_at: string;
   updated_at: string;
 }

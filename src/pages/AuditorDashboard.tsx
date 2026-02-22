@@ -8,11 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import { useOrganizationContext } from "@/contexts/OrganizationContext";
 import { format, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   FileText, DollarSign, Users, Calendar,
-  TrendingUp, BarChart3, Eye, FolderOpen,
+  BarChart3, Eye, FolderOpen, AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
@@ -22,6 +23,9 @@ function formatCurrency(value: number): string {
 }
 
 const AuditorDashboard = () => {
+  const { currentOrganization, loading: orgLoading } = useOrganizationContext();
+  const orgId = currentOrganization?.id;
+
   const currentMonth = format(new Date(), "yyyy-MM");
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
 
@@ -38,76 +42,130 @@ const AuditorDashboard = () => {
     return options;
   }, []);
 
+  if (import.meta.env.DEV) {
+    console.log("[AuditorDashboard] orgId:", orgId, "orgLoading:", orgLoading);
+  }
+
   const { data, isLoading } = useQuery({
-    queryKey: ["auditor-dashboard", selectedMonth],
+    queryKey: ["auditor-dashboard", selectedMonth, orgId],
     staleTime: 2 * 60 * 1000,
+    enabled: !!orgId,
     queryFn: async () => {
-      // Active scholars
-      const { count: activeScholars } = await supabase
-        .from("enrollments")
+      if (!orgId) throw new Error("No organization");
+
+      // 1. Thematic projects for this org
+      const { data: thematicProjects } = await supabase
+        .from("thematic_projects")
+        .select("id")
+        .eq("organization_id", orgId);
+
+      const tpIds = thematicProjects?.map((tp) => tp.id) ?? [];
+      if (tpIds.length === 0) {
+        return { activeScholars: 0, approvedReports: 0, totalReports: 0, totalPaid: 0, activeProjects: 0, chartData: [] };
+      }
+
+      // 2. Projects for those thematic projects
+      const { data: projects } = await supabase
+        .from("projects")
+        .select("id")
+        .in("thematic_project_id", tpIds);
+
+      const projectIds = projects?.map((p) => p.id) ?? [];
+
+      // 3. Active projects count
+      const { count: activeProjects } = await supabase
+        .from("projects")
         .select("*", { count: "exact", head: true })
+        .in("thematic_project_id", tpIds)
         .eq("status", "active");
 
-      // Approved reports for the month
+      if (projectIds.length === 0) {
+        return { activeScholars: 0, approvedReports: 0, totalReports: 0, totalPaid: 0, activeProjects: activeProjects ?? 0, chartData: [] };
+      }
+
+      // 4. Active enrollments
+      const { data: enrollments } = await supabase
+        .from("enrollments")
+        .select("id")
+        .in("project_id", projectIds)
+        .eq("status", "active");
+
+      const enrollmentIds = enrollments?.map((e) => e.id) ?? [];
+      const activeScholars = enrollments?.length ?? 0;
+
+      // 5. Reports for the month (using reports table which dashboard originally used)
       const { count: approvedReports } = await supabase
         .from("reports")
         .select("*", { count: "exact", head: true })
         .eq("reference_month", selectedMonth)
+        .eq("status", "approved")
+        .in("user_id", enrollments?.map((e) => e.id) ?? ["__none__"]);
+
+      // Use monthly_reports which has organization_id directly
+      const { count: totalMonthlyReports } = await supabase
+        .from("monthly_reports")
+        .select("*", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .in("project_id", projectIds);
+
+      const [year, mon] = selectedMonth.split("-").map(Number);
+      const { count: approvedMonthlyReports } = await supabase
+        .from("monthly_reports")
+        .select("*", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .eq("period_year", year)
+        .eq("period_month", mon)
         .eq("status", "approved");
 
-      // Total reports for month
-      const { count: totalReports } = await supabase
-        .from("reports")
+      const { count: totalMonthlyReportsMonth } = await supabase
+        .from("monthly_reports")
         .select("*", { count: "exact", head: true })
-        .eq("reference_month", selectedMonth);
+        .eq("organization_id", orgId)
+        .eq("period_year", year)
+        .eq("period_month", mon);
 
-      // Paid payments for the month (using audit view - no bank data)
-      const { data: paidPayments } = await supabase
-        .from("payments")
-        .select("amount")
-        .eq("reference_month", selectedMonth)
-        .eq("status", "paid");
+      // 6. Paid payments for the month
+      let totalPaid = 0;
+      if (enrollmentIds.length > 0) {
+        const { data: paidPayments } = await supabase
+          .from("payments")
+          .select("amount")
+          .eq("reference_month", selectedMonth)
+          .eq("status", "paid")
+          .in("enrollment_id", enrollmentIds);
 
-      const totalPaid = paidPayments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
-
-      // Active projects
-      const { count: activeProjects } = await supabase
-        .from("projects")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "active");
-
-      // Chart data - last 6 months paid totals
-      const chartMonths: { month: string; label: string; paid: number }[] = [];
-      const [year, mon] = selectedMonth.split("-").map(Number);
-      const selectedDate = new Date(year, mon - 1, 1);
-      
-      for (let i = 5; i >= 0; i--) {
-        const d = subMonths(selectedDate, i);
-        const monthKey = format(d, "yyyy-MM");
-        const label = format(d, "MMM/yy", { locale: ptBR });
-        chartMonths.push({ month: monthKey, label, paid: 0 });
+        totalPaid = paidPayments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
       }
 
-      const monthKeys = chartMonths.map(m => m.month);
-      const { data: chartPayments } = await supabase
-        .from("payments")
-        .select("reference_month, amount, status")
-        .in("reference_month", monthKeys)
-        .eq("status", "paid");
+      // 7. Chart data - last 6 months
+      const selectedDate = new Date(year, mon - 1, 1);
+      const chartMonths: { month: string; label: string; paid: number }[] = [];
+      for (let i = 5; i >= 0; i--) {
+        const d = subMonths(selectedDate, i);
+        chartMonths.push({ month: format(d, "yyyy-MM"), label: format(d, "MMM/yy", { locale: ptBR }), paid: 0 });
+      }
 
-      if (chartPayments) {
-        for (const p of chartPayments) {
-          const entry = chartMonths.find(m => m.month === p.reference_month);
-          if (entry) {
-            entry.paid += Number(p.amount);
+      if (enrollmentIds.length > 0) {
+        const monthKeys = chartMonths.map((m) => m.month);
+        const { data: chartPayments } = await supabase
+          .from("payments")
+          .select("reference_month, amount")
+          .in("reference_month", monthKeys)
+          .eq("status", "paid")
+          .in("enrollment_id", enrollmentIds);
+
+        if (chartPayments) {
+          for (const p of chartPayments) {
+            const entry = chartMonths.find((m) => m.month === p.reference_month);
+            if (entry) entry.paid += Number(p.amount);
           }
         }
       }
 
       return {
-        activeScholars: activeScholars ?? 0,
-        approvedReports: approvedReports ?? 0,
-        totalReports: totalReports ?? 0,
+        activeScholars,
+        approvedReports: approvedMonthlyReports ?? 0,
+        totalReports: totalMonthlyReportsMonth ?? 0,
         totalPaid,
         activeProjects: activeProjects ?? 0,
         chartData: chartMonths,
@@ -129,6 +187,28 @@ const AuditorDashboard = () => {
     warning: "bg-warning/10 text-warning border-l-warning",
   };
 
+  // No org loaded state
+  if (!orgLoading && !orgId) {
+    return (
+      <div className="flex min-h-screen w-full bg-background">
+        <Sidebar />
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          <Header />
+          <main className="flex-1 p-6 overflow-auto">
+            <div className="max-w-md mx-auto mt-20 text-center space-y-4">
+              <AlertTriangle className="h-12 w-12 text-warning mx-auto" />
+              <h2 className="text-xl font-semibold">Organização não encontrada</h2>
+              <p className="text-muted-foreground">
+                Não foi possível carregar sua organização. Contate o administrador.
+              </p>
+            </div>
+          </main>
+          <Footer />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen w-full bg-background">
       <Sidebar />
@@ -144,7 +224,9 @@ const AuditorDashboard = () => {
                   <Badge variant="outline" className="text-xs">Somente Leitura</Badge>
                 </div>
                 <h1 className="text-2xl font-bold tracking-tight">Painel do Auditor</h1>
-                <p className="text-muted-foreground">Visão de auditoria dos projetos e bolsas</p>
+                <p className="text-muted-foreground">
+                  Visão de auditoria — {currentOrganization?.name}
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -168,7 +250,7 @@ const AuditorDashboard = () => {
               {kpis.map((kpi) => (
                 <Card key={kpi.label} className={cn("border-l-3", `border-l-${kpi.color}`)}>
                   <CardContent className="p-3">
-                    {isLoading ? (
+                    {isLoading || orgLoading ? (
                       <div className="space-y-1">
                         <Skeleton className="h-3 w-20" />
                         <Skeleton className="h-5 w-10" />
@@ -200,7 +282,7 @@ const AuditorDashboard = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {isLoading ? (
+                {isLoading || orgLoading ? (
                   <Skeleton className="h-52 w-full" />
                 ) : data?.chartData && data.chartData.length > 0 ? (
                   <ResponsiveContainer width="100%" height={220}>
