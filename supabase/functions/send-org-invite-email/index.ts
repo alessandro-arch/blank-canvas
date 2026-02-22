@@ -13,6 +13,7 @@ const roleLabels: Record<string, string> = {
   admin: 'Administrador',
   manager: 'Gestor',
   reviewer: 'Avaliador',
+  auditor: 'Auditor',
   beneficiary: 'Proponente',
 };
 
