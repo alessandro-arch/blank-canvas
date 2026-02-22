@@ -12,6 +12,7 @@ const roleRedirects: Record<string, string> = {
   admin: "/admin/dashboard",
   manager: "/admin/dashboard",
   reviewer: "/admin/dashboard",
+  auditor: "/auditor/dashboard",
   beneficiary: "/bolsista/painel",
   proponente: "/bolsista/painel",
 };
@@ -103,7 +104,7 @@ const InviteAcceptPage = () => {
   }
 
   if (accepted) {
-    const roleLabel = acceptedRole === "admin" ? "Administrador" : acceptedRole === "manager" ? "Gestor" : acceptedRole === "reviewer" ? "Avaliador" : "Proponente";
+    const roleLabel = acceptedRole === "admin" ? "Administrador" : acceptedRole === "manager" ? "Gestor" : acceptedRole === "reviewer" ? "Avaliador" : acceptedRole === "auditor" ? "Auditor" : "Proponente";
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="max-w-md w-full">
