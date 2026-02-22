@@ -18,6 +18,7 @@ import {
   FileSearch,
   Filter,
   Undo2,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -649,6 +650,17 @@ export function MonthlyReportsReviewManagement() {
                                 Avaliar
                               </Button>
                             )}
+                            {report && ["approved", "returned"].includes(report.status) && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-1.5"
+                                onClick={() => handleOpenReview(report, scholar)}
+                              >
+                                <Sparkles className="h-3.5 w-3.5" />
+                                Ver Parecer
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -720,6 +732,17 @@ export function MonthlyReportsReviewManagement() {
                                     onClick={() => handleOpenReview(report, scholar)}
                                   >
                                     Avaliar Relatório
+                                  </Button>
+                                )}
+                                {["approved", "returned"].includes(report.status) && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="gap-1.5"
+                                    onClick={() => handleOpenReview(report, scholar)}
+                                  >
+                                    <Sparkles className="h-3.5 w-3.5" />
+                                    Ver Parecer IA
                                   </Button>
                                 )}
                               </div>
@@ -818,16 +841,20 @@ export function MonthlyReportsReviewManagement() {
 
           <DialogFooter className="px-6 pb-6 pt-3 border-t shrink-0 gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setReviewDialogOpen(false)} disabled={submitting}>
-              Cancelar
+              {selectedReport && ["approved", "returned"].includes(selectedReport.status) ? "Fechar" : "Cancelar"}
             </Button>
-            <Button variant="destructive" onClick={handleReturn} disabled={submitting} className="gap-2">
-              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Undo2 className="w-4 h-4" />}
-              Devolver
-            </Button>
-            <Button onClick={handleApprove} disabled={submitting} className="gap-2">
-              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-              Aprovar
-            </Button>
+            {selectedReport && !["approved", "returned"].includes(selectedReport.status) && (
+              <>
+                <Button variant="destructive" onClick={handleReturn} disabled={submitting} className="gap-2">
+                  {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Undo2 className="w-4 h-4" />}
+                  Devolver
+                </Button>
+                <Button onClick={handleApprove} disabled={submitting} className="gap-2">
+                  {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                  Aprovar
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
