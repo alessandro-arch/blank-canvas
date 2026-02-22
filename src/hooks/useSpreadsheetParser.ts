@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import ExcelJS from 'exceljs';
+import * as XLSX from 'xlsx';
 import { ImportType, IMPORT_TYPES, ParsedRow, ImportPreview } from '@/types/import';
 
 export function useSpreadsheetParser() {
@@ -93,112 +93,28 @@ export function useSpreadsheetParser() {
 
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const workbook = new ExcelJS.Workbook();
-      
-      // Determine file type and load accordingly
-      const fileName = file.name.toLowerCase();
-      if (fileName.endsWith('.csv')) {
-        // For CSV files, convert to text and parse
-        const text = new TextDecoder().decode(arrayBuffer);
-        const lines = text.split(/\r?\n/).filter(line => line.trim());
-        
-        if (lines.length === 0) {
-          throw new Error('Arquivo vazio ou sem dados válidos');
-        }
-        
-        // Parse CSV manually
-        const parseCSVLine = (line: string): string[] => {
-          const result: string[] = [];
-          let current = '';
-          let inQuotes = false;
-          
-          for (let i = 0; i < line.length; i++) {
-            const char = line[i];
-            if (char === '"') {
-              inQuotes = !inQuotes;
-            } else if ((char === ',' || char === ';') && !inQuotes) {
-              result.push(current.trim());
-              current = '';
-            } else {
-              current += char;
-            }
-          }
-          result.push(current.trim());
-          return result;
-        };
-        
-        const headers = parseCSVLine(lines[0]);
-        const rawData: Record<string, unknown>[] = [];
-        
-        for (let i = 1; i < lines.length; i++) {
-          const values = parseCSVLine(lines[i]);
-          const row: Record<string, unknown> = {};
-          headers.forEach((header, index) => {
-            row[header] = values[index] || null;
-          });
-          rawData.push(row);
-        }
-        
-        return processRawData(rawData, file.name, importType);
-      } else {
-        // For Excel files (.xlsx, .xls)
-        await workbook.xlsx.load(arrayBuffer);
-        
-        const worksheet = workbook.worksheets[0];
-        if (!worksheet || worksheet.rowCount === 0) {
-          throw new Error('Planilha vazia ou sem dados válidos');
-        }
-        
-        // Get headers from first row
-        const headerRow = worksheet.getRow(1);
-        const headers: string[] = [];
-        headerRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-          const value = cell.value;
-          headers[colNumber - 1] = value ? String(value) : `column_${colNumber}`;
-        });
-        
-        // Get data rows
-        const rawData: Record<string, unknown>[] = [];
-        worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-          if (rowNumber === 1) return; // Skip header row
-          
-          const rowData: Record<string, unknown> = {};
-          row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-            const header = headers[colNumber - 1];
-            if (header) {
-              // Handle different cell value types
-              let value = cell.value;
-              if (value && typeof value === 'object') {
-                // Handle rich text, formulas, etc.
-                if ('text' in value) {
-                  value = value.text;
-                } else if ('result' in value) {
-                  value = value.result;
-                } else if ('richText' in value) {
-                  value = (value as ExcelJS.CellRichTextValue).richText
-                    .map(rt => rt.text)
-                    .join('');
-                }
-              }
-              rowData[header] = value ?? null;
-            }
-          });
-          rawData.push(rowData);
-        });
-        
-        if (rawData.length === 0) {
-          throw new Error('Planilha vazia ou sem dados válidos');
-        }
-        
-        return processRawData(rawData, file.name, importType);
+      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+
+      const sheetName = workbook.SheetNames[0];
+      if (!sheetName) {
+        throw new Error('Arquivo vazio ou sem dados válidos');
       }
+
+      const worksheet = workbook.Sheets[sheetName];
+      const rawData: Record<string, unknown>[] = XLSX.utils.sheet_to_json(worksheet, { defval: null });
+
+      if (rawData.length === 0) {
+        throw new Error('Planilha vazia ou sem dados válidos');
+      }
+
+      return processRawData(rawData, file.name, importType);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao processar arquivo';
       setError(message);
       setIsLoading(false);
       throw new Error(message);
     }
-  }, [validateRow]);
+  }, []);
 
   const processRawData = useCallback((
     rawData: Record<string, unknown>[],
