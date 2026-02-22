@@ -164,28 +164,35 @@ Deno.serve(async (req) => {
 <tr><td style="background-color:#003366;border-radius:8px 8px 0 0;padding:24px 32px;">
 <table role="presentation" width="100%"><tr>
 <td><img src="${logoUrl}" alt="InnovaGO" style="max-height:40px;width:auto;" /></td>
-<td align="right" style="vertical-align:middle;"><span style="font-size:12px;color:#fff;opacity:0.9;">BolsaGo</span></td>
+<td align="right" style="vertical-align:middle;"><span style="font-size:12px;color:#ffffff;opacity:0.9;">BolsaGo</span></td>
 </tr></table></td></tr>
-<tr><td style="background-color:#fff;padding:32px;">
+<tr><td style="background-color:#ffffff;padding:32px;">
 <h1 style="margin:0 0 16px;font-size:22px;color:#003366;">Convite para ${orgName}</h1>
-<p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.7;">
+<p style="margin:0 0 16px;font-size:15px;color:#333333;line-height:1.7;">
 Ola! Voce foi convidado(a) para acessar a plataforma <strong>BolsaGo</strong> como <strong>${roleLabel}</strong> da organizacao <strong>${orgName}</strong>.
 </p>
-<p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.7;">
+<p style="margin:0 0 24px;font-size:15px;color:#333333;line-height:1.7;">
 Clique no botao abaixo para aceitar o convite e criar sua conta (caso ainda nao tenha).
 </p>
-<table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0;"><tr>
-<td style="background-color:#003366;border-radius:6px;">
-<a href="${inviteLink}" target="_blank" style="display:inline-block;padding:14px 32px;color:#fff;text-decoration:none;font-size:15px;font-weight:600;">Aceitar Convite</a>
-</td></tr></table>
-<p style="margin:0 0 8px;font-size:13px;color:#666;">Este convite expira em: <strong>${expiresDate}</strong></p>
-<hr style="border:none;border-top:1px solid #eee;margin:16px 0;" />
-<p style="margin:0 0 4px;font-size:12px;color:#999;">Se voce nao solicitou este convite, pode ignorar este e-mail com seguranca.</p>
-<p style="margin:0;font-size:11px;color:#bbb;">Seus dados serao tratados exclusivamente para gestao de acesso e governanca do programa, conforme a LGPD.</p>
+<div style="text-align:center;margin:32px 0;">
+<!--[if mso]>
+<v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${inviteLink}" style="height:50px;v-text-anchor:middle;width:250px;" arcsize="12%" stroke="f" fillcolor="#003366">
+<w:anchorlock/>
+<center style="color:#ffffff;font-family:sans-serif;font-size:15px;font-weight:bold;">Aceitar Convite</center>
+</v:roundrect>
+<![endif]-->
+<!--[if !mso]><!-->
+<a href="${inviteLink}" target="_blank" style="background-color:#003366;border-radius:6px;color:#ffffff;display:inline-block;font-size:15px;font-weight:600;line-height:50px;text-align:center;text-decoration:none;width:250px;-webkit-text-size-adjust:none;mso-hide:all;">Aceitar Convite</a>
+<!--<![endif]-->
+</div>
+<p style="margin:0 0 8px;font-size:13px;color:#666666;">Este convite expira em: <strong>${expiresDate}</strong></p>
+<hr style="border:none;border-top:1px solid #eeeeee;margin:16px 0;" />
+<p style="margin:0 0 4px;font-size:12px;color:#999999;">Se voce nao solicitou este convite, pode ignorar este e-mail com seguranca.</p>
+<p style="margin:0;font-size:11px;color:#bbbbbb;">Seus dados serao tratados exclusivamente para gestao de acesso e governanca do programa, conforme a LGPD.</p>
 </td></tr>
 <tr><td style="background-color:#003366;border-radius:0 0 8px 8px;padding:24px 32px;">
-<p style="margin:0;font-size:12px;color:#fff;opacity:0.8;">InnovaGO. Sistema de Gestao de Bolsas<br/>
-<a href="https://www.innovago.app" style="color:#fff;text-decoration:underline;">www.innovago.app</a></p>
+<p style="margin:0;font-size:12px;color:#ffffff;">InnovaGO. Sistema de Gestao de Bolsas<br/>
+<a href="https://www.innovago.app" style="color:#ffffff;text-decoration:underline;">www.innovago.app</a></p>
 </td></tr>
 </table></td></tr></table></body></html>`;
 

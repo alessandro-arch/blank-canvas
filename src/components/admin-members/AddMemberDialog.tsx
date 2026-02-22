@@ -48,7 +48,7 @@ export function AddMemberDialog({ open, onOpenChange, onSubmit, existingInvites 
   }, [trimmedEmail, existingInvites]);
 
   const inviteLink = inviteToken
-    ? `${window.location.origin}/invite/${inviteToken}`
+    ? `${window.location.origin}/convite?token=${inviteToken}`
     : null;
 
   const handleSubmit = async () => {
