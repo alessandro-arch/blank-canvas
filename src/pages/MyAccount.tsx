@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ArrowLeft, User, Briefcase, Save, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { InstitutionCombobox } from "@/components/my-account/InstitutionCombobox";
 
 export default function MyAccount() {
   const { user } = useAuth();
@@ -25,8 +26,13 @@ export default function MyAccount() {
 
   // Professional info (from profiles table)
   const [lattesUrl, setLattesUrl] = useState("");
-  const [institution, setInstitution] = useState("");
   const [linkedinUrl, setLinkedinUrl] = useState("");
+  const [institutionData, setInstitutionData] = useState({
+    name: "",
+    sigla: "",
+    uf: "",
+    isCustom: false,
+  });
 
   useEffect(() => {
     if (!user) return;
@@ -38,15 +44,20 @@ export default function MyAccount() {
       setLoading(true);
       try {
         // Fetch profile
-        const { data: profile } = await supabase
+        const { data: profile } = await (supabase as any)
           .from("profiles")
-          .select("lattes_url, institution")
+          .select("lattes_url, institution, institution_sigla, institution_uf, institution_is_custom")
           .eq("user_id", user.id)
           .single();
 
         if (profile) {
           setLattesUrl(profile.lattes_url || "");
-          setInstitution(profile.institution || "");
+          setInstitutionData({
+            name: profile.institution || "",
+            sigla: (profile as any).institution_sigla || "",
+            uf: (profile as any).institution_uf || "",
+            isCustom: (profile as any).institution_is_custom || false,
+          });
         }
 
         // Fetch sensitive profile (phone)
@@ -78,8 +89,11 @@ export default function MyAccount() {
         .from("profiles")
         .update({
           lattes_url: lattesUrl || null,
-          institution: institution || null,
-        })
+          institution: institutionData.name || null,
+          institution_sigla: institutionData.sigla || null,
+          institution_uf: institutionData.uf || null,
+          institution_is_custom: institutionData.isCustom,
+        } as any)
         .eq("user_id", user.id);
 
       if (profileError) throw profileError;
@@ -184,12 +198,10 @@ export default function MyAccount() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="institution">Empresa / Instituição</Label>
-                  <Input
-                    id="institution"
-                    value={institution}
-                    onChange={(e) => setInstitution(e.target.value)}
-                    placeholder="Nome da instituição"
+                  <Label>Empresa / Instituição *</Label>
+                  <InstitutionCombobox
+                    value={institutionData}
+                    onChange={setInstitutionData}
                     disabled={loading}
                   />
                 </div>
