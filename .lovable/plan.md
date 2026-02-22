@@ -1,117 +1,93 @@
 
-# Notificacoes Automaticas para Decisao de Relatorio Mensal
 
-## Contexto Atual
+## Atualizar o Manual do Bolsista
 
-O sistema ja possui:
-- Trigger `notify_report_status_change` na tabela **legacy** `reports` (cria notificacao + mensagem inbox + dispara e-mail via `send-system-email`)
-- Trigger `queue_system_message_email` na tabela `messages` que chama a Edge Function `send-system-email` via `net.http_post`
-- Coluna `email_notifications_enabled` na tabela `organizations` para controle por org
-- Funcoes RPC `approve_monthly_report` e `return_monthly_report` que ja gravam audit_logs mas **nao criam notificacoes**
+O manual atual descreve o fluxo antigo de envio de relatorios (upload de PDF), mas o sistema evoluiu significativamente. Segue o plano de atualizacao completo.
 
-O que falta: um trigger equivalente na tabela `monthly_reports` para gerar notificacao, mensagem inbox (que automaticamente dispara e-mail) e log de auditoria de notificacao.
+---
 
-## Plano de Implementacao
+### Mudancas necessarias no arquivo `src/pages/ScholarManual.tsx`
 
-### Fase 1: Migration SQL (trigger + tabela de log)
+#### 1. Secao "5. Enviar Relatorio Mensal" -- REESCREVER COMPLETAMENTE
 
-Criar uma migration com:
+O manual atual descreve upload de PDF. O sistema agora usa um **formulario digital estruturado** com:
+- Campos: atividades realizadas, entregas, dificuldades, proximos passos, horas dedicadas
+- Salvamento automatico de rascunho a cada 15 segundos
+- Botao "Salvar Rascunho" manual
+- Submissao com aceite eletronico (dialog de confirmacao)
+- Geracao automatica de PDF auditavel com hash SHA-256
+- Status: Rascunho, Submetido, Aprovado, Devolvido
 
-1. **Tabela `notification_delivery_logs`** para auditoria de entregas:
-   - `id` uuid PK
-   - `user_id` uuid NOT NULL
-   - `report_id` uuid NOT NULL (ref monthly_reports)
-   - `status` text NOT NULL (approved, returned)
-   - `sent_in_app` boolean DEFAULT false
-   - `sent_email` boolean DEFAULT false
-   - `created_at` timestamptz DEFAULT now()
-   - Indice unico em `(report_id, status)` para prevenir duplicidade
-   - RLS: leitura para admins/managers da org
+Novo conteudo:
+- Acessar "Meus Pagamentos" no menu lateral
+- Rolar ate a secao "Relatorio Mensal" do mes corrente
+- Preencher todos os campos do formulario digital
+- O sistema salva automaticamente a cada 15 segundos (indicador "Salvo" aparece no topo)
+- Quando finalizar, clicar em "Submeter Relatorio"
+- Confirmar a submissao no dialogo de aceite eletronico
+- Apos a submissao, um PDF auditavel sera gerado automaticamente
+- Dica: voce pode salvar rascunhos e voltar para editar antes de submeter
 
-2. **Funcao `notify_monthly_report_decision()`** (trigger AFTER UPDATE em monthly_reports):
-   - Dispara quando `OLD.status != NEW.status` e `NEW.status IN ('approved', 'returned')`
-   - Verifica duplicidade: se ja existe log para `(report_id, status)`, retorna sem agir
-   - Monta titulo e mensagem com periodo formatado (ex: "Fevereiro/2026")
-   - Insere na tabela `notifications` (notificacao bell)
-   - Insere na tabela `messages` com `type = 'SYSTEM'` e `event_type` adequado (isso automaticamente aciona o trigger `queue_system_message_email` existente, que chama `send-system-email` via Resend)
-   - Insere log na `notification_delivery_logs`
-   - Respeita `organizations.email_notifications_enabled`
+#### 2. Nova secao "6. Parecer de Inteligencia Artificial" -- ADICIONAR
 
-3. **Trigger** `trigger_notify_monthly_report_decision` AFTER UPDATE em `monthly_reports`
+Apos a decisao do gestor (aprovacao ou devolucao), o bolsista pode ver o parecer tecnico gerado por IA com:
+- Quatro metricas de avaliacao (0-5): Aderencia ao Plano, Evidencia e Verificabilidade, Progresso vs Historico, Qualidade Tecnica
+- Resumo e recomendacoes
+- O parecer e visivel na secao do relatorio mensal e tambem no historico de relatorios
 
-### Fase 2: Template de e-mail diferenciado (Edge Function)
+Passos:
+- Apos o gestor avaliar o relatorio, o parecer IA aparece automaticamente abaixo do formulario
+- Tambem pode ser acessado em "Meus Relatorios" clicando no icone de parecer IA
 
-Atualizar a Edge Function `send-system-email` para detectar `event_type` de relatorio mensal e usar templates HTML especificos:
+#### 3. Nova secao "7. Plano de Trabalho" -- ADICIONAR
 
-- `MONTHLY_REPORT_APPROVED`: template verde com icone de aprovacao, link para `/bolsista/relatorios`
-- `MONTHLY_REPORT_RETURNED`: template com alerta, exibindo motivo da devolucao, link para `/bolsista/relatorios`
+O sistema agora disponibiliza o Plano de Trabalho do bolsista:
+- Acessar "Documentos" no menu lateral
+- Na aba "Plano de Trabalho", visualizar ou baixar o documento
+- O plano de trabalho contem os objetivos e cronograma da bolsa
+- Ele e usado pela IA como referencia ao avaliar os relatorios mensais
 
-Os dados dinamicos (nome do bolsista, periodo, projeto, comentarios do gestor) serao passados via campos da mensagem.
+#### 4. Nova secao "8. Mensagens" -- ADICIONAR
 
-### Fase 3: Nenhuma alteracao no frontend
+O bolsista agora possui uma caixa de mensagens:
+- Acessar "Mensagens" no menu lateral
+- Visualizar mensagens recebidas do gestor
+- O badge vermelho no menu lateral indica mensagens nao lidas
 
-O componente `NotificationBell` ja consome a tabela `notifications` com real-time subscription, entao as notificacoes aparecerao automaticamente no sino do bolsista sem alteracao de codigo.
+#### 5. Renumerar secoes existentes
 
-## Detalhes Tecnicos
+Com as novas secoes, a numeracao ficara:
+1. Primeiro Acesso e Cadastro (sem mudancas)
+2. Alterar Foto de Perfil (sem mudancas)
+3. Atualizar Dados Pessoais (sem mudancas)
+4. Cadastrar/Atualizar Dados Bancarios (sem mudancas)
+5. Enviar Relatorio Mensal (REESCRITO -- formulario digital)
+6. Parecer de Inteligencia Artificial (NOVO)
+7. Plano de Trabalho (NOVO)
+8. Acompanhar Pagamentos (atualizado -- era secao 6)
+9. Termo de Outorga (sem mudancas -- era secao 7)
+10. Documentos Institucionais (sem mudancas -- era secao 8)
+11. Mensagens (NOVO)
+12. Notificacoes (sem mudancas -- era secao 9)
+13. Duvidas Frequentes (atualizado com novas perguntas -- era secao 10)
 
-### Trigger SQL (pseudocodigo)
+#### 6. Atualizar "Duvidas Frequentes"
 
-```text
-FUNCTION notify_monthly_report_decision()
-  -- Skip if no status change
-  IF OLD.status = NEW.status THEN RETURN NEW
-  
-  -- Only for final decisions
-  IF NEW.status NOT IN ('approved', 'returned') THEN RETURN NEW
-  
-  -- Dedup check
-  IF EXISTS(SELECT 1 FROM notification_delivery_logs 
-            WHERE report_id = NEW.id AND status = NEW.status) THEN RETURN NEW
-  
-  -- Build message
-  periodo = nome_mes(NEW.period_month) || '/' || NEW.period_year
-  
-  IF NEW.status = 'approved':
-    titulo = 'Relatorio Mensal Aprovado'
-    mensagem = 'Seu relatorio de {periodo} foi aprovado!'
-    tipo_notif = 'success'
-    event_type = 'MONTHLY_REPORT_APPROVED'
-  ELSE: -- returned
-    titulo = 'Relatorio Devolvido para Ajustes'
-    mensagem = 'Seu relatorio de {periodo} foi devolvido. Motivo: {return_reason}'
-    tipo_notif = 'warning'
-    event_type = 'MONTHLY_REPORT_RETURNED'
-  
-  -- Bell notification
-  INSERT INTO notifications (user_id, title, message, type, entity_type, entity_id)
-  VALUES (NEW.beneficiary_user_id, titulo, mensagem, tipo_notif, 'monthly_report', NEW.id)
-  
-  -- Inbox message (triggers email automatically via queue_system_message_email)
-  INSERT INTO messages (recipient_id, sender_id, subject, body, type, event_type, 
-                        link_url, organization_id)
-  VALUES (NEW.beneficiary_user_id, NULL, titulo, mensagem, 'SYSTEM', event_type,
-          '/bolsista/relatorios', NEW.organization_id)
-  
-  -- Delivery log
-  INSERT INTO notification_delivery_logs (user_id, report_id, status, sent_in_app, sent_email)
-  VALUES (NEW.beneficiary_user_id, NEW.id, NEW.status, true, v_email_enabled)
-```
+Adicionar novas perguntas:
+- "O que e o parecer de IA?" -- Explicar que e uma avaliacao automatica do relatorio com base no plano de trabalho.
+- "Posso editar o relatorio apos submeter?" -- Nao, mas se o gestor devolver, a edicao sera reaberta.
+- Atualizar a pergunta sobre formato de relatorios: agora e formulario digital (nao mais upload de PDF).
 
-### Edge Function send-system-email
+#### 7. Adicionar novos icones
 
-Adicionar deteccao do `event_type` via lookup na tabela `messages` para personalizar o template HTML quando for `MONTHLY_REPORT_APPROVED` ou `MONTHLY_REPORT_RETURNED`.
+Importar icones adicionais: `Bot` (para IA), `ClipboardList` (para Plano de Trabalho), `MessageSquare` (para Mensagens).
 
-### Arquivos Modificados
+---
 
-| Arquivo | Alteracao |
-|---------|-----------|
-| Nova migration SQL | Tabela + funcao + trigger |
-| `supabase/functions/send-system-email/index.ts` | Templates diferenciados por event_type |
+### Resumo tecnico
 
-### Sem alteracoes necessarias
+- **Arquivo editado**: `src/pages/ScholarManual.tsx`
+- **Tipo de mudanca**: Apenas conteudo textual e novas secoes usando os componentes existentes (`ManualSection`, `StepList`, `Tip`)
+- **Sem mudancas estruturais**: Os componentes auxiliares ja existentes sao reutilizados
+- **Sem dependencias novas**: Apenas icones adicionais do `lucide-react`
 
-| Arquivo | Motivo |
-|---------|--------|
-| `NotificationBell.tsx` | Ja consome notifications com real-time |
-| `useNotifications.ts` | Ja funciona com qualquer notificacao |
-| `MonthlyReportsReviewManagement.tsx` | Ja chama RPCs que alteram status |
