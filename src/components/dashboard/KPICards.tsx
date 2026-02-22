@@ -32,15 +32,15 @@ export function KPICards() {
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
       {kpis.map((kpi) => (
         <div key={kpi.label} className="card-stat">
-          <div className="flex items-center gap-3 mb-3">
-            <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center", colorClasses[kpi.color])}>
-              <kpi.icon className="w-4 h-4" />
+          <div className="flex items-center gap-2 mb-2">
+            <div className={cn("w-7 h-7 rounded-md flex items-center justify-center", colorClasses[kpi.color])}>
+              <kpi.icon className="w-3.5 h-3.5" />
             </div>
           </div>
-          <p className="text-2xl font-bold text-foreground">{kpi.value}</p>
-          <p className="text-xs font-medium text-muted-foreground mt-1">{kpi.label}</p>
+          <p className="text-xl font-bold text-foreground">{kpi.value}</p>
+          <p className="text-[11px] font-medium text-muted-foreground mt-0.5">{kpi.label}</p>
           {kpi.trend && (
-            <p className="text-xs text-muted-foreground/70 mt-1">{kpi.trend}</p>
+            <p className="text-[11px] text-muted-foreground/70 mt-0.5">{kpi.trend}</p>
           )}
         </div>
       ))}
