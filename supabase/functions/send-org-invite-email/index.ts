@@ -128,6 +128,12 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Normalize: ensure https:// prefix
+    appUrl = appUrl.replace(/\/+$/, '');
+    if (!/^https?:\/\//i.test(appUrl)) {
+      appUrl = 'https://' + appUrl;
+    }
+
     // 8. Check RESEND_API_KEY
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
     if (!resendApiKey) {
@@ -181,7 +187,11 @@ Clique no botao abaixo para aceitar o convite e criar sua conta (caso ainda nao 
 </td>
 </tr>
 </table>
-<p style="margin:0 0 8px;font-size:13px;color:#666666;">Este convite expira em: <strong>${expiresDate}</strong></p>
+<p style="margin:16px 0 0;font-size:12px;color:#888888;text-align:center;line-height:1.6;">
+Se o botao nao funcionar, copie e cole este link no navegador:<br/>
+<a href="${inviteLink}" style="color:#003366;word-break:break-all;font-size:11px;">${inviteLink}</a>
+</p>
+<p style="margin:16px 0 8px;font-size:13px;color:#666666;">Este convite expira em: <strong>${expiresDate}</strong></p>
 <hr style="border:none;border-top:1px solid #eeeeee;margin:16px 0;" />
 <p style="margin:0 0 4px;font-size:12px;color:#999999;">Se voce nao solicitou este convite, pode ignorar este e-mail com seguranca.</p>
 <p style="margin:0;font-size:11px;color:#bbbbbb;">Seus dados serao tratados exclusivamente para gestao de acesso e governanca do programa, conforme a LGPD.</p>
