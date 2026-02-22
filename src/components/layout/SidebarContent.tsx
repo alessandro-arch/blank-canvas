@@ -54,6 +54,7 @@ const auditorNavigation: NavItem[] = [
   { name: "Relatórios", icon: FileText, href: "/auditor/relatorios" },
   { name: "Pagamentos", icon: Receipt, href: "/auditor/pagamentos" },
   { name: "Gestão Financeira", icon: BarChart3, href: "/auditor/gestao-financeira" },
+  { name: "Ajuda do Auditor", icon: HelpCircle, href: "/auditor/ajuda" },
 ];
 
 const adminNavigation: NavItem[] = [
