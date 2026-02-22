@@ -122,24 +122,24 @@ const OperacaoBolsas = () => {
               </div>
 
               {/* KPI Cards */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {kpis.map((kpi) => (
                   <div key={kpi.label} className="card-stat">
                     {kpiLoading ? (
-                      <div className="space-y-2">
-                        <Skeleton className="h-4 w-24" />
-                        <Skeleton className="h-8 w-16" />
+                      <div className="space-y-1">
+                        <Skeleton className="h-3 w-20" />
+                        <Skeleton className="h-5 w-10" />
                       </div>
                     ) : (
-                      <>
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", colorClasses[kpi.color])}>
-                            <kpi.icon className="w-4 h-4" />
-                          </div>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xl font-bold text-foreground leading-none">{kpi.value}</p>
+                          <p className="text-[11px] font-medium text-muted-foreground mt-1">{kpi.label}</p>
                         </div>
-                        <p className="text-2xl font-bold text-foreground">{kpi.value}</p>
-                        <p className="text-xs font-medium text-muted-foreground mt-1">{kpi.label}</p>
-                      </>
+                        <div className={cn("w-7 h-7 rounded flex items-center justify-center shrink-0", colorClasses[kpi.color])}>
+                          <kpi.icon className="w-3.5 h-3.5" />
+                        </div>
+                      </div>
                     )}
                   </div>
                 ))}
