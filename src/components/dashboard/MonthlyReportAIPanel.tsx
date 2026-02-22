@@ -1,15 +1,40 @@
 import { useState } from "react";
-import { Sparkles, FileText, AlertTriangle, BarChart3, Scale, Loader2, Copy, Check, Maximize2 } from "lucide-react";
+import { Sparkles, Loader2, Copy, Check, Maximize2, AlertTriangle, ChevronDown, ChevronUp, ClipboardPaste } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-
+import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-type AnalysisType = "summary" | "risks" | "indicators" | "opinion" | "adherence";
+// Types
+interface AIParecerOutput {
+  parecer: {
+    titulo: string;
+    identificacao: { bolsista: string; instituicao: string; nivel: string; projeto: string; periodo: string };
+    sumario: string[];
+    avaliacao_tecnica: { secao: string; texto: string }[];
+    metricas: {
+      aderencia_plano_0a5: number;
+      evidencia_verificabilidade_0a5: number;
+      progresso_vs_historico_0a5: number;
+      qualidade_tecnica_clareza_0a5: number;
+    };
+    evidencias: string[];
+    lacunas: string[];
+    riscos_pendencias: string[];
+    perguntas_ao_bolsista: string[];
+    decisao_sugerida: "aprovar" | "aprovar_com_ressalvas" | "devolver";
+    justificativa_decisao: string;
+  };
+  indicadores: Record<string, unknown>;
+  analise_riscos: { riscos: string[]; mitigacoes: string[] };
+  resumo_executivo: { texto: string };
+  _parse_error?: boolean;
+}
 
 interface MonthlyReportAIPanelProps {
   reportId: string;
@@ -17,197 +42,329 @@ interface MonthlyReportAIPanelProps {
   onInsertToFeedback?: (text: string) => void;
 }
 
-const analysisOptions: { type: AnalysisType; label: string; icon: React.ElementType; description: string }[] = [
-  { type: "summary", label: "Resumo executivo", icon: FileText, description: "Síntese das atividades e resultados" },
-  { type: "risks", label: "Análise de riscos", icon: AlertTriangle, description: "Riscos e inconsistências identificados" },
-  { type: "indicators", label: "Indicadores", icon: BarChart3, description: "Métricas de produtividade e aderência" },
-  { type: "opinion", label: "Rascunho de parecer", icon: Scale, description: "Sugestão de parecer técnico" },
-  { type: "adherence", label: "Aderência ao Plano", icon: FileText, description: "Comparação relatório x plano de trabalho" },
-];
+const METRIC_LABELS: Record<string, string> = {
+  aderencia_plano_0a5: "Aderência ao Plano de Trabalho",
+  evidencia_verificabilidade_0a5: "Evidência e Verificabilidade",
+  progresso_vs_historico_0a5: "Progresso vs Histórico",
+  qualidade_tecnica_clareza_0a5: "Qualidade Técnica e Clareza",
+};
 
-export function MonthlyReportAIPanel({ reportId, projectId, onInsertToFeedback }: MonthlyReportAIPanelProps) {
-  const [loading, setLoading] = useState<AnalysisType | null>(null);
-  const [results, setResults] = useState<Record<AnalysisType, string>>({
-    summary: "",
-    risks: "",
-    indicators: "",
-    opinion: "",
-    adherence: "",
-  });
-  const [copied, setCopied] = useState<AnalysisType | null>(null);
-  const [expandedType, setExpandedType] = useState<AnalysisType | null>(null);
+const DECISION_CONFIG = {
+  aprovar: { label: "Aprovar", className: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" },
+  aprovar_com_ressalvas: { label: "Aprovar com Ressalvas", className: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" },
+  devolver: { label: "Devolver", className: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" },
+};
 
-  const handleAnalyze = async (type: AnalysisType) => {
-    setLoading(type);
+function MetricBar({ label, value }: { label: string; value: number }) {
+  const pct = Math.min(Math.max((value / 5) * 100, 0), 100);
+  const color = value >= 4 ? "bg-emerald-500" : value >= 3 ? "bg-amber-500" : "bg-red-500";
+  return (
+    <div className="space-y-1">
+      <div className="flex justify-between text-xs">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="font-medium">{value}/5</span>
+      </div>
+      <div className="h-2 w-full rounded-full bg-muted">
+        <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function ListSection({ title, items, icon }: { title: string; items: string[]; icon: string }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs font-semibold text-foreground">{icon} {title}</p>
+      <ul className="space-y-1 pl-4">
+        {items.map((item, i) => (
+          <li key={i} className="text-xs text-foreground/80 list-disc">{item}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function buildPlainTextParecer(data: AIParecerOutput): string {
+  const p = data.parecer;
+  const lines: string[] = [];
+  lines.push(p.titulo || "Parecer Tecnico");
+  lines.push("");
+  if (p.identificacao) {
+    lines.push(`Bolsista: ${p.identificacao.bolsista}`);
+    lines.push(`Projeto: ${p.identificacao.projeto}`);
+    lines.push(`Periodo: ${p.identificacao.periodo}`);
+    lines.push("");
+  }
+  if (p.sumario?.length) {
+    lines.push("Sumario:");
+    p.sumario.forEach(s => lines.push(`- ${s}`));
+    lines.push("");
+  }
+  if (p.avaliacao_tecnica?.length) {
+    p.avaliacao_tecnica.forEach(a => {
+      lines.push(`${a.secao}:`);
+      lines.push(a.texto);
+      lines.push("");
+    });
+  }
+  if (p.metricas) {
+    lines.push("Metricas:");
+    Object.entries(p.metricas).forEach(([k, v]) => {
+      lines.push(`- ${METRIC_LABELS[k] || k}: ${v}/5`);
+    });
+    lines.push("");
+  }
+  if (p.decisao_sugerida) {
+    const label = DECISION_CONFIG[p.decisao_sugerida]?.label || p.decisao_sugerida;
+    lines.push(`Decisao sugerida: ${label}`);
+    lines.push(p.justificativa_decisao || "");
+  }
+  return lines.join("\n");
+}
+
+export function MonthlyReportAIPanel({ reportId, onInsertToFeedback }: MonthlyReportAIPanelProps) {
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<AIParecerOutput | null>(null);
+  const [hasWorkPlan, setHasWorkPlan] = useState<boolean | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+
+  const handleGenerate = async () => {
+    setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("ai-analyze-report", {
-        body: { report_id: reportId, type },
+      const { data, error } = await supabase.functions.invoke("ai-evaluate-monthly-report", {
+        body: { report_id: reportId },
       });
 
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      setResults(prev => ({ ...prev, [type]: data.text || "" }));
-      toast.success(`${analysisOptions.find(o => o.type === type)?.label} gerado com sucesso`);
+      setResult(data.data as AIParecerOutput);
+      setHasWorkPlan(data.has_work_plan ?? null);
+      toast.success("Parecer completo gerado com sucesso");
     } catch (err: any) {
-      toast.error(err.message || "Erro ao gerar análise de IA");
+      toast.error(err.message || "Erro ao gerar parecer de IA");
     } finally {
-      setLoading(null);
+      setLoading(false);
     }
   };
 
-  const handleCopy = async (type: AnalysisType) => {
-    await navigator.clipboard.writeText(results[type]);
-    setCopied(type);
-    setTimeout(() => setCopied(null), 2000);
-    toast.success("Copiado!");
+  const handleCopy = async () => {
+    if (!result) return;
+    await navigator.clipboard.writeText(buildPlainTextParecer(result));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    toast.success("Parecer copiado!");
   };
 
-  const handleInsert = (type: AnalysisType) => {
-    if (onInsertToFeedback) {
-      onInsertToFeedback(results[type]);
-      toast.success("Texto inserido no campo de parecer");
+  const handleInsert = () => {
+    if (!result || !onInsertToFeedback) return;
+    const text = result.parecer?.justificativa_decisao || buildPlainTextParecer(result);
+    onInsertToFeedback(text);
+    toast.success("Texto inserido no campo de parecer");
+  };
+
+  const parecer = result?.parecer;
+  const decisao = parecer?.decisao_sugerida;
+  const decisionCfg = decisao ? DECISION_CONFIG[decisao] : null;
+
+  const renderContent = (fullscreen = false) => {
+    if (!result || !parecer) return null;
+
+    if (result._parse_error) {
+      return (
+        <div className="p-4 text-sm text-foreground/80 whitespace-pre-wrap">
+          <Alert variant="destructive" className="mb-3">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>Erro ao processar resposta da IA. Exibindo texto bruto.</AlertDescription>
+          </Alert>
+          {parecer.justificativa_decisao || "Sem conteudo"}
+        </div>
+      );
     }
-  };
 
-  const expandedOpt = expandedType ? analysisOptions.find(o => o.type === expandedType) : null;
+    const textSize = fullscreen ? "text-sm" : "text-xs";
+
+    return (
+      <div className={`space-y-4 ${textSize}`}>
+        {/* Identification */}
+        {parecer.identificacao && (
+          <div className="rounded-md border bg-muted/30 p-3 space-y-1">
+            <p className="font-semibold text-foreground">{parecer.identificacao.bolsista}</p>
+            <p className="text-muted-foreground">{parecer.identificacao.projeto}</p>
+            <div className="flex gap-3 text-muted-foreground">
+              <span>{parecer.identificacao.instituicao}</span>
+              <span>{parecer.identificacao.nivel}</span>
+              <span>{parecer.identificacao.periodo}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Work plan warning */}
+        {hasWorkPlan === false && (
+          <Alert className="border-amber-300 bg-amber-50 dark:bg-amber-950/20">
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-amber-800 dark:text-amber-400">
+              Plano de Trabalho nao encontrado. Analise de aderencia limitada.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Summary */}
+        {parecer.sumario?.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="font-semibold text-foreground">Sumario</p>
+            <ul className="space-y-1 pl-4">
+              {parecer.sumario.map((s, i) => <li key={i} className="list-disc text-foreground/80">{s}</li>)}
+            </ul>
+          </div>
+        )}
+
+        {/* Technical evaluation sections */}
+        {parecer.avaliacao_tecnica?.map((sec, i) => (
+          <div key={i} className="space-y-1">
+            <p className="font-semibold text-foreground">{sec.secao}</p>
+            <p className="text-foreground/80 leading-relaxed">{sec.texto}</p>
+          </div>
+        ))}
+
+        <Separator />
+
+        {/* Metrics */}
+        {parecer.metricas && (
+          <div className="space-y-2">
+            <p className="font-semibold text-foreground">Metricas</p>
+            <div className="grid gap-3">
+              {Object.entries(parecer.metricas).map(([key, value]) => (
+                <MetricBar key={key} label={METRIC_LABELS[key] || key} value={Number(value) || 0} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        <Separator />
+
+        {/* Lists */}
+        <ListSection title="Evidencias encontradas" items={parecer.evidencias} icon="✅" />
+        <ListSection title="Lacunas / Faltas de evidencia" items={parecer.lacunas} icon="⚠️" />
+        <ListSection title="Riscos e pendencias" items={parecer.riscos_pendencias} icon="🔴" />
+        <ListSection title="Perguntas ao bolsista" items={parecer.perguntas_ao_bolsista} icon="❓" />
+
+        <Separator />
+
+        {/* Decision */}
+        {decisao && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <p className="font-semibold text-foreground">Decisao sugerida:</p>
+              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${decisionCfg?.className || ""}`}>
+                {decisionCfg?.label || decisao}
+              </span>
+            </div>
+            <div className="rounded-md border bg-muted/30 p-3">
+              <p className="text-foreground/80 leading-relaxed">{parecer.justificativa_decisao}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Executive summary */}
+        {result.resumo_executivo?.texto && (
+          <div className="space-y-1">
+            <p className="font-semibold text-foreground">Resumo executivo</p>
+            <p className="text-foreground/80 leading-relaxed">{result.resumo_executivo.texto}</p>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <>
       <Card className="border-primary/20 bg-primary/5">
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-3 cursor-pointer" onClick={() => result && setCollapsed(!collapsed)}>
           <CardTitle className="flex items-center gap-2 text-sm">
             <Sparkles className="h-4 w-4 text-primary" />
-            Sugestões da IA
+            Parecer IA
             <Badge variant="outline" className="text-[10px] font-normal ml-auto">Beta</Badge>
+            {result && (collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />)}
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {/* Action buttons */}
-          <div className="grid grid-cols-2 gap-2">
-            {analysisOptions.map(({ type, label, icon: Icon }) => (
+        {!collapsed && (
+          <CardContent className="space-y-3">
+            {!result && (
               <Button
-                key={type}
-                variant={results[type] ? "secondary" : "outline"}
+                onClick={handleGenerate}
+                disabled={loading}
+                className="w-full gap-2"
                 size="sm"
-                className="justify-start gap-2 h-9 text-xs"
-                onClick={() => handleAnalyze(type)}
-                disabled={loading !== null}
               >
-                {loading === type ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Icon className="h-3.5 w-3.5" />
-                )}
-                {label}
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                {loading ? "Gerando parecer completo..." : "Gerar Parecer Completo"}
               </Button>
-            ))}
-          </div>
+            )}
 
-          {/* Results */}
-          {Object.entries(results).map(([type, text]) => {
-            if (!text) return null;
-            const opt = analysisOptions.find(o => o.type === type)!;
-            const Icon = opt.icon;
-            const maxH = type === "opinion" ? "max-h-80" : "max-h-64";
-            return (
-              <div key={type} className="space-y-2">
-                <Separator />
-                {/* Sticky actions bar */}
-                <div className="sticky top-0 z-10 bg-primary/5 flex items-center justify-between py-1">
-                  <div className="flex items-center gap-1.5">
-                    <Icon className="h-3.5 w-3.5 text-primary" />
-                    <span className="text-xs font-medium">{opt.label}</span>
-                  </div>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => setExpandedType(type as AnalysisType)}
-                      title="Expandir"
-                    >
-                      <Maximize2 className="h-3.5 w-3.5" />
+            {result && (
+              <>
+                {/* Action bar */}
+                <div className="flex items-center gap-1 flex-wrap">
+                  <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" onClick={() => setExpanded(true)}>
+                    <Maximize2 className="h-3 w-3" /> Expandir
+                  </Button>
+                  <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" onClick={handleCopy}>
+                    {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+                    Copiar
+                  </Button>
+                  {onInsertToFeedback && (
+                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" onClick={handleInsert}>
+                      <ClipboardPaste className="h-3 w-3" /> Inserir no parecer
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => handleCopy(type as AnalysisType)}
-                      title="Copiar"
-                    >
-                      {copied === type ? (
-                        <Check className="h-3.5 w-3.5 text-emerald-500" />
-                      ) : (
-                        <Copy className="h-3.5 w-3.5" />
-                      )}
-                    </Button>
-                    {onInsertToFeedback && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 text-[10px] px-2"
-                        onClick={() => handleInsert(type as AnalysisType)}
-                      >
-                        Inserir no parecer
-                      </Button>
-                    )}
-                  </div>
+                  )}
+                  <Button variant="ghost" size="sm" className="h-7 text-xs gap-1.5 ml-auto" onClick={handleGenerate} disabled={loading}>
+                    {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                    Regenerar
+                  </Button>
                 </div>
-                <div
-                  className="resize-y overflow-auto min-h-[180px] max-h-[480px] rounded-md border bg-background p-4 text-[15px] leading-relaxed whitespace-pre-wrap break-words text-foreground/80"
-                  style={{ resize: 'vertical' }}
-                >
-                  {text}
-                </div>
+
+                {renderContent(false)}
+
                 <p className="text-[10px] text-muted-foreground italic flex items-center gap-1">
-                  <Sparkles className="h-2.5 w-2.5" /> Gerado por IA — requer validação do gestor
+                  <Sparkles className="h-2.5 w-2.5" /> Gerado por IA — requer validacao do gestor
                 </p>
-              </div>
-            );
-          })}
-        </CardContent>
+              </>
+            )}
+          </CardContent>
+        )}
       </Card>
 
       {/* Fullscreen Dialog */}
-      <Dialog open={expandedType !== null} onOpenChange={(open) => { if (!open) setExpandedType(null); }}>
+      <Dialog open={expanded} onOpenChange={setExpanded}>
         <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 gap-0">
           <DialogHeader className="px-6 pt-6 pb-3 shrink-0">
             <DialogTitle className="flex items-center gap-2 text-base">
-              {expandedOpt && <expandedOpt.icon className="h-4 w-4 text-primary" />}
-              {expandedOpt?.label}
-              <Badge variant="outline" className="text-[10px] font-normal ml-2">IA Beta</Badge>
+              <Sparkles className="h-4 w-4 text-primary" />
+              Parecer Tecnico IA
+              <Badge variant="outline" className="text-[10px] font-normal ml-2">Beta</Badge>
             </DialogTitle>
           </DialogHeader>
           <div className="flex items-center gap-2 px-6 pb-3 shrink-0 border-b">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs gap-1.5"
-              onClick={() => expandedType && handleCopy(expandedType)}
-            >
-              {copied === expandedType ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+            <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" onClick={handleCopy}>
+              {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
               Copiar
             </Button>
-            {onInsertToFeedback && expandedType && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs gap-1.5"
-                onClick={() => expandedType && handleInsert(expandedType)}
-              >
-                Inserir no parecer
+            {onInsertToFeedback && (
+              <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" onClick={handleInsert}>
+                <ClipboardPaste className="h-3 w-3" /> Inserir no parecer
               </Button>
             )}
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
-            <div className="text-base leading-relaxed whitespace-pre-wrap break-words text-foreground/80 p-6 bg-muted/50 rounded border min-h-[200px]">
-              {expandedType && results[expandedType]}
-            </div>
+            {renderContent(true)}
           </div>
           <div className="px-6 py-3 border-t shrink-0">
             <p className="text-[10px] text-muted-foreground italic flex items-center gap-1">
-              <Sparkles className="h-2.5 w-2.5" /> Gerado por IA — requer validação do gestor
+              <Sparkles className="h-2.5 w-2.5" /> Gerado por IA — requer validacao do gestor
             </p>
           </div>
         </DialogContent>
