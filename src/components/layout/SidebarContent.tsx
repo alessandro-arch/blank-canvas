@@ -14,6 +14,7 @@ import {
   FolderOpen,
   ShieldAlert,
   Ticket,
+  Building,
   Building2,
   Globe,
   Mail,
@@ -71,6 +72,7 @@ const adminNavigation: NavItem[] = [
   { name: "Membros Admin", icon: UserCog, href: "/admin/membros", adminOnly: true },
   { name: "Importar Dados", icon: Upload, href: "/admin/importar", adminOnly: true },
   { name: "Organizações", icon: Building2, href: "/admin/organizacoes", adminOnly: true },
+  { name: "Instituições", icon: Building, href: "/admin/instituicoes", adminOnly: true },
   { name: "Trilha de Auditoria", icon: ShieldAlert, href: "/admin/trilha-auditoria", adminOnly: true },
   { name: "Configurações", icon: Settings, href: "/admin/configuracoes", adminOnly: true },
 ];
