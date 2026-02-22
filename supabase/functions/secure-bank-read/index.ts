@@ -93,6 +93,15 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     const callerRole = systemRole?.role || "scholar";
+
+    // Block auditors explicitly before any data processing
+    if (callerRole === "auditor") {
+      return new Response(
+        JSON.stringify({ error: "Auditores não têm acesso a dados bancários" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const isSystemAdmin = callerRole === "admin";
 
     // Check caller membership in organization
@@ -103,6 +112,14 @@ Deno.serve(async (req) => {
       .eq("organization_id", organization_id)
       .eq("is_active", true)
       .maybeSingle();
+
+    // Also block auditor membership role
+    if (membership?.role === "auditor") {
+      return new Response(
+        JSON.stringify({ error: "Auditores não têm acesso a dados bancários" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const isOrgAdminOrManager = membership?.role && ["admin", "manager", "owner"].includes(membership.role);
 
