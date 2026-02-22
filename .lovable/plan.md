@@ -1,34 +1,35 @@
 
 
-# Bloquear Dados Bancarios para Auditor - Defesa em Profundidade
+# Melhorar cores do Painel do Auditor
 
-## Situacao Atual
+## Problema
+O dashboard do auditor esta visualmente apagado/claro comparado ao painel do Admin. Faltam cores nos KPI cards, badges e icones. O pill "Auditor" deve ser amarelo.
 
-O sistema ja possui multiplas camadas de protecao que impedem auditores de acessar dados bancarios:
+## Alteracoes
 
-1. **RLS (banco de dados)**: A tabela `bank_accounts` nao tem politica SELECT para auditores -- acesso negado
-2. **Rotas protegidas**: `AdminProtectedRoute` redireciona auditores para `/auditor/dashboard`
-3. **Sidebar**: O menu do auditor nao inclui "Operacao de Bolsas" nem "Dados Bancarios"
-4. **Edge Function `secure-bank-read`**: So retorna dados completos para admin/manager/owner
+### 1. `src/pages/AuditorDashboard.tsx`
 
-## Reforcos Adicionais Propostos
+**KPI Cards** - Adicionar fundo colorido sutil nos cards (como no Admin), com borda esquerda colorida mais visivel:
+- Cada card tera `bg-{color}/5` para dar um tom de fundo sutil
+- Borda esquerda com `border-l-4` (mais grossa) em vez de `border-l-3`
 
-Para garantir protecao total, vamos adicionar bloqueios explicitos em mais pontos:
+**Badge "Somente Leitura"** - Trocar de `variant="outline"` (cinza claro) para um estilo com fundo amarelo sutil (`bg-yellow-100 text-yellow-800 border-yellow-300`)
 
-### 1. Edge Function `secure-bank-read/index.ts`
-Adicionar verificacao explicita no inicio: se o `callerRole` for `auditor` OU se o usuario tiver membership com role `auditor`, retornar erro 403 imediatamente, antes de qualquer processamento.
+**Badge "Auditor"** - Ja esta amarelo (`bg-yellow-500`), manter
 
-### 2. Componente `BankDataManagement.tsx`
-Adicionar verificacao no componente: se o usuario for auditor (`useUserRole().isAuditor`), renderizar um banner de "Acesso Restrito" em vez do conteudo de dados bancarios.
+**Badge da Organizacao** - Dar mais destaque com fundo primario sutil (`bg-primary/10 text-primary border-primary/30`)
 
-### 3. Pagina `OperacaoBolsas.tsx`
-Ocultar a aba "Dados Bancarios" do TabsList quando o usuario for auditor (mesmo que ele nao devesse chegar nessa pagina, e uma camada extra de seguranca).
+**Icone Eye** - Trocar de `text-primary` para `text-yellow-600` para alinhar com a identidade do auditor
+
+**Titulo e subtitulo** - Manter como esta (ja esta bom)
+
+**Grafico** - Usar cor amarela/amber (`hsl(45, 93%, 47%)`) nas barras em vez de primary (azul escuro), para diferenciar do admin e dar mais vida
+
+### 2. `src/components/layout/SidebarContent.tsx`
+O pill "Auditor" na sidebar ja esta correto (`bg-yellow-500 text-white`). Nenhuma alteracao necessaria.
 
 ### Resumo dos arquivos alterados
 
 | Arquivo | Alteracao |
 |---|---|
-| `supabase/functions/secure-bank-read/index.ts` | Rejeitar auditor com 403 antes de processar |
-| `src/components/dashboard/BankDataManagement.tsx` | Mostrar "Acesso Restrito" para auditores |
-| `src/pages/OperacaoBolsas.tsx` | Ocultar aba "Dados Bancarios" para auditores |
-
+| `src/pages/AuditorDashboard.tsx` | Cores mais vibrantes nos KPIs, badges, grafico e icones |
