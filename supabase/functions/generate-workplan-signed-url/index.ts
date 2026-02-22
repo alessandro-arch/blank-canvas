@@ -70,17 +70,18 @@ serve(async (req) => {
 
     const isAdmin = userRoles.includes("admin");
     const isManager = userRoles.includes("manager");
+    const isAuditor = userRoles.includes("auditor");
     const isScholar = workplan.scholar_user_id === user.id;
 
-    if (!isAdmin && !isManager && !isScholar) {
+    if (!isAdmin && !isManager && !isAuditor && !isScholar) {
       return new Response(JSON.stringify({ error: "Acesso negado" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // If manager, check org access
-    if (isManager && !isAdmin && !isScholar) {
+    // If manager or auditor, check org access
+    if ((isManager || isAuditor) && !isAdmin && !isScholar) {
       const { data: orgs } = await supabase
         .from("organization_members")
         .select("organization_id")
