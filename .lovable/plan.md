@@ -1,55 +1,169 @@
 
-
-# Padronizacao Visual do Botao "Sair" + Remocao do Campo "Cargo/Funcao"
+# Cadastro e Governanca de Instituicoes (Base MEC + Validacao Administrativa)
 
 ## Resumo
 
-Duas alteracoes pontuais: (1) padronizar o botao "Sair" no dropdown do usuario para usar o estilo primario do sistema, e (2) remover o campo "Cargo / Funcao" da pagina Minha Conta.
+Evoluir o sistema atual de instituicoes -- que usa a tabela `institutions_mec` apenas para consulta e salva dados diretamente no perfil -- para um modelo com tabela unificada `institutions`, fluxo de submissao por usuarios, validacao CNPJ, e painel administrativo de aprovacao.
 
 ---
 
-## Parte 1 -- Botao "Sair"
+## Situacao Atual
 
-**Arquivo:** `src/components/layout/Header.tsx`
-
-Substituir o estilo atual do `DropdownMenuItem` de logout (fundo cinza escuro + texto amarelo) pelo estilo primario do sistema (`bg-primary text-primary-foreground hover:bg-primary/90`).
-
-**De:**
-```text
-className="bg-gray-800 dark:bg-gray-900 text-yellow-400 font-bold hover:!bg-gray-700 dark:hover:!bg-gray-800 focus:!bg-gray-700 focus:!text-yellow-400 rounded-md"
-```
-
-**Para:**
-```text
-className="bg-primary text-primary-foreground font-bold hover:!bg-primary/90 focus:!bg-primary/90 focus:!text-primary-foreground rounded-md"
-```
-
-Nenhuma alteracao funcional -- apenas visual.
+- Tabela `institutions_mec` com ~4.300 registros do MEC (somente leitura)
+- Campo `InstitutionCombobox` busca nessa tabela e permite cadastro manual
+- Dados da instituicao salvos diretamente em colunas do `profiles` (`institution`, `institution_sigla`, `institution_uf`, `institution_is_custom`)
+- Sem validacao de CNPJ, sem fluxo de aprovacao, sem painel admin
 
 ---
 
-## Parte 2 -- Remocao do Campo "Cargo / Funcao"
+## Plano de Implementacao
 
-**Arquivo:** `src/pages/MyAccount.tsx`
+### Etapa 1 -- Migracoes de Banco de Dados
 
-Remover o bloco do campo "Cargo / Funcao" (linhas ~178-183 aproximadamente):
+**1a. Criar tabela `institutions`**
 
-```text
-<div className="space-y-2">
-  <Label htmlFor="cargo">Cargo / Função</Label>
-  <Input id="cargo" disabled placeholder="Em breve" className="bg-muted/50" />
-  <p className="text-xs text-muted-foreground">Em breve — campo será salvo quando disponível no banco.</p>
-</div>
+Tabela unificada que substitui `institutions_mec` como fonte principal:
+
+| Campo | Tipo | Descricao |
+|---|---|---|
+| id | uuid PK | Identificador |
+| name | text NOT NULL | Nome oficial (MAIUSCULO) |
+| acronym | text | Sigla |
+| uf | text NOT NULL | Estado |
+| municipality | text | Municipio |
+| category | text | Publica, Privada, etc. |
+| academic_organization | text | Universidade, Centro, etc. |
+| cnpj | text | CNPJ formatado (unico quando preenchido) |
+| source | text NOT NULL | 'MEC' ou 'USER_SUBMITTED' |
+| status | text NOT NULL DEFAULT 'approved' | 'approved', 'pending', 'rejected' |
+| submitted_by | uuid | user_id do solicitante |
+| institution_type | text | Empresa, IES, ONG, Orgao Publico |
+| rejection_reason | text | Motivo da rejeicao |
+| normalized_name | text | Para busca sem acentos |
+| created_at / updated_at | timestamptz | Timestamps |
+
+**1b. Migrar dados existentes**
+
+- Copiar registros de `institutions_mec` para `institutions` com `source='MEC'`, `status='approved'`
+- Manter `institutions_mec` intacta (compatibilidade)
+
+**1c. Adicionar coluna `institution_id` em `profiles`**
+
+- `institution_id uuid REFERENCES institutions(id)` (nullable)
+- Perfis existentes com `institution_is_custom=false` serao vinculados via match por nome
+- Perfis com `institution_is_custom=true` gerarao registros `USER_SUBMITTED` com `status='approved'` (legado)
+
+**1d. RLS na tabela `institutions`**
+
+- SELECT: qualquer usuario autenticado pode ler instituicoes com `status='approved'` ou `submitted_by = auth.uid()`
+- INSERT: qualquer usuario autenticado pode inserir com `source='USER_SUBMITTED'` e `status='pending'`
+- UPDATE: apenas admin (via `has_role`)
+
+**1e. Indices**
+
+- `idx_institutions_name` em `normalized_name` com `pg_trgm`
+- `idx_institutions_cnpj` unico condicional (quando nao nulo)
+- `idx_institutions_status`
+
+### Etapa 2 -- Validador de CNPJ
+
+Criar `src/lib/cnpj-validator.ts` seguindo o padrao do `cpf-validator.ts` existente:
+- `formatCNPJ(value)` -- mascara XX.XXX.XXX/XXXX-XX
+- `unformatCNPJ(value)` -- apenas digitos
+- `validateCNPJ(cnpj)` -- algoritmo Modulo 11 com dois digitos verificadores
+
+### Etapa 3 -- Refatorar InstitutionCombobox
+
+Alterar `src/components/my-account/InstitutionCombobox.tsx`:
+
+- Buscar na tabela `institutions` (em vez de `institutions_mec`)
+- Filtrar por `status='approved'` na busca
+- No modo manual ("Nao encontrei"), abrir formulario expandido com:
+  - Nome (MAIUSCULO, obrigatorio)
+  - Sigla (MAIUSCULO, obrigatorio)
+  - UF (obrigatorio)
+  - CNPJ (obrigatorio para empresas privadas, validacao Modulo 11)
+  - Municipio (opcional)
+  - Tipo: Empresa / IES / ONG / Orgao Publico (select)
+- Ao confirmar: INSERT na tabela `institutions` com `status='pending'`, `source='USER_SUBMITTED'`
+- Salvar `institution_id` no perfil em vez dos campos avulsos
+- Exibir badge "Pendente de aprovacao" quando a instituicao selecionada tem `status='pending'`
+
+### Etapa 4 -- Atualizar MyAccount.tsx
+
+- Alterar `handleSave` para salvar `institution_id` no perfil
+- Carregar dados da instituicao via join ou consulta separada
+- Manter compatibilidade: se `institution_id` for null mas `institution` (texto antigo) existir, exibir normalmente
+
+### Etapa 5 -- Painel Admin de Instituicoes
+
+**5a. Criar pagina `src/pages/InstitutionsManagement.tsx`**
+
+Acessivel em `/admin/instituicoes` (AdminProtectedRoute, adminOnly).
+
+Funcionalidades:
+- Listagem com filtros por status (Pendentes / Aprovadas / Rejeitadas)
+- Contadores por status
+- Para cada instituicao pendente: botoes Aprovar e Rejeitar
+- Ao rejeitar: campo de motivo obrigatorio
+- Edicao de dados antes da aprovacao
+- Busca por nome, sigla, CNPJ
+
+**5b. Adicionar ao sidebar**
+
+Em `SidebarContent.tsx`, adicionar item na secao "Gestao Institucional":
+```
+{ name: "Instituicoes", icon: Building, href: "/admin/instituicoes", adminOnly: true }
 ```
 
-Nenhuma alteracao no banco de dados. Dados existentes permanecem intactos.
+**5c. Adicionar rota em `App.tsx`**
+
+```
+<Route path="/admin/instituicoes" element={
+  <AdminProtectedRoute allowedRoles={["admin"]}>
+    <InstitutionsManagement />
+  </AdminProtectedRoute>
+} />
+```
+
+### Etapa 6 -- Verificacao de Duplicidade
+
+Na submissao de nova instituicao, verificar no frontend antes do INSERT:
+- Nome similar (busca ilike)
+- Sigla identica
+- CNPJ ja cadastrado (busca exata)
+
+Exibir alerta se encontrar possiveis duplicatas, permitindo que o usuario confirme ou selecione a existente.
+
+### Etapa 7 -- Audit Log
+
+Registrar em `audit_logs`:
+- `institution_submitted` -- quando usuario submete nova instituicao
+- `institution_approved` -- quando admin aprova
+- `institution_rejected` -- quando admin rejeita
 
 ---
 
-## Arquivos Modificados
+## Arquivos a Criar
+
+| Arquivo | Descricao |
+|---|---|
+| `src/lib/cnpj-validator.ts` | Validador e formatador de CNPJ |
+| `src/pages/InstitutionsManagement.tsx` | Painel admin de gestao de instituicoes |
+| Migracao SQL | Tabela `institutions`, indices, RLS, migracao de dados |
+
+## Arquivos a Modificar
 
 | Arquivo | Alteracao |
 |---|---|
-| `src/components/layout/Header.tsx` | Estilo do botao "Sair" para primario |
-| `src/pages/MyAccount.tsx` | Remocao do campo "Cargo / Funcao" |
+| `src/components/my-account/InstitutionCombobox.tsx` | Refatorar para usar tabela `institutions`, adicionar CNPJ e tipo |
+| `src/pages/MyAccount.tsx` | Salvar `institution_id`, carregar dados via nova tabela |
+| `src/components/layout/SidebarContent.tsx` | Adicionar link "Instituicoes" no menu admin |
+| `src/App.tsx` | Adicionar rota `/admin/instituicoes` |
 
+## Notas Importantes
+
+- A tabela `institutions_mec` original nao sera removida (compatibilidade)
+- Colunas legadas em `profiles` (`institution`, `institution_sigla`, etc.) permanecem mas deixam de ser a fonte primaria
+- CNPJ e dado publico institucional, nao PII -- pode ser armazenado na tabela `institutions` sem isolamento especial
+- Notificacoes por e-mail (aprovacao/rejeicao) podem ser implementadas em etapa futura
