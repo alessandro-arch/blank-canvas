@@ -372,6 +372,63 @@ export type Database = {
           },
         ]
       }
+      institutions: {
+        Row: {
+          academic_organization: string | null
+          acronym: string | null
+          category: string | null
+          cnpj: string | null
+          created_at: string
+          id: string
+          institution_type: string | null
+          municipality: string | null
+          name: string
+          normalized_name: string | null
+          rejection_reason: string | null
+          source: string
+          status: string
+          submitted_by: string | null
+          uf: string
+          updated_at: string
+        }
+        Insert: {
+          academic_organization?: string | null
+          acronym?: string | null
+          category?: string | null
+          cnpj?: string | null
+          created_at?: string
+          id?: string
+          institution_type?: string | null
+          municipality?: string | null
+          name: string
+          normalized_name?: string | null
+          rejection_reason?: string | null
+          source?: string
+          status?: string
+          submitted_by?: string | null
+          uf: string
+          updated_at?: string
+        }
+        Update: {
+          academic_organization?: string | null
+          acronym?: string | null
+          category?: string | null
+          cnpj?: string | null
+          created_at?: string
+          id?: string
+          institution_type?: string | null
+          municipality?: string | null
+          name?: string
+          normalized_name?: string | null
+          rejection_reason?: string | null
+          source?: string
+          status?: string
+          submitted_by?: string | null
+          uf?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       institutions_mec: {
         Row: {
           categoria: string | null
@@ -1355,6 +1412,7 @@ export type Database = {
           full_name: string | null
           id: string
           institution: string | null
+          institution_id: string | null
           institution_is_custom: boolean | null
           institution_sigla: string | null
           institution_uf: string | null
@@ -1378,6 +1436,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           institution?: string | null
+          institution_id?: string | null
           institution_is_custom?: boolean | null
           institution_sigla?: string | null
           institution_uf?: string | null
@@ -1401,6 +1460,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           institution?: string | null
+          institution_id?: string | null
           institution_is_custom?: boolean | null
           institution_sigla?: string | null
           institution_uf?: string | null
@@ -1417,6 +1477,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "profiles_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profiles_organization_id_fkey"
             columns: ["organization_id"]
@@ -2091,6 +2158,8 @@ export type Database = {
         Args: { p_payload: Json; p_report_id: string }
         Returns: Json
       }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
       submit_monthly_report: {
         Args: { p_ip?: string; p_report_id: string; p_user_agent?: string }
         Returns: Json

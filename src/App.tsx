@@ -63,6 +63,7 @@ import PdfReports from "./pages/PdfReports";
 import AuditorDashboard from "./pages/AuditorDashboard";
 import AuditorHelp from "./pages/AuditorHelp";
 import MyAccount from "./pages/MyAccount";
+import InstitutionsManagement from "./pages/InstitutionsManagement";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -251,6 +252,11 @@ const App = () => (
               <Route path="/admin/organizacoes" element={
                 <AdminProtectedRoute allowedRoles={["admin"]}>
                   <Organizations />
+                </AdminProtectedRoute>
+              } />
+              <Route path="/admin/instituicoes" element={
+                <AdminProtectedRoute allowedRoles={["admin"]}>
+                  <InstitutionsManagement />
                 </AdminProtectedRoute>
               } />
               <Route path="/admin/configuracoes" element={

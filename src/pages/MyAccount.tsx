@@ -28,8 +28,9 @@ export default function MyAccount() {
   // Professional info (from profiles table)
   const [lattesUrl, setLattesUrl] = useState("");
   const [linkedinUrl, setLinkedinUrl] = useState("");
-  const [institutionData, setInstitutionData] = useState({
+  const [institutionData, setInstitutionData] = useState<import("@/components/my-account/InstitutionCombobox").InstitutionData>({
     name: "",
+    acronym: "",
     sigla: "",
     uf: "",
     isCustom: false,
@@ -53,12 +54,34 @@ export default function MyAccount() {
 
         if (profile) {
           setLattesUrl(profile.lattes_url || "");
-          setInstitutionData({
-            name: profile.institution || "",
-            sigla: (profile as any).institution_sigla || "",
-            uf: (profile as any).institution_uf || "",
-            isCustom: (profile as any).institution_is_custom || false,
-          });
+          // Load institution by institution_id or fall back to legacy fields
+          const instId = (profile as any).institution_id;
+          if (instId) {
+            const { data: inst } = await (supabase as any)
+              .from("institutions")
+              .select("id, name, acronym, uf, status")
+              .eq("id", instId)
+              .single();
+            if (inst) {
+              setInstitutionData({
+                id: inst.id,
+                name: inst.name,
+                acronym: inst.acronym || "",
+                sigla: inst.acronym || "",
+                uf: inst.uf,
+                status: inst.status,
+                isCustom: inst.status !== "approved",
+              });
+            }
+          } else {
+            setInstitutionData({
+              name: profile.institution || "",
+              acronym: (profile as any).institution_sigla || "",
+              sigla: (profile as any).institution_sigla || "",
+              uf: (profile as any).institution_uf || "",
+              isCustom: (profile as any).institution_is_custom || false,
+            });
+          }
         }
 
         // Fetch sensitive profile (phone)
@@ -86,15 +109,19 @@ export default function MyAccount() {
     setSaving(true);
     try {
       // Update profile fields
+      const profileUpdate: any = {
+        lattes_url: lattesUrl || null,
+        institution: institutionData.name || null,
+        institution_sigla: institutionData.acronym || institutionData.sigla || null,
+        institution_uf: institutionData.uf || null,
+        institution_is_custom: institutionData.isCustom,
+      };
+      if (institutionData.id) {
+        profileUpdate.institution_id = institutionData.id;
+      }
       const { error: profileError } = await supabase
         .from("profiles")
-        .update({
-          lattes_url: lattesUrl || null,
-          institution: institutionData.name || null,
-          institution_sigla: institutionData.sigla || null,
-          institution_uf: institutionData.uf || null,
-          institution_is_custom: institutionData.isCustom,
-        } as any)
+        .update(profileUpdate)
         .eq("user_id", user.id);
 
       if (profileError) throw profileError;
