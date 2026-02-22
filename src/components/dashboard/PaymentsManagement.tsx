@@ -237,7 +237,7 @@ export function PaymentsManagement() {
           thematic_project_title: thematicProject?.title || "",
           enrollment_id: enrollment.id,
           current_payment: null,
-          all_payments: userPayments.sort((a, b) => b.reference_month.localeCompare(a.reference_month)),
+          all_payments: userPayments.sort((a, b) => a.reference_month.localeCompare(b.reference_month)),
         });
       });
 
