@@ -1,7 +1,7 @@
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
-import { ArrowLeft, BookOpen, UserCircle, Building2, FileText, Banknote, ShieldCheck, Bell, HelpCircle, ChevronDown, Camera } from "lucide-react";
+import { ArrowLeft, BookOpen, UserCircle, Building2, FileText, Banknote, ShieldCheck, Bell, HelpCircle, ChevronDown, Camera, Bot, ClipboardList, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -161,28 +161,74 @@ const ScholarManual = () => {
               </Tip>
             </ManualSection>
 
-            {/* 5. Enviar Relatório */}
+            {/* 5. Enviar Relatório Mensal — REESCRITO */}
             <ManualSection icon={FileText} title="5. Enviar Relatório Mensal">
-              <p>O envio do relatório mensal é <strong className="text-foreground">obrigatório</strong> para a liberação do pagamento da parcela correspondente.</p>
+              <p>O envio do relatório mensal é <strong className="text-foreground">obrigatório</strong> para a liberação do pagamento da parcela correspondente. O relatório é preenchido diretamente em um <strong className="text-foreground">formulário digital estruturado</strong> dentro do portal.</p>
               <StepList steps={[
                 "No menu lateral, clique em \"Meus Pagamentos\".",
-                "Localize a parcela do mês correspondente no Histórico de Parcelas.",
-                "Clique no botão \"Enviar Relatório\" da parcela desejada.",
-                "Selecione o arquivo PDF do relatório (máximo 5 MB).",
-                "Confirme o envio. O status mudará para \"Em Análise\".",
-                "Aguarde a avaliação do gestor. Se aprovado, o pagamento será liberado automaticamente.",
+                "Role até a seção \"Relatório Mensal\" referente ao mês corrente.",
+                "Preencha todos os campos do formulário: atividades realizadas, entregas, dificuldades encontradas, próximos passos e horas dedicadas.",
+                "O sistema salva seu rascunho automaticamente a cada 15 segundos — o indicador \"Salvo\" aparece no topo do formulário.",
+                "Você também pode clicar em \"Salvar Rascunho\" a qualquer momento para salvar manualmente.",
+                "Quando finalizar, clique em \"Submeter Relatório\".",
+                "Confirme a submissão no diálogo de aceite eletrônico que será exibido.",
+                "Após a submissão, um PDF auditável será gerado automaticamente com hash SHA-256.",
               ]} />
               <Tip>
-                <strong>Prazo:</strong> Envie seu relatório até o <strong>dia 25 de cada mês</strong> para evitar atrasos no pagamento no mês posterior. O pagamento é realizado até o 5º dia útil do mês seguinte.
+                <strong>Prazo:</strong> Envie seu relatório até o <strong>dia 25 de cada mês</strong> para evitar atrasos no pagamento. Você pode salvar rascunhos e voltar para editar quantas vezes quiser antes de submeter.
               </Tip>
               <div className="mt-2 space-y-2">
-                <p className="font-medium text-foreground">E se o relatório for recusado?</p>
-                <p>Se o gestor recusar seu relatório, você receberá uma notificação com o motivo da recusa e terá <strong className="text-foreground">5 dias</strong> para enviar uma nova versão corrigida.</p>
+                <p className="font-medium text-foreground">Status do relatório:</p>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li><strong className="text-foreground">Rascunho:</strong> Em edição, ainda não submetido.</li>
+                  <li><strong className="text-foreground">Submetido:</strong> Enviado para avaliação do gestor. A edição fica bloqueada.</li>
+                  <li><strong className="text-foreground">Aprovado:</strong> Avaliado e aceito pelo gestor.</li>
+                  <li><strong className="text-foreground">Devolvido:</strong> O gestor solicitou correções. A edição será reaberta com o motivo da devolução.</li>
+                </ul>
+              </div>
+              <div className="mt-2 space-y-2">
+                <p className="font-medium text-foreground">E se o relatório for devolvido?</p>
+                <p>Você receberá uma notificação com o motivo da devolução. O formulário será reaberto para edição e você poderá corrigir e submeter novamente.</p>
               </div>
             </ManualSection>
 
-            {/* 6. Pagamentos */}
-            <ManualSection icon={Banknote} title="6. Acompanhar Pagamentos">
+            {/* 6. Parecer de Inteligência Artificial — NOVO */}
+            <ManualSection icon={Bot} title="6. Parecer de Inteligência Artificial">
+              <p>Após o gestor avaliar seu relatório (aprovação ou devolução), um <strong className="text-foreground">parecer técnico gerado por Inteligência Artificial</strong> ficará disponível automaticamente.</p>
+              <StepList steps={[
+                "Após a decisão do gestor, acesse a seção do relatório mensal em \"Meus Pagamentos\".",
+                "O parecer da IA aparecerá automaticamente abaixo do formulário do relatório.",
+              ]} />
+              <div className="mt-2 space-y-2">
+                <p className="font-medium text-foreground">O que o parecer avalia?</p>
+                <p>A IA cruza seu relatório com o Plano de Trabalho e o histórico de submissões anteriores, avaliando quatro métricas (nota de 0 a 5):</p>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li><strong className="text-foreground">Aderência ao Plano:</strong> Se as atividades relatadas estão alinhadas ao plano de trabalho.</li>
+                  <li><strong className="text-foreground">Evidência e Verificabilidade:</strong> Se as entregas podem ser comprovadas.</li>
+                  <li><strong className="text-foreground">Progresso vs Histórico:</strong> Se houve evolução em relação aos meses anteriores.</li>
+                  <li><strong className="text-foreground">Qualidade Técnica:</strong> Clareza, coerência e profundidade do relato.</li>
+                </ul>
+              </div>
+              <Tip>
+                <strong>Importante:</strong> O parecer da IA é uma ferramenta de apoio. A decisão final sobre o relatório é sempre do gestor responsável.
+              </Tip>
+            </ManualSection>
+
+            {/* 7. Plano de Trabalho — NOVO */}
+            <ManualSection icon={ClipboardList} title="7. Plano de Trabalho">
+              <p>O Plano de Trabalho define os objetivos, metas e cronograma da sua bolsa. Ele é utilizado como referência pela IA ao avaliar seus relatórios mensais.</p>
+              <StepList steps={[
+                "No menu lateral, clique em \"Documentos\".",
+                "Acesse a aba \"Plano de Trabalho\".",
+                "Visualize ou baixe o documento em PDF.",
+              ]} />
+              <Tip>
+                <strong>Dica:</strong> Consulte seu Plano de Trabalho regularmente ao preencher os relatórios mensais para garantir que suas atividades estejam alinhadas aos objetivos definidos.
+              </Tip>
+            </ManualSection>
+
+            {/* 8. Pagamentos */}
+            <ManualSection icon={Banknote} title="8. Acompanhar Pagamentos">
               <p>Acompanhe o status de todas as suas parcelas em tempo real.</p>
               <StepList steps={[
                 "Acesse \"Meus Pagamentos\" no menu lateral.",
@@ -200,8 +246,8 @@ const ScholarManual = () => {
               </div>
             </ManualSection>
 
-            {/* 7. Termo de Outorga */}
-            <ManualSection icon={ShieldCheck} title="7. Termo de Outorga (Contrato)">
+            {/* 9. Termo de Outorga */}
+            <ManualSection icon={ShieldCheck} title="9. Termo de Outorga (Contrato)">
               <p>O Termo de Outorga é o <strong className="text-foreground">contrato oficial</strong> que formaliza o vínculo entre você e o programa de bolsas. Ele contém as condições, direitos e deveres relacionados à sua bolsa.</p>
               <StepList steps={[
                 "Acesse \"Meu Perfil\" no menu lateral.",
@@ -224,8 +270,8 @@ const ScholarManual = () => {
               </div>
             </ManualSection>
 
-            {/* 8. Documentos */}
-            <ManualSection icon={FileText} title="8. Documentos Institucionais">
+            {/* 10. Documentos */}
+            <ManualSection icon={FileText} title="10. Documentos Institucionais">
               <p>A seção de documentos disponibiliza manuais, templates e termos necessários para o andamento do programa.</p>
               <StepList steps={[
                 "Acesse \"Documentos\" no menu lateral.",
@@ -237,20 +283,34 @@ const ScholarManual = () => {
               </Tip>
             </ManualSection>
 
-            {/* 9. Notificações */}
-            <ManualSection icon={Bell} title="9. Notificações">
+            {/* 11. Mensagens — NOVO */}
+            <ManualSection icon={MessageSquare} title="11. Mensagens">
+              <p>O portal conta com uma <strong className="text-foreground">caixa de mensagens interna</strong> para comunicação com a gestão do programa.</p>
+              <StepList steps={[
+                "No menu lateral, clique em \"Mensagens\".",
+                "Visualize as mensagens recebidas do gestor.",
+                "Clique em uma mensagem para ver o conteúdo completo.",
+              ]} />
+              <Tip>
+                <strong>Dica:</strong> O badge vermelho no ícone de mensagens indica que há mensagens não lidas. Fique atento para não perder comunicações importantes.
+              </Tip>
+            </ManualSection>
+
+            {/* 12. Notificações */}
+            <ManualSection icon={Bell} title="12. Notificações">
               <p>O sistema envia notificações automáticas sobre eventos importantes, como:</p>
               <ul className="list-disc pl-5 space-y-1">
-                <li>Avaliação de relatório (aprovado ou recusado)</li>
+                <li>Avaliação de relatório (aprovado ou devolvido)</li>
                 <li>Alteração de status de pagamento</li>
                 <li>Devolução de dados bancários para correção</li>
                 <li>Novos documentos institucionais disponíveis</li>
+                <li>Parecer de IA disponível</li>
               </ul>
               <p className="mt-2">Fique atento ao ícone de sino no cabeçalho para não perder nenhuma atualização.</p>
             </ManualSection>
 
-            {/* 10. Dúvidas */}
-            <ManualSection icon={HelpCircle} title="10. Dúvidas Frequentes">
+            {/* 13. Dúvidas Frequentes */}
+            <ManualSection icon={HelpCircle} title="13. Dúvidas Frequentes">
               <div className="space-y-4">
                 <div>
                   <p className="font-medium text-foreground">Posso alterar meu CPF após o cadastro?</p>
@@ -258,15 +318,23 @@ const ScholarManual = () => {
                 </div>
                 <div>
                   <p className="font-medium text-foreground">Como sei se meu relatório foi aprovado?</p>
-                  <p>Você receberá uma notificação e o status da parcela mudará para "Liberado" na tela de pagamentos.</p>
+                  <p>Você receberá uma notificação e o status da parcela mudará para "Liberado" na tela de pagamentos. O parecer da IA também ficará disponível.</p>
                 </div>
                 <div>
                   <p className="font-medium text-foreground">Não consigo editar meus dados bancários. O que fazer?</p>
                   <p>Seus dados estão em análise ou já foram validados pelo gestor. Caso precise corrigir algo, solicite a devolução ao gestor.</p>
                 </div>
                 <div>
-                  <p className="font-medium text-foreground">Qual o formato aceito para relatórios?</p>
-                  <p>Apenas arquivos PDF com no máximo 5 MB.</p>
+                  <p className="font-medium text-foreground">Como funciona o envio do relatório mensal?</p>
+                  <p>O relatório é preenchido em um formulário digital estruturado diretamente no portal. Não é necessário fazer upload de PDF — o sistema gera o PDF automaticamente após a submissão.</p>
+                </div>
+                <div>
+                  <p className="font-medium text-foreground">Posso editar o relatório após submeter?</p>
+                  <p>Não. Após a submissão, o relatório fica bloqueado para edição. Se o gestor devolver o relatório, a edição será reaberta automaticamente para você corrigir.</p>
+                </div>
+                <div>
+                  <p className="font-medium text-foreground">O que é o parecer de IA?</p>
+                  <p>É uma avaliação técnica automática do seu relatório mensal, gerada por Inteligência Artificial. A IA cruza o relatório com o seu Plano de Trabalho e avalia quatro métricas: aderência ao plano, evidência, progresso e qualidade técnica. O parecer é informativo — a decisão final é sempre do gestor.</p>
                 </div>
                 <div>
                   <p className="font-medium text-foreground">O que acontece se eu perder o prazo de envio do relatório?</p>
