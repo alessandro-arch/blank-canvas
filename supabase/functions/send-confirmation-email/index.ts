@@ -427,7 +427,7 @@ Deno.serve(async (req) => {
     const subject = getSubjectForType(email_action_type);
 
     const { error } = await resend.emails.send({
-      from: 'InnovaGO <noreply@bolsaconecta.com.br>',
+      from: 'InnovaGO <contato@innovago.app>',
       to: [user.email],
       subject,
       html,
