@@ -372,6 +372,48 @@ export type Database = {
           },
         ]
       }
+      institutions_mec: {
+        Row: {
+          categoria: string | null
+          codigo_ies: number | null
+          created_at: string | null
+          id: string
+          municipio: string | null
+          nome: string
+          normalized_name: string | null
+          organizacao_academica: string | null
+          sigla: string | null
+          situacao: string | null
+          uf: string
+        }
+        Insert: {
+          categoria?: string | null
+          codigo_ies?: number | null
+          created_at?: string | null
+          id?: string
+          municipio?: string | null
+          nome: string
+          normalized_name?: string | null
+          organizacao_academica?: string | null
+          sigla?: string | null
+          situacao?: string | null
+          uf: string
+        }
+        Update: {
+          categoria?: string | null
+          codigo_ies?: number | null
+          created_at?: string | null
+          id?: string
+          municipio?: string | null
+          nome?: string
+          normalized_name?: string | null
+          organizacao_academica?: string | null
+          sigla?: string | null
+          situacao?: string | null
+          uf?: string
+        }
+        Relationships: []
+      }
       invite_code_uses: {
         Row: {
           id: string
@@ -1313,6 +1355,9 @@ export type Database = {
           full_name: string | null
           id: string
           institution: string | null
+          institution_is_custom: boolean | null
+          institution_sigla: string | null
+          institution_uf: string | null
           invite_code_used: string | null
           invite_used_at: string | null
           is_active: boolean
@@ -1333,6 +1378,9 @@ export type Database = {
           full_name?: string | null
           id?: string
           institution?: string | null
+          institution_is_custom?: boolean | null
+          institution_sigla?: string | null
+          institution_uf?: string | null
           invite_code_used?: string | null
           invite_used_at?: string | null
           is_active?: boolean
@@ -1353,6 +1401,9 @@ export type Database = {
           full_name?: string | null
           id?: string
           institution?: string | null
+          institution_is_custom?: boolean | null
+          institution_sigla?: string | null
+          institution_uf?: string | null
           invite_code_used?: string | null
           invite_used_at?: string | null
           is_active?: boolean

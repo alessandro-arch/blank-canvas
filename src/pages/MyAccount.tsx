@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { ArrowLeft, User, Briefcase, Save, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { InstitutionCombobox } from "@/components/my-account/InstitutionCombobox";
+import { ImportMecButton } from "@/components/my-account/ImportMecButton";
 
 export default function MyAccount() {
   const { user } = useAuth();
@@ -133,6 +134,7 @@ export default function MyAccount() {
                 <p className="text-muted-foreground text-sm">Gerencie suas informações pessoais e profissionais.</p>
               </div>
             </div>
+            <ImportMecButton />
 
             {/* Informações Pessoais */}
             <Card>
