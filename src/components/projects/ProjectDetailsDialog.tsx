@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Edit, Archive, Trash2, AlertTriangle, FileText, Eye, Upload, Loader2 } from 'lucide-react';
+import { Edit, Archive, Trash2, AlertTriangle, FileText, Eye, Upload, Loader2, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { EditProjectDialog } from './EditProjectDialog';
@@ -20,8 +20,10 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { useWorkPlanByProject } from '@/hooks/useWorkPlans';
+import { useGrantTerm } from '@/hooks/useGrantTerm';
 import { UploadWorkPlanDialog } from '@/components/scholars/UploadWorkPlanDialog';
 import { PdfViewerDialog } from '@/components/ui/PdfViewerDialog';
+import { useUserRole } from '@/hooks/useUserRole';
 import { toast } from 'sonner';
 
 type ProjectStatus = Database['public']['Enums']['project_status'];
@@ -65,6 +67,8 @@ export function ProjectDetailsDialog({
   const [wpViewLoading, setWpViewLoading] = useState(false);
   const [wpPdfUrl, setWpPdfUrl] = useState<string | null>(null);
   const [wpPdfViewerOpen, setWpPdfViewerOpen] = useState(false);
+  const [gtPdfViewerOpen, setGtPdfViewerOpen] = useState(false);
+  const { isAuditor } = useUserRole();
 
   // Get enrollment to find scholar_user_id
   const { data: enrollmentData } = useQuery({
@@ -103,6 +107,8 @@ export function ProjectDetailsDialog({
     project.id,
     scholarUserId || undefined
   );
+
+  const { grantTerm, signedUrl: gtSignedUrl, loading: gtLoading } = useGrantTerm(scholarUserId);
 
   const handleViewWorkPlan = async () => {
     if (!activeWorkPlan) return;
@@ -217,10 +223,11 @@ export function ProjectDetailsDialog({
           </DialogHeader>
 
           <Tabs defaultValue="details" className="mt-4">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className={`grid w-full ${isAuditor ? 'grid-cols-3' : 'grid-cols-4'}`}>
               <TabsTrigger value="details">Detalhes</TabsTrigger>
+              <TabsTrigger value="grantterm">Termo de Outorga</TabsTrigger>
               <TabsTrigger value="workplan">Plano de Trabalho</TabsTrigger>
-              <TabsTrigger value="actions">Ações</TabsTrigger>
+              {!isAuditor && <TabsTrigger value="actions">Ações</TabsTrigger>}
             </TabsList>
 
             <TabsContent value="details" className="space-y-4 mt-4">
@@ -302,6 +309,63 @@ export function ProjectDetailsDialog({
               )}
             </TabsContent>
 
+            {/* Grant Term Tab */}
+            <TabsContent value="grantterm" className="space-y-4 mt-4">
+              {!scholarUserId ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <FileText className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                  <p className="text-sm">Nenhum bolsista vinculado a este subprojeto.</p>
+                </div>
+              ) : gtLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : grantTerm ? (
+                <div className="p-4 rounded-lg border bg-card space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <FileText className="w-5 h-5 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm">{grantTerm.fileName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Assinado em {format(new Date(grantTerm.signedAt), "dd/MM/yyyy", { locale: ptBR })}
+                        {grantTerm.fileSize && ` • ${(grantTerm.fileSize / 1024 / 1024).toFixed(1)} MB`}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => { if (gtSignedUrl) setGtPdfViewerOpen(true); }}
+                      disabled={!gtSignedUrl}
+                    >
+                      <Eye className="h-4 w-4 mr-2" />
+                      Visualizar
+                    </Button>
+                    {gtSignedUrl && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        asChild
+                      >
+                        <a href={gtSignedUrl} download={grantTerm.fileName}>
+                          <Download className="h-4 w-4 mr-2" />
+                          Baixar
+                        </a>
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <FileText className="h-10 w-10 mx-auto mb-3 text-muted-foreground opacity-50" />
+                  <p className="text-sm text-muted-foreground">Nenhum termo de outorga disponível.</p>
+                </div>
+              )}
+            </TabsContent>
+
             {/* Work Plan Tab */}
             <TabsContent value="workplan" className="space-y-4 mt-4">
               {!scholarUserId ? (
@@ -336,110 +400,116 @@ export function ProjectDetailsDialog({
                           {wpViewLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Eye className="h-4 w-4 mr-2" />}
                           Visualizar
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setWorkPlanDialogOpen(true)}
-                        >
-                          <Upload className="h-4 w-4 mr-2" />
-                          Substituir
-                        </Button>
+                        {!isAuditor && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setWorkPlanDialogOpen(true)}
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            Substituir
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ) : (
                     <div className="text-center py-8">
                       <FileText className="h-10 w-10 mx-auto mb-3 text-muted-foreground opacity-50" />
                       <p className="text-sm text-muted-foreground mb-3">Nenhum plano de trabalho enviado.</p>
-                      <Button onClick={() => setWorkPlanDialogOpen(true)} size="sm">
-                        <Upload className="h-4 w-4 mr-2" />
-                        Enviar Plano de Trabalho
-                      </Button>
+                      {!isAuditor && (
+                        <Button onClick={() => setWorkPlanDialogOpen(true)} size="sm">
+                          <Upload className="h-4 w-4 mr-2" />
+                          Enviar Plano de Trabalho
+                        </Button>
+                      )}
                     </div>
                   )}
                 </>
               )}
             </TabsContent>
 
-            <TabsContent value="actions" className="space-y-4 mt-4">
-              {/* Edit button */}
-              <div className="flex items-center justify-between p-4 rounded-lg border">
-                <div>
-                  <p className="font-medium">Editar Subprojeto</p>
-                  <p className="text-sm text-muted-foreground">
-                    Alterar título, valores, datas e outros campos
-                  </p>
-                </div>
-                <Button onClick={() => setEditDialogOpen(true)}>
-                  <Edit className="h-4 w-4 mr-2" />
-                  Editar
-                </Button>
-              </div>
-
-              {/* Archive button */}
-              {project.status !== 'archived' && (
+            {!isAuditor && (
+              <TabsContent value="actions" className="space-y-4 mt-4">
+                {/* Edit button */}
                 <div className="flex items-center justify-between p-4 rounded-lg border">
                   <div>
-                    <p className="font-medium">Arquivar Subprojeto</p>
+                    <p className="font-medium">Editar Subprojeto</p>
                     <p className="text-sm text-muted-foreground">
-                      Impede novos vínculos, mantém histórico para consulta
+                      Alterar título, valores, datas e outros campos
                     </p>
                   </div>
-                  <Button variant="secondary" onClick={() => setArchiveDialogOpen(true)}>
-                    <Archive className="h-4 w-4 mr-2" />
-                    Arquivar
+                  <Button onClick={() => setEditDialogOpen(true)}>
+                    <Edit className="h-4 w-4 mr-2" />
+                    Editar
                   </Button>
                 </div>
-              )}
 
-              {/* Reactivate button for archived projects */}
-              {project.status === 'archived' && (
-                <div className="flex items-center justify-between p-4 rounded-lg border">
+                {/* Archive button */}
+                {project.status !== 'archived' && (
+                  <div className="flex items-center justify-between p-4 rounded-lg border">
+                    <div>
+                      <p className="font-medium">Arquivar Subprojeto</p>
+                      <p className="text-sm text-muted-foreground">
+                        Impede novos vínculos, mantém histórico para consulta
+                      </p>
+                    </div>
+                    <Button variant="secondary" onClick={() => setArchiveDialogOpen(true)}>
+                      <Archive className="h-4 w-4 mr-2" />
+                      Arquivar
+                    </Button>
+                  </div>
+                )}
+
+                {/* Reactivate button for archived projects */}
+                {project.status === 'archived' && (
+                  <div className="flex items-center justify-between p-4 rounded-lg border">
+                    <div>
+                      <p className="font-medium">Reativar Subprojeto</p>
+                      <p className="text-sm text-muted-foreground">
+                        Tornar o subprojeto ativo novamente para novos vínculos
+                      </p>
+                    </div>
+                    <Button variant="secondary" onClick={() => setArchiveDialogOpen(true)}>
+                      <Archive className="h-4 w-4 mr-2" />
+                      Reativar
+                    </Button>
+                  </div>
+                )}
+
+                {/* Delete button */}
+                <div className="flex items-center justify-between p-4 rounded-lg border border-destructive/30 bg-destructive/5">
                   <div>
-                    <p className="font-medium">Reativar Subprojeto</p>
+                    <p className="font-medium text-destructive">Excluir Subprojeto</p>
                     <p className="text-sm text-muted-foreground">
-                      Tornar o subprojeto ativo novamente para novos vínculos
+                      {dependencies?.hasDependencies
+                        ? 'Não é possível excluir - existem vínculos, pagamentos ou relatórios'
+                        : 'Remover permanentemente o subprojeto do sistema'}
                     </p>
                   </div>
-                  <Button variant="secondary" onClick={() => setArchiveDialogOpen(true)}>
-                    <Archive className="h-4 w-4 mr-2" />
-                    Reativar
+                  <Button
+                    variant="destructive"
+                    onClick={() => setDeleteDialogOpen(true)}
+                    disabled={dependencies?.hasDependencies}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Excluir
                   </Button>
                 </div>
-              )}
 
-              {/* Delete button */}
-              <div className="flex items-center justify-between p-4 rounded-lg border border-destructive/30 bg-destructive/5">
-                <div>
-                  <p className="font-medium text-destructive">Excluir Subprojeto</p>
-                  <p className="text-sm text-muted-foreground">
-                    {dependencies?.hasDependencies
-                      ? 'Não é possível excluir - existem vínculos, pagamentos ou relatórios'
-                      : 'Remover permanentemente o subprojeto do sistema'}
-                  </p>
-                </div>
-                <Button
-                  variant="destructive"
-                  onClick={() => setDeleteDialogOpen(true)}
-                  disabled={dependencies?.hasDependencies}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Excluir
-                </Button>
-              </div>
-
-              {dependencies?.hasDependencies && (
-                <div className="flex items-start gap-2 p-3 rounded-lg bg-warning/10 border border-warning/30">
-                  <AlertTriangle className="h-4 w-4 text-warning mt-0.5" />
-                  <div className="text-sm">
-                    <p className="font-medium">Exclusão bloqueada</p>
-                    <p className="text-muted-foreground">
-                      Este subprojeto possui {dependencies.enrollments} vínculo(s), {dependencies.payments} pagamento(s) 
-                      e {dependencies.reports} relatório(s). Use a opção "Arquivar" para desativá-lo mantendo o histórico.
-                    </p>
+                {dependencies?.hasDependencies && (
+                  <div className="flex items-start gap-2 p-3 rounded-lg bg-warning/10 border border-warning/30">
+                    <AlertTriangle className="h-4 w-4 text-warning mt-0.5" />
+                    <div className="text-sm">
+                      <p className="font-medium">Exclusão bloqueada</p>
+                      <p className="text-muted-foreground">
+                        Este subprojeto possui {dependencies.enrollments} vínculo(s), {dependencies.payments} pagamento(s) 
+                        e {dependencies.reports} relatório(s). Use a opção "Arquivar" para desativá-lo mantendo o histórico.
+                      </p>
+                    </div>
                   </div>
-                </div>
-              )}
-            </TabsContent>
+                )}
+              </TabsContent>
+            )}
           </Tabs>
         </DialogContent>
       </Dialog>
@@ -485,6 +555,15 @@ export function ProjectDetailsDialog({
           onOpenChange={setWpPdfViewerOpen}
           title={activeWorkPlan?.file_name || "Plano de Trabalho"}
           pdfUrl={wpPdfUrl}
+        />
+      )}
+
+      {gtSignedUrl && (
+        <PdfViewerDialog
+          open={gtPdfViewerOpen}
+          onOpenChange={setGtPdfViewerOpen}
+          title={grantTerm?.fileName || "Termo de Outorga"}
+          pdfUrl={gtSignedUrl}
         />
       )}
     </>
