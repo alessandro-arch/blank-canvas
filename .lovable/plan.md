@@ -1,132 +1,35 @@
 
 
-# Patch: Auditor Dashboard Zerado
+# Corrigir Badge do Auditor e Exibir Organizacao
 
 ## Problema
-O Auditor loga com sucesso mas ve todos os KPIs zerados porque:
-1. O `AuditorDashboard` nao filtra queries por `organization_id` (consulta global sem filtro)
-2. As politicas RLS das tabelas `enrollments`, `projects`, `payments` e `reports` so permitem `admin` e `manager` -- o `auditor` recebe 0 linhas do Supabase
-3. O tipo `OrganizationMember` no inclui `"auditor"` como role valido
+1. O badge do Auditor na sidebar usa `bg-accent text-accent-foreground` que resulta em um fundo cinza claro quase invisivel -- deveria ser amarelo como no painel de Membros Admin
+2. A organizacao vinculada ao auditor precisa estar mais visivel no painel
 
 ## Correcoes
 
-### Parte 1 -- Frontend: Tipo OrganizationMember (useOrganization.ts)
-Adicionar `"auditor"` ao union type do role:
+### 1. Badge amarelo "Auditor" na Sidebar (SidebarContent.tsx)
+Alterar a classe do badge do auditor de `bg-accent text-accent-foreground` para `bg-yellow-500 text-white` (amarelo vibrante), mantendo o mesmo padrao visual do badge de "Auditor" na tela de Membros Admin.
+
+**Linha 146 atual:**
 ```
-role: "owner" | "admin" | "manager" | "member" | "auditor"
-```
-
-### Parte 2 -- Frontend: AuditorDashboard com filtro por organizacao
-- Importar `useOrganizationContext` 
-- Obter `currentOrganization` do contexto
-- Se `currentOrganization` for null, mostrar estado de erro amigavel
-- Todas as queries passam a filtrar por `organization_id`:
-  - `enrollments` -> join via `projects` -> `thematic_projects.organization_id`
-  - `projects` -> join via `thematic_projects.organization_id`
-  - `reports` -> filtra via profile org ou join
-  - `payments` -> join via enrollment -> project -> thematic_project
-- Para simplificar, usar a abordagem de buscar os `thematic_project_ids` da org e filtrar por eles
-
-Fluxo das queries filtradas:
-1. Buscar `thematic_projects` com `organization_id = currentOrg.id`
-2. Buscar `projects` com `thematic_project_id IN (ids acima)`
-3. Buscar `enrollments` com `project_id IN (project_ids)`
-4. Buscar `payments` com `enrollment_id` dos enrollments da org
-5. Buscar `monthly_reports` com `organization_id = currentOrg.id`
-
-### Parte 3 -- RLS: Politicas SELECT para o Auditor
-Criar politicas RLS novas (ou alterar existentes) para permitir SELECT ao auditor nas tabelas:
-
-**enrollments** -- nova policy:
-```sql
-CREATE POLICY "Auditor can view org enrollments"
-ON enrollments FOR SELECT TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM organization_members om
-    JOIN thematic_projects tp ON tp.organization_id = om.organization_id
-    JOIN projects p ON p.thematic_project_id = tp.id
-    WHERE p.id = enrollments.project_id
-      AND om.user_id = auth.uid()
-      AND om.role = 'auditor'
-      AND om.is_active = true
-  )
-);
+hasManagerAccess ? "bg-primary text-primary-foreground" : isAuditor ? "bg-accent text-accent-foreground" : "bg-info text-white"
 ```
 
-**projects** -- nova policy:
-```sql
-CREATE POLICY "Auditor can view org projects"
-ON projects FOR SELECT TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM organization_members om
-    JOIN thematic_projects tp ON tp.organization_id = om.organization_id
-    WHERE tp.id = projects.thematic_project_id
-      AND om.user_id = auth.uid()
-      AND om.role = 'auditor'
-      AND om.is_active = true
-  )
-);
+**Corrigido para:**
+```
+hasManagerAccess ? "bg-primary text-primary-foreground" : isAuditor ? "bg-yellow-500 text-white" : "bg-info text-white"
 ```
 
-**thematic_projects** -- nova policy:
-```sql
-CREATE POLICY "Auditor can view org thematic_projects"
-ON thematic_projects FOR SELECT TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM organization_members om
-    WHERE om.organization_id = thematic_projects.organization_id
-      AND om.user_id = auth.uid()
-      AND om.role = 'auditor'
-      AND om.is_active = true
-  )
-);
-```
+### 2. Organizacao visivel no dashboard do Auditor (AuditorDashboard.tsx)
+Adicionar um badge/destaque com o nome da organizacao na area do cabecalho do painel, junto ao badge "Somente Leitura". A organizacao ja aparece na linha de subtitulo, mas sera reforcada com um badge visual dedicado com icone de Building2.
 
-**payments** -- nova policy:
-```sql
-CREATE POLICY "Auditor can view org payments"
-ON payments FOR SELECT TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM organization_members om
-    JOIN thematic_projects tp ON tp.organization_id = om.organization_id
-    JOIN projects p ON p.thematic_project_id = tp.id
-    JOIN enrollments e ON e.project_id = p.id
-    WHERE e.id = payments.enrollment_id
-      AND om.user_id = auth.uid()
-      AND om.role = 'auditor'
-      AND om.is_active = true
-  )
-);
-```
-
-**monthly_reports** -- nova policy:
-```sql
-CREATE POLICY "Auditor can view org monthly_reports"
-ON monthly_reports FOR SELECT TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM organization_members om
-    WHERE om.organization_id = monthly_reports.organization_id
-      AND om.user_id = auth.uid()
-      AND om.role = 'auditor'
-      AND om.is_active = true
-  )
-);
-```
-
-### Parte 4 -- Confirmacao de seguranca
-- Auditor continua bloqueado de `bank_accounts`, `bank_accounts_public`, `profiles_sensitive` (sem alteracoes nessas tabelas)
-- Nenhuma policy INSERT/UPDATE/DELETE sera criada para auditor
-- Somente SELECT
+**Adicionar ao header (linhas 222-229):**
+- Badge com icone Building2 e nome da organizacao em destaque
+- Estilo visual claro para o auditor identificar rapidamente a org
 
 ### Resumo dos arquivos alterados
 | Arquivo | Alteracao |
 |---|---|
-| `src/hooks/useOrganization.ts` | Adicionar "auditor" ao tipo role |
-| `src/pages/AuditorDashboard.tsx` | Usar OrganizationContext, filtrar todas as queries por org, estado de erro |
-| Nova migracao SQL | 5 novas politicas RLS de SELECT para auditor |
-
+| `src/components/layout/SidebarContent.tsx` | Badge auditor amarelo (`bg-yellow-500 text-white`) |
+| `src/pages/AuditorDashboard.tsx` | Badge com nome da organizacao no cabecalho |
