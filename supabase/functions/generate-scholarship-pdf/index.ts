@@ -399,6 +399,56 @@ async function buildPdfFromData(data: RelatorioBolsaData, branding: OrgBranding)
     page.drawText(t, { x, y: yy, size, font: f, color });
   };
 
+  // Word-wrap text within a max pixel width
+  const wrapText = (text: string, maxWidth: number, size: number, f = font): string[] => {
+    const safe = sanitize(text);
+    const words = safe.split(/\s+/);
+    const lines: string[] = [];
+    let current = "";
+    for (const word of words) {
+      const test = current ? `${current} ${word}` : word;
+      const w = f.widthOfTextAtSize(test, size);
+      if (w > maxWidth && current) {
+        lines.push(current);
+        current = word;
+      } else {
+        current = test;
+      }
+    }
+    if (current) lines.push(current);
+    return lines.length > 0 ? lines : [""];
+  };
+
+  // Draw wrapped text, advancing y, and return how many lines were drawn
+  const drawWrapped = (text: string, x: number, maxWidth: number, size = 9.5, f = font, color = rgb(0.1, 0.1, 0.12)): number => {
+    const lines = wrapText(text, maxWidth, size, f);
+    for (const ln of lines) {
+      check(LH);
+      page.drawText(ln, { x, y, size, font: f, color });
+      y -= LH;
+    }
+    return lines.length;
+  };
+
+  // Draw two wrapped columns side by side, advancing y by the taller one
+  const drawTwoCol = (
+    leftText: string, leftX: number, leftMaxW: number,
+    rightText: string, rightX: number, rightMaxW: number,
+    size = 9.5, f = font, color = rgb(0.1, 0.1, 0.12),
+  ) => {
+    const leftLines = wrapText(leftText, leftMaxW, size, f);
+    const rightLines = wrapText(rightText, rightMaxW, size, f);
+    const maxLines = Math.max(leftLines.length, rightLines.length);
+    check(maxLines * LH);
+    const startY = y;
+    for (let i = 0; i < maxLines; i++) {
+      const ly = startY - i * LH;
+      if (leftLines[i]) page.drawText(leftLines[i], { x: leftX, y: ly, size, font: f, color });
+      if (rightLines[i]) page.drawText(rightLines[i], { x: rightX, y: ly, size, font: f, color });
+    }
+    y -= maxLines * LH;
+  };
+
   const line = (yy: number, thick = 0.5) => {
     page.drawLine({ start: { x: M, y: yy }, end: { x: W - M, y: yy }, thickness: thick, color: rgb(0.78, 0.78, 0.78) });
   };
@@ -411,7 +461,7 @@ async function buildPdfFromData(data: RelatorioBolsaData, branding: OrgBranding)
   };
 
   const fmtDate = (d: string | null) => {
-    if (!d) return '—';
+    if (!d) return '--';
     try { const dt = new Date(d); return `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`; } catch { return d; }
   };
 
@@ -451,28 +501,27 @@ async function buildPdfFromData(data: RelatorioBolsaData, branding: OrgBranding)
   sectionTitle('DADOS DA BOLSA', '1');
 
   const col2X = M + COL / 2 + 10;
+  const leftColW = col2X - M - 10;
+  const rightColW = W - M - col2X;
 
   check(LH * 3);
   txt('FINANCIADOR:', M, y, 7.5, fontBold, rgb(0.5, 0.5, 0.55));
   txt('PROJETO TEMATICO:', col2X, y, 7.5, fontBold, rgb(0.5, 0.5, 0.55));
   y -= 11;
-  txt(data.financiador, M, y, 10.5, fontBold);
-  txt(data.projetoTematicoTitulo, col2X, y, 9.5);
-  y -= LH + 2;
+  drawTwoCol(data.financiador, M, leftColW, data.projetoTematicoTitulo, col2X, rightColW, 9.5, font);
+  y -= 2;
 
   txt('SUBPROJETO:', M, y, 7.5, fontBold, rgb(0.5, 0.5, 0.55));
   txt('MODALIDADE:', col2X, y, 7.5, fontBold, rgb(0.5, 0.5, 0.55));
   y -= 11;
-  txt(`${data.subprojetoCodigo} — ${data.subprojetoTitulo}`, M, y, 9.5);
-  txt(data.modalidade, col2X, y, 9.5);
-  y -= LH + 2;
+  drawTwoCol(`${data.subprojetoCodigo} -- ${data.subprojetoTitulo}`, M, leftColW, data.modalidade, col2X, rightColW, 9.5, font);
+  y -= 2;
 
   txt('VALOR MENSAL:', M, y, 7.5, fontBold, rgb(0.5, 0.5, 0.55));
   txt('VIGENCIA:', col2X, y, 7.5, fontBold, rgb(0.5, 0.5, 0.55));
   y -= 11;
-  txt(fmtCur(data.valorMensal), M, y, 11, fontBold);
-  txt(`${fmtDate(data.vigenciaInicio)} a ${fmtDate(data.vigenciaFim)}`, col2X, y, 9.5);
-  y -= LH + 6;
+  drawTwoCol(fmtCur(data.valorMensal), M, leftColW, `${fmtDate(data.vigenciaInicio)} a ${fmtDate(data.vigenciaFim)}`, col2X, rightColW, 9.5, font);
+  y -= 6;
 
   // ═══ SEÇÃO 2 ═══
   sectionTitle('BOLSISTA E ORIENTACAO', '2');
@@ -579,12 +628,17 @@ async function buildPdfFromData(data: RelatorioBolsaData, branding: OrgBranding)
     y -= LH - 2;
 
     for (const doc of data.documentos) {
-      check(LH + 2);
-      txt(doc.nome, M, y, 8.5);
-      txt(doc.tipo, M + 200, y, 8.5);
-      txt(sLabel(doc.status), M + 310, y, 8.5);
-      txt(fmtDate(doc.dataUpload || doc.dataAssinatura), M + 400, y, 8.5);
-      y -= LH;
+      const docNameLines = wrapText(doc.nome, 190, 8.5);
+      const rowLines = docNameLines.length;
+      check(rowLines * LH + 2);
+      const startY = y;
+      for (let li = 0; li < docNameLines.length; li++) {
+        page.drawText(docNameLines[li], { x: M, y: startY - li * LH, size: 8.5, font, color: rgb(0.1, 0.1, 0.12) });
+      }
+      txt(doc.tipo, M + 200, startY, 8.5);
+      txt(sLabel(doc.status), M + 310, startY, 8.5);
+      txt(fmtDate(doc.dataUpload || doc.dataAssinatura), M + 400, startY, 8.5);
+      y -= rowLines * LH;
     }
   }
   y -= 6;
@@ -669,7 +723,7 @@ async function buildPdfFromData(data: RelatorioBolsaData, branding: OrgBranding)
   if (branding.watermark_text) {
     const pages = pdfDoc.getPages();
     for (const pg of pages) {
-      pg.drawText(branding.watermark_text, {
+      pg.drawText(sanitize(branding.watermark_text), {
         x: W / 2 - branding.watermark_text.length * 6,
         y: H / 2,
         size: 48,
@@ -686,11 +740,11 @@ async function buildPdfFromData(data: RelatorioBolsaData, branding: OrgBranding)
 
 function getSitInfo(s: string) {
   const map: Record<string, { label: string; emoji: string; fgColor: any; bgColor: any }> = {
-    active:         { label: 'ATIVA',               emoji: '✓', fgColor: rgb(0.08, 0.5, 0.24), bgColor: rgb(0.86, 0.98, 0.9) },
-    suspended:      { label: 'SUSPENSA',            emoji: '⏸', fgColor: rgb(0.7, 0.33, 0.04), bgColor: rgb(1, 0.97, 0.88) },
-    completed:      { label: 'ENCERRADA',           emoji: '✓', fgColor: rgb(0.42, 0.42, 0.5), bgColor: rgb(0.95, 0.95, 0.96) },
-    cancelled:      { label: 'CANCELADA',           emoji: '✕', fgColor: rgb(0.86, 0.15, 0.15), bgColor: rgb(1, 0.89, 0.89) },
-    pending_report: { label: 'PEND. RELATORIO',     emoji: '⏳', fgColor: rgb(0.85, 0.47, 0.02), bgColor: rgb(1, 0.98, 0.92) },
+    active:         { label: 'ATIVA',               emoji: '[OK]', fgColor: rgb(0.08, 0.5, 0.24), bgColor: rgb(0.86, 0.98, 0.9) },
+    suspended:      { label: 'SUSPENSA',            emoji: '[!]', fgColor: rgb(0.7, 0.33, 0.04), bgColor: rgb(1, 0.97, 0.88) },
+    completed:      { label: 'ENCERRADA',           emoji: '[OK]', fgColor: rgb(0.42, 0.42, 0.5), bgColor: rgb(0.95, 0.95, 0.96) },
+    cancelled:      { label: 'CANCELADA',           emoji: '[X]', fgColor: rgb(0.86, 0.15, 0.15), bgColor: rgb(1, 0.89, 0.89) },
+    pending_report: { label: 'PEND. RELATORIO',     emoji: '[*]', fgColor: rgb(0.85, 0.47, 0.02), bgColor: rgb(1, 0.98, 0.92) },
   };
   return map[s] || { label: s.toUpperCase(), emoji: '?', fgColor: rgb(0.22, 0.22, 0.28), bgColor: rgb(0.95, 0.95, 0.96) };
 }
