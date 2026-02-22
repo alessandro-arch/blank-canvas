@@ -1493,6 +1493,62 @@ export type Database = {
         }
         Relationships: []
       }
+      report_attachments: {
+        Row: {
+          caption: string
+          created_at: string
+          file_name: string
+          file_path: string
+          file_size_bytes: number
+          file_type: string
+          id: string
+          ip_address: string | null
+          report_id: string
+          sha256_hash: string | null
+          uploaded_at: string
+          uploaded_by: string
+          user_agent: string | null
+        }
+        Insert: {
+          caption: string
+          created_at?: string
+          file_name: string
+          file_path: string
+          file_size_bytes: number
+          file_type: string
+          id?: string
+          ip_address?: string | null
+          report_id: string
+          sha256_hash?: string | null
+          uploaded_at?: string
+          uploaded_by: string
+          user_agent?: string | null
+        }
+        Update: {
+          caption?: string
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          file_size_bytes?: number
+          file_type?: string
+          id?: string
+          ip_address?: string | null
+          report_id?: string
+          sha256_hash?: string | null
+          uploaded_at?: string
+          uploaded_by?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_attachments_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "monthly_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reports: {
         Row: {
           created_at: string

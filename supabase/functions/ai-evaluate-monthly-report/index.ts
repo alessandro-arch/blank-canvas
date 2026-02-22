@@ -18,6 +18,13 @@ REGRAS OBRIGATORIAS:
 4. Se o relatorio for curto, generico, sem numeros, sem evidencias verificaveis ou sem vinculo claro com o plano de trabalho:
    - Reduza fortemente as notas de "evidencia_verificabilidade_0a5" e "aderencia_plano_0a5"
    - Sugira "devolver" ou "aprovar_com_ressalvas" com checklist do que corrigir
+5. Criterios para "evidencia_verificabilidade_0a5":
+   - 5/5: Texto com dados quantitativos + entregas claras + anexos bem descritos
+   - 4/5: Texto consistente + anexos presentes
+   - 3/5: Texto consistente sem anexos
+   - 2/5: Texto generico com alguma evidencia minima
+   - 1/5: Texto generico sem evidencia minima
+   IMPORTANTE: Ausencia de anexos NAO penaliza automaticamente. Nota baixa apenas quando faltarem evidencias minimas.
 5. Elogios so sao permitidos se houver evidencias explicitas (numeros, datasets, resultados concretos, amostras, logs, tabelas).
 6. Cite OBRIGATORIAMENTE ao menos 2 elementos do Plano de Trabalho (objetivo, entrega ou cronograma).
 7. Compare com o historico quando disponivel (ao menos 1 comparacao explicita).
@@ -133,12 +140,13 @@ serve(async (req) => {
 
     const orgId = (report as any).projects?.thematic_projects?.organization_id;
 
-    // Fetch fields, profile, work plan, history in parallel
+    // Fetch fields, profile, work plan, history, attachments in parallel
     const [
       { data: fields },
       { data: profile },
       { data: workPlan },
       { data: history },
+      { data: attachments },
     ] = await Promise.all([
       supabase.from("monthly_report_fields").select("payload").eq("report_id", report_id).single(),
       supabase.from("profiles").select("full_name, institution, academic_level").eq("user_id", report.beneficiary_user_id).single(),
@@ -152,6 +160,11 @@ serve(async (req) => {
         .order("period_year", { ascending: false })
         .order("period_month", { ascending: false })
         .limit(6),
+      supabase
+        .from("report_attachments")
+        .select("file_name, file_type, caption")
+        .eq("report_id", report_id)
+        .order("uploaded_at", { ascending: true }),
     ]);
 
     const payload = (fields?.payload as Record<string, unknown>) || {};
@@ -206,7 +219,24 @@ serve(async (req) => {
       ? "\n\nATENCAO: Nenhum Plano de Trabalho foi encontrado para este bolsista. Informe isso no parecer, reduza a nota de aderencia ao plano e indique que a analise e limitada."
       : "";
 
-    const userPrompt = `Avalie o relatorio mensal abaixo e retorne o JSON estruturado conforme o schema.\n\n${reportContext}${historyContext}${workPlanContext}${workPlanWarning}`;
+    // Attachments context
+    let attachmentsContext = "";
+    if (attachments && attachments.length > 0) {
+      const lines = attachments.map((a: any, i: number) =>
+        `${i + 1}) tipo: ${(a.file_type || "").toUpperCase()} | legenda: "${a.caption || ""}"`
+      );
+      attachmentsContext = "\n\n=== ANEXOS DE RESULTADOS ===\n" +
+        "O bolsista anexou os seguintes arquivos como evidencia documental:\n" +
+        lines.join("\n") +
+        "\n\nINSTRUCOES SOBRE ANEXOS:\n" +
+        "- Considere os anexos como evidencia adicional na metrica de Evidencia e Verificabilidade.\n" +
+        "- Use apenas a legenda como referencia. NAO invente conteudo dos arquivos.\n" +
+        "- NAO assuma dominio cientifico pelo tipo de arquivo.\n" +
+        "- Anexos bem descritos com legendas relevantes reforçam a nota de evidencia.\n" +
+        "- Ausencia de anexos NAO penaliza automaticamente; a nota baixa so se aplica quando faltam evidencias minimas no texto.";
+    }
+
+    const userPrompt = `Avalie o relatorio mensal abaixo e retorne o JSON estruturado conforme o schema.\n\n${reportContext}${historyContext}${workPlanContext}${workPlanWarning}${attachmentsContext}`;
 
     // Call LLM
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {

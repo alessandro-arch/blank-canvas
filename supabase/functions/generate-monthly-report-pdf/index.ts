@@ -119,12 +119,11 @@ async function generatePdfInBackground(
 ) {
   console.log(`[rid:${requestId}] Fetching data for monthly report ${reportId}`);
 
-  // Fetch payload
-  const { data: fields } = await db
-    .from("monthly_report_fields")
-    .select("payload")
-    .eq("report_id", reportId)
-    .maybeSingle();
+  // Fetch payload and attachments
+  const [{ data: fields }, { data: attachments }] = await Promise.all([
+    db.from("monthly_report_fields").select("payload").eq("report_id", reportId).maybeSingle(),
+    db.from("report_attachments").select("file_name, file_type, file_size_bytes, caption").eq("report_id", reportId).order("uploaded_at", { ascending: true }),
+  ]);
 
   const payload = fields?.payload || {};
 
@@ -182,6 +181,7 @@ async function generatePdfInBackground(
     periodLabel,
     submittedAt: submittedAtStr,
     reportId,
+    attachments: (attachments || []) as Array<{ file_name: string; file_type: string; file_size_bytes: number; caption: string }>,
   });
 
   // Calculate SHA-256 of the plain PDF (for integrity verification)
@@ -267,6 +267,7 @@ interface PdfData {
   periodLabel: string;
   submittedAt: string;
   reportId: string;
+  attachments: Array<{ file_name: string; file_type: string; file_size_bytes: number; caption: string }>;
 }
 
 function hexToRgb(hex: string) {
@@ -484,6 +485,19 @@ async function buildMonthlyReportPdf(data: PdfData): Promise<Uint8Array> {
     sectionTitle("Observacoes");
     drawWrapped(data.payload.observacoes, M);
     y -= 4;
+  }
+
+  // ═══ ANEXOS DE RESULTADOS ═══
+  if (data.attachments && data.attachments.length > 0) {
+    sectionTitle("Anexos de Resultados");
+    for (const att of data.attachments) {
+      check(LH * 2 + 4);
+      const sizeKb = (att.file_size_bytes / 1024).toFixed(1);
+      txt(`${att.file_type.toUpperCase()} - ${att.file_name} (${sizeKb} KB)`, M, y, 9, fontBold, rgb(0.2, 0.2, 0.25));
+      y -= LH;
+      drawWrapped(`Legenda: ${att.caption}`, M + 10, 8.5, font, rgb(0.35, 0.35, 0.4));
+      y -= 4;
+    }
   }
 
   // ═══ ELECTRONIC ACCEPTANCE ═══
