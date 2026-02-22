@@ -134,16 +134,29 @@ export function MonthlyReportAIPanel({ reportId, reportStatus, onInsertToFeedbac
   const [expanded, setExpanded] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
-  // Load saved parecer from monthly_report_ai_outputs on mount
+  // Load saved parecer from monthly_report_ai_outputs when reportId changes
   useEffect(() => {
+    // Reset state
+    setResult(null);
+    setSavedResult(null);
+    setCollapsed(false);
+    setExpanded(false);
+
+    if (!reportId) return;
+
+    let cancelled = false;
     const fetchSaved = async () => {
       setLoadingSaved(true);
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from("monthly_report_ai_outputs")
           .select("payload")
           .eq("report_id", reportId)
           .maybeSingle();
+        
+        if (cancelled) return;
+        console.log("[MonthlyReportAIPanel] fetchSaved for", reportId, "found:", !!data?.payload, "error:", error?.message);
+        
         if (data?.payload) {
           const saved = data.payload as unknown as AIParecerOutput;
           setSavedResult(saved);
@@ -152,13 +165,14 @@ export function MonthlyReportAIPanel({ reportId, reportStatus, onInsertToFeedbac
             setResult(saved);
           }
         }
-      } catch {
-        // ignore
+      } catch (err) {
+        console.warn("[MonthlyReportAIPanel] Error loading saved parecer:", err);
       } finally {
-        setLoadingSaved(false);
+        if (!cancelled) setLoadingSaved(false);
       }
     };
     fetchSaved();
+    return () => { cancelled = true; };
   }, [reportId, reportStatus]);
 
   const handleGenerate = async () => {
