@@ -4,6 +4,7 @@ import { SecurityBadge } from '@/components/ui/SecurityBadge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAuditLog } from '@/hooks/useAuditLog';
+import { useUserRole } from '@/hooks/useUserRole';
 import { useOrganizationContext } from '@/contexts/OrganizationContext';
 import { useBankDataSecureRead, SecureBankResponse } from '@/hooks/useBankDataSecureRead';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -44,6 +45,7 @@ import {
   Filter,
   Building2,
   UserX,
+  ShieldAlert,
 } from 'lucide-react';
 
 import { BankDataThematicCard } from './BankDataThematicCard';
@@ -113,9 +115,12 @@ const STATUS_CONFIG = {
 export function BankDataManagement() {
   const { user } = useAuth();
   const { logAction } = useAuditLog();
+  const { isAuditor } = useUserRole();
   const queryClient = useQueryClient();
   const { currentOrganization } = useOrganizationContext();
   const { readBankData, loading: secureBankLoading } = useBankDataSecureRead();
+
+
   
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -472,6 +477,25 @@ export function BankDataManagement() {
       validated: allAccounts.filter(a => a.validation_status === 'validated').length,
     };
   }, [data?.accounts]);
+
+  // Block auditors from seeing bank data
+  if (isAuditor) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center py-16 text-center gap-4">
+          <div className="w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center">
+            <ShieldAlert className="h-7 w-7 text-destructive" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold">Acesso Restrito</h3>
+            <p className="text-muted-foreground text-sm mt-1">
+              Auditores não possuem permissão para visualizar dados bancários.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <>

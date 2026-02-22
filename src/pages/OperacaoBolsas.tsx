@@ -1,4 +1,5 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo } from "react";
+import { useUserRole } from "@/hooks/useUserRole";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -31,6 +32,7 @@ import { MonthlyReportsReviewManagement } from "@/components/dashboard/MonthlyRe
 
 const OperacaoBolsas = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { isAuditor } = useUserRole();
   const initialTab = searchParams.get("tab") || "relatorios";
   const [activeTab, setActiveTab] = useState(initialTab);
   const currentMonth = format(new Date(), "yyyy-MM");
@@ -179,10 +181,12 @@ const OperacaoBolsas = () => {
                       </Badge>
                     )}
                   </TabsTrigger>
-                  <TabsTrigger value="dados-bancarios" className="gap-2">
-                    <Landmark className="h-4 w-4" />
-                    <span className="hidden sm:inline">Dados Bancários</span>
-                  </TabsTrigger>
+                  {!isAuditor && (
+                    <TabsTrigger value="dados-bancarios" className="gap-2">
+                      <Landmark className="h-4 w-4" />
+                      <span className="hidden sm:inline">Dados Bancários</span>
+                    </TabsTrigger>
+                  )}
                 </TabsList>
 
                 <TabsContent value="relatorios" className="mt-0">
