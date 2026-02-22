@@ -29,16 +29,16 @@ const kpis: KPIData[] = [
 
 export function KPICards() {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-6">
       {kpis.map((kpi) => (
         <div key={kpi.label} className="card-stat">
           <div className="flex items-center gap-2 mb-2">
-            <div className={cn("w-7 h-7 rounded-md flex items-center justify-center", colorClasses[kpi.color])}>
-              <kpi.icon className="w-3.5 h-3.5" />
+            <div className={cn("w-6 h-6 rounded flex items-center justify-center", colorClasses[kpi.color])}>
+              <kpi.icon className="w-3 h-3" />
             </div>
           </div>
-          <p className="text-xl font-bold text-foreground">{kpi.value}</p>
-          <p className="text-[11px] font-medium text-muted-foreground mt-0.5">{kpi.label}</p>
+          <p className="text-lg font-bold text-foreground">{kpi.value}</p>
+          <p className="text-[10px] font-medium text-muted-foreground leading-tight">{kpi.label}</p>
           {kpi.trend && (
             <p className="text-[11px] text-muted-foreground/70 mt-0.5">{kpi.trend}</p>
           )}
