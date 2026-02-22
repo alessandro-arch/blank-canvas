@@ -1,35 +1,26 @@
 
 
-# Corrigir Badge do Auditor e Exibir Organizacao
+# Exibir "Todas" para Admins com acesso global
 
 ## Problema
-1. O badge do Auditor na sidebar usa `bg-accent text-accent-foreground` que resulta em um fundo cinza claro quase invisivel -- deveria ser amarelo como no painel de Membros Admin
-2. A organizacao vinculada ao auditor precisa estar mais visivel no painel
+Membros com papel "admin" no sistema (`user_roles.role = 'admin'`) tem acesso a todas as organizacoes, mas a coluna "Organizacao" mostra apenas a org especifica onde o vinculo foi criado (ex: "TOMMASI"). Deveria exibir "Todas" para esses usuarios.
 
-## Correcoes
+## Correcao
 
-### 1. Badge amarelo "Auditor" na Sidebar (SidebarContent.tsx)
-Alterar a classe do badge do auditor de `bg-accent text-accent-foreground` para `bg-yellow-500 text-white` (amarelo vibrante), mantendo o mesmo padrao visual do badge de "Auditor" na tela de Membros Admin.
+### 1. Edge Function `admin-list-members/index.ts`
+Apos buscar os membros, consultar a tabela `user_roles` para identificar quais `user_id`s possuem `role = 'admin'` (admin do sistema). Para esses membros, substituir `organization_name` por `"Todas"`.
 
-**Linha 146 atual:**
-```
-hasManagerAccess ? "bg-primary text-primary-foreground" : isAuditor ? "bg-accent text-accent-foreground" : "bg-info text-white"
-```
+Alteracao:
+- Buscar `user_roles` com `role = 'admin'` para os `userIds` da lista
+- Criar um Set de `user_id`s que sao system admins
+- No mapeamento final, se o `user_id` esta no Set, `organization_name = "Todas"`
 
-**Corrigido para:**
-```
-hasManagerAccess ? "bg-primary text-primary-foreground" : isAuditor ? "bg-yellow-500 text-white" : "bg-info text-white"
-```
-
-### 2. Organizacao visivel no dashboard do Auditor (AuditorDashboard.tsx)
-Adicionar um badge/destaque com o nome da organizacao na area do cabecalho do painel, junto ao badge "Somente Leitura". A organizacao ja aparece na linha de subtitulo, mas sera reforcada com um badge visual dedicado com icone de Building2.
-
-**Adicionar ao header (linhas 222-229):**
-- Badge com icone Building2 e nome da organizacao em destaque
-- Estilo visual claro para o auditor identificar rapidamente a org
+### 2. Frontend `AdminMembersManagement.tsx`
+Ajustar a exibicao da coluna Organizacao para destacar "Todas" com um badge visual diferente (ex: badge com icone de globo) quando o valor for "Todas".
 
 ### Resumo dos arquivos alterados
 | Arquivo | Alteracao |
 |---|---|
-| `src/components/layout/SidebarContent.tsx` | Badge auditor amarelo (`bg-yellow-500 text-white`) |
-| `src/pages/AuditorDashboard.tsx` | Badge com nome da organizacao no cabecalho |
+| `supabase/functions/admin-list-members/index.ts` | Verificar `user_roles` para admins e retornar "Todas" como `organization_name` |
+| `src/components/admin-members/AdminMembersManagement.tsx` | Badge visual para "Todas" na coluna Organizacao |
+
