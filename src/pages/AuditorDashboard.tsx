@@ -30,7 +30,9 @@ const AuditorDashboard = () => {
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
 
   const monthOptions = useMemo(() => {
-    const options = [];
+    const options: { value: string; label: string }[] = [
+      { value: "all", label: "Todos os meses" },
+    ];
     const today = new Date();
     for (let i = 0; i < 12; i++) {
       const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
@@ -93,54 +95,55 @@ const AuditorDashboard = () => {
       const enrollmentIds = enrollments?.map((e) => e.id) ?? [];
       const activeScholars = enrollments?.length ?? 0;
 
-      // 5. Reports for the month (using reports table which dashboard originally used)
-      const { count: approvedReports } = await supabase
-        .from("reports")
-        .select("*", { count: "exact", head: true })
-        .eq("reference_month", selectedMonth)
-        .eq("status", "approved")
-        .in("user_id", enrollments?.map((e) => e.id) ?? ["__none__"]);
+      // 5. Reports - filter by month only if not "all"
+      const isAll = selectedMonth === "all";
+      const now = new Date();
+      const year = isAll ? now.getFullYear() : Number(selectedMonth.split("-")[0]);
+      const mon = isAll ? now.getMonth() + 1 : Number(selectedMonth.split("-")[1]);
 
-      // Use monthly_reports which has organization_id directly
-      const { count: totalMonthlyReports } = await supabase
+      let approvedMonthlyReportsQuery = supabase
         .from("monthly_reports")
         .select("*", { count: "exact", head: true })
         .eq("organization_id", orgId)
-        .in("project_id", projectIds);
-
-      const [year, mon] = selectedMonth.split("-").map(Number);
-      const { count: approvedMonthlyReports } = await supabase
-        .from("monthly_reports")
-        .select("*", { count: "exact", head: true })
-        .eq("organization_id", orgId)
-        .eq("period_year", year)
-        .eq("period_month", mon)
         .eq("status", "approved");
+      if (!isAll) {
+        approvedMonthlyReportsQuery = approvedMonthlyReportsQuery
+          .eq("period_year", year)
+          .eq("period_month", mon);
+      }
+      const { count: approvedMonthlyReports } = await approvedMonthlyReportsQuery;
 
-      const { count: totalMonthlyReportsMonth } = await supabase
+      let totalMonthlyReportsQuery = supabase
         .from("monthly_reports")
         .select("*", { count: "exact", head: true })
-        .eq("organization_id", orgId)
-        .eq("period_year", year)
-        .eq("period_month", mon);
+        .eq("organization_id", orgId);
+      if (!isAll) {
+        totalMonthlyReportsQuery = totalMonthlyReportsQuery
+          .eq("period_year", year)
+          .eq("period_month", mon);
+      }
+      const { count: totalMonthlyReportsMonth } = await totalMonthlyReportsQuery;
 
-      // 6. Paid payments for the month
+      // 6. Paid payments
       let totalPaid = 0;
       if (enrollmentIds.length > 0) {
-        const { data: paidPayments } = await supabase
+        let paymentsQuery = supabase
           .from("payments")
           .select("amount")
-          .eq("reference_month", selectedMonth)
           .eq("status", "paid")
           .in("enrollment_id", enrollmentIds);
-
+        if (!isAll) {
+          paymentsQuery = paymentsQuery.eq("reference_month", selectedMonth);
+        }
+        const { data: paidPayments } = await paymentsQuery;
         totalPaid = paidPayments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
       }
 
-      // 7. Chart data - last 6 months
+      // 7. Chart data - last 12 months if "all", else last 6
+      const chartCount = isAll ? 12 : 6;
       const selectedDate = new Date(year, mon - 1, 1);
       const chartMonths: { month: string; label: string; paid: number }[] = [];
-      for (let i = 5; i >= 0; i--) {
+      for (let i = chartCount - 1; i >= 0; i--) {
         const d = subMonths(selectedDate, i);
         chartMonths.push({ month: format(d, "yyyy-MM"), label: format(d, "MMM/yy", { locale: ptBR }), paid: 0 });
       }
@@ -173,11 +176,14 @@ const AuditorDashboard = () => {
     },
   });
 
+  const isAllSelected = selectedMonth === "all";
+  const periodLabel = isAllSelected ? "Total" : "Mês";
+
   const kpis = [
     { label: "Bolsistas Ativos", value: data?.activeScholars ?? 0, icon: Users, color: "primary" as const },
     { label: "Projetos Ativos", value: data?.activeProjects ?? 0, icon: FolderOpen, color: "info" as const },
-    { label: "Relatórios (Mês)", value: `${data?.approvedReports ?? 0}/${data?.totalReports ?? 0}`, icon: FileText, color: "success" as const },
-    { label: "Total Pago (Mês)", value: formatCurrency(data?.totalPaid ?? 0), icon: DollarSign, color: "warning" as const },
+    { label: `Relatórios (${periodLabel})`, value: `${data?.approvedReports ?? 0}/${data?.totalReports ?? 0}`, icon: FileText, color: "success" as const },
+    { label: `Total Pago (${periodLabel})`, value: formatCurrency(data?.totalPaid ?? 0), icon: DollarSign, color: "warning" as const },
   ];
 
   const colorClasses: Record<string, string> = {
@@ -285,7 +291,7 @@ const AuditorDashboard = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
                   <BarChart3 className="h-4 w-4 text-primary" />
-                  Execução Financeira — Últimos 6 meses
+                  Execução Financeira — {isAllSelected ? "Últimos 12 meses" : "Últimos 6 meses"}
                 </CardTitle>
               </CardHeader>
               <CardContent>
