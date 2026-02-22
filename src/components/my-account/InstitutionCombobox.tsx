@@ -100,6 +100,7 @@ export function InstitutionCombobox({ value, onChange, disabled }: InstitutionCo
     const sigla = sanitize(manualSigla);
     if (!name || !sigla || !manualUf) return;
     onChange({ name, sigla, uf: manualUf, isCustom: true });
+    setManualMode(false);
   };
 
   const handleClear = () => {
