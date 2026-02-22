@@ -2,6 +2,7 @@ export interface AdminMemberFlat {
   id: string;
   user_id: string;
   organization_id: string;
+  organization_name: string | null;
   role: string;
   is_active: boolean;
   permissions: Record<string, unknown>;

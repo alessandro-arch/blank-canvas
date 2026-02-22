@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
     }
 
     // Optional filters
-    const roleFilter = url.searchParams.get('role_filter'); // 'admin', 'manager', or null for all
+    const roleFilter = url.searchParams.get('role_filter');
     const includeInactive = url.searchParams.get('include_inactive') === 'true';
 
     // Fetch org members
@@ -98,6 +98,15 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    // Fetch organization name
+    const { data: orgData } = await supabaseAdmin
+      .from('organizations')
+      .select('id, name')
+      .eq('id', organizationId)
+      .single();
+
+    const orgName = orgData?.name || null;
 
     // Fetch profiles for full_name + avatar
     const userIds = members.map(m => m.user_id);
@@ -129,6 +138,7 @@ Deno.serve(async (req) => {
       id: m.id,
       user_id: m.user_id,
       organization_id: m.organization_id,
+      organization_name: orgName,
       role: m.role,
       is_active: m.is_active,
       permissions: m.permissions,

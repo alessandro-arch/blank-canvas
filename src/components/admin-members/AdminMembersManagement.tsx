@@ -24,7 +24,7 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 export function AdminMembersManagement() {
-  const { members, invites, loading, updateMemberRole, toggleMemberActive, createInvite, revokeInvite, resendInviteEmail } = useAdminMembers();
+  const { members, invites, loading, updateMemberRole, updateMemberOrganization, toggleMemberActive, createInvite, revokeInvite, resendInviteEmail } = useAdminMembers();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -250,6 +250,7 @@ export function AdminMembersManagement() {
                 <TableRow>
                   <TableHead>Nome</TableHead>
                   <TableHead>E-mail</TableHead>
+                  <TableHead>Organização</TableHead>
                   <TableHead>Papel</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Criado em</TableHead>
@@ -259,7 +260,7 @@ export function AdminMembersManagement() {
               <TableBody>
                 {filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                       Nenhum membro encontrado
                     </TableCell>
                   </TableRow>
@@ -268,6 +269,7 @@ export function AdminMembersManagement() {
                   <TableRow key={m.id} className={!m.is_active ? "opacity-50" : ""}>
                     <TableCell className="font-medium">{m.full_name || "—"}</TableCell>
                     <TableCell>{m.email || "—"}</TableCell>
+                    <TableCell className="text-sm">{m.organization_name || "—"}</TableCell>
                     <TableCell>{roleBadge(m.role)}</TableCell>
                     <TableCell>
                       {m.is_active ? (
@@ -368,6 +370,7 @@ export function AdminMembersManagement() {
         member={editMember}
         onUpdateRole={updateMemberRole}
         onToggleActive={toggleMemberActive}
+        onUpdateOrganization={updateMemberOrganization}
       />
     </div>
   );

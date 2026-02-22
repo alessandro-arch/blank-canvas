@@ -91,6 +91,20 @@ export function useAdminMembers() {
     return true;
   };
 
+  const updateMemberOrganization = async (memberId: string, newOrgId: string) => {
+    const { error } = await supabase
+      .from("organization_members")
+      .update({ organization_id: newOrgId } as any)
+      .eq("id", memberId);
+    if (error) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+      return false;
+    }
+    toast({ title: "Organização atualizada com sucesso" });
+    await fetchMembers();
+    return true;
+  };
+
   const createInvite = async (email: string, role: string, expiresDays: number = 7) => {
     if (!orgId) return null;
     const { data, error } = await supabase.rpc("create_org_invite" as any, {
@@ -171,6 +185,7 @@ export function useAdminMembers() {
     invites,
     loading,
     updateMemberRole,
+    updateMemberOrganization,
     toggleMemberActive,
     createInvite,
     revokeInvite,
