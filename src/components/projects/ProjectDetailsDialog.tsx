@@ -21,6 +21,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { useWorkPlanByProject } from '@/hooks/useWorkPlans';
 import { UploadWorkPlanDialog } from '@/components/scholars/UploadWorkPlanDialog';
+import { PdfViewerDialog } from '@/components/ui/PdfViewerDialog';
 import { toast } from 'sonner';
 
 type ProjectStatus = Database['public']['Enums']['project_status'];
@@ -62,6 +63,8 @@ export function ProjectDetailsDialog({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [workPlanDialogOpen, setWorkPlanDialogOpen] = useState(false);
   const [wpViewLoading, setWpViewLoading] = useState(false);
+  const [wpPdfUrl, setWpPdfUrl] = useState<string | null>(null);
+  const [wpPdfViewerOpen, setWpPdfViewerOpen] = useState(false);
 
   // Get enrollment to find scholar_user_id
   const { data: enrollmentData } = useQuery({
@@ -104,20 +107,18 @@ export function ProjectDetailsDialog({
   const handleViewWorkPlan = async () => {
     if (!activeWorkPlan) return;
     setWpViewLoading(true);
-    const newTab = window.open("about:blank", "_blank", "noopener,noreferrer");
     try {
       const { data, error } = await supabase.functions.invoke("generate-workplan-signed-url", {
         body: { workplan_id: activeWorkPlan.id },
       });
       if (error) throw error;
-      if (data?.signedUrl && newTab) {
-        newTab.location.href = data.signedUrl;
+      if (data?.signedUrl) {
+        setWpPdfUrl(data.signedUrl);
+        setWpPdfViewerOpen(true);
       } else {
-        newTab?.close();
         toast.error("Não foi possível abrir o plano de trabalho");
       }
     } catch {
-      newTab?.close();
       toast.error("Erro ao abrir plano de trabalho");
     } finally {
       setWpViewLoading(false);
@@ -475,6 +476,15 @@ export function ProjectDetailsDialog({
           scholarName={project.orientador}
           existingPlan={activeWorkPlan ? { id: activeWorkPlan.id, fileName: activeWorkPlan.file_name } : null}
           onSuccess={() => refetchWorkPlan()}
+        />
+      )}
+
+      {wpPdfUrl && (
+        <PdfViewerDialog
+          open={wpPdfViewerOpen}
+          onOpenChange={setWpPdfViewerOpen}
+          title={activeWorkPlan?.file_name || "Plano de Trabalho"}
+          pdfUrl={wpPdfUrl}
         />
       )}
     </>
