@@ -20,7 +20,7 @@ const loginSchema = z.object({
 
 export default function ManagerLogin() {
   const { user, signIn } = useAuth();
-  const { role, loading: roleLoading, hasManagerAccess, isScholar } = useUserRole();
+  const { role, loading: roleLoading, hasManagerAccess, isScholar, isAuditor } = useUserRole();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
@@ -32,13 +32,15 @@ export default function ManagerLogin() {
   useEffect(() => {
     if (user && !roleLoading) {
       const returnUrl = searchParams.get("returnUrl");
-      if (isScholar) {
+      if (isAuditor) {
+        navigate("/auditor/dashboard", { replace: true });
+      } else if (isScholar) {
         navigate(returnUrl?.startsWith("/bolsista") ? returnUrl : "/bolsista/painel", { replace: true });
       } else if (hasManagerAccess) {
         navigate(returnUrl?.startsWith("/manager") || returnUrl?.startsWith("/admin") ? returnUrl : "/admin/dashboard", { replace: true });
       }
     }
-  }, [user, role, roleLoading, hasManagerAccess, isScholar, navigate, searchParams]);
+  }, [user, role, roleLoading, hasManagerAccess, isScholar, isAuditor, navigate, searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

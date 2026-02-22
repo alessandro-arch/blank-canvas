@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
-import { AlertCircle, Mail, Lock, Loader2, ArrowLeft, Users, ShieldAlert } from "lucide-react";
+import { AlertCircle, Mail, Lock, Loader2, ArrowLeft, Eye, ShieldAlert } from "lucide-react";
 import { z } from "zod";
 import logoInnovaGO from "@/assets/logo-innovago.png";
 
@@ -18,30 +18,29 @@ const loginSchema = z.object({
   password: z.string().min(6, "A senha deve ter pelo menos 6 caracteres"),
 });
 
-export default function AdminLogin() {
+export default function AuditorLogin() {
   const { user, signIn } = useAuth();
-  const { role, loading: roleLoading, hasManagerAccess, isScholar, isAuditor } = useUserRole();
+  const { role, loading: roleLoading, isAuditor, hasManagerAccess, isScholar } = useUserRole();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const { isLocked, remainingAttempts, countdown, formattedCountdown, checkLockout, recordAttempt } = useLoginLockout();
+  const { isLocked, remainingAttempts, formattedCountdown, checkLockout, recordAttempt } = useLoginLockout();
 
-  // Redirect based on role after login
   useEffect(() => {
     if (user && !roleLoading) {
       const returnUrl = searchParams.get("returnUrl");
       if (isAuditor) {
-        navigate("/auditor/dashboard", { replace: true });
-      } else if (isScholar) {
-        navigate(returnUrl?.startsWith("/bolsista") ? returnUrl : "/bolsista/painel", { replace: true });
+        navigate(returnUrl?.startsWith("/auditor") ? returnUrl : "/auditor/dashboard", { replace: true });
       } else if (hasManagerAccess) {
-        navigate(returnUrl?.startsWith("/admin") ? returnUrl : "/admin/dashboard", { replace: true });
+        navigate("/admin/dashboard", { replace: true });
+      } else if (isScholar) {
+        navigate("/bolsista/painel", { replace: true });
       }
     }
-  }, [user, role, roleLoading, hasManagerAccess, isScholar, isAuditor, navigate, searchParams]);
+  }, [user, role, roleLoading, isAuditor, hasManagerAccess, isScholar, navigate, searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,7 +73,6 @@ export default function AdminLogin() {
     }
   };
 
-  // Show loading while checking auth
   if (user && roleLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -86,7 +84,6 @@ export default function AdminLogin() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Back link */}
         <Link 
           to="/acesso" 
           replace
@@ -96,7 +93,6 @@ export default function AdminLogin() {
           Voltar ao início
         </Link>
 
-        {/* Logo/Header */}
         <div className="text-center mb-8">
           <img 
             src={logoInnovaGO} 
@@ -104,18 +100,18 @@ export default function AdminLogin() {
             className="h-14 mx-auto mb-4"
           />
           <div className="flex items-center justify-center gap-2 mb-2">
-            <Users className="h-6 w-6 text-primary" />
-            <h1 className="text-xl font-bold text-foreground">Portal do Administrador</h1>
+            <Eye className="h-6 w-6 text-primary" />
+            <h1 className="text-xl font-bold text-foreground">Portal do Auditor</h1>
           </div>
           <p className="text-muted-foreground text-sm">
-            InnovaGO
+            Acesso de auditoria — somente leitura
           </p>
         </div>
 
         <Card className="shadow-lg border-border/50">
           <CardHeader className="pb-4">
-            <CardTitle className="text-lg">Acesse o Portal do Administrador</CardTitle>
-            <CardDescription>Entre com suas credenciais de gestor</CardDescription>
+            <CardTitle className="text-lg">Acesse o Portal do Auditor</CardTitle>
+            <CardDescription>Entre com suas credenciais de auditor</CardDescription>
           </CardHeader>
           
           <CardContent>
@@ -151,7 +147,7 @@ export default function AdminLogin() {
                   <Input
                     id="email"
                     type="email"
-                    placeholder="gestor@organizacao.com"
+                    placeholder="auditor@empresa.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="pl-10"
@@ -200,7 +196,7 @@ export default function AdminLogin() {
 
             <div className="mt-6 pt-6 border-t border-border">
               <p className="text-sm text-center text-muted-foreground">
-                O acesso de administradores é configurado pela organização.
+                O acesso de auditores é configurado pela organização.
                 <br />
                 Contate o suporte se precisar de ajuda.
               </p>
@@ -208,7 +204,6 @@ export default function AdminLogin() {
           </CardContent>
         </Card>
 
-        {/* Footer */}
         <div className="mt-6 text-center">
           <p className="text-xs text-muted-foreground">
             © InnovaGO – Sistema de Gestão de Bolsas em Pesquisa e Desenvolvimento

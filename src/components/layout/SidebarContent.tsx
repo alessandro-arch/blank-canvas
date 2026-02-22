@@ -47,6 +47,14 @@ const scholarNavigation: NavItem[] = [
   { name: "Manual", icon: HelpCircle, href: "/bolsista/manual" },
 ];
 
+const auditorNavigation: NavItem[] = [
+  { name: "Painel do Auditor", icon: LayoutDashboard, href: "/auditor/dashboard" },
+  { name: "Projetos Temáticos", icon: FolderOpen, href: "/auditor/projetos-tematicos" },
+  { name: "Relatórios", icon: FileText, href: "/auditor/relatorios" },
+  { name: "Pagamentos", icon: Receipt, href: "/auditor/pagamentos" },
+  { name: "Gestão Financeira", icon: BarChart3, href: "/auditor/gestao-financeira" },
+];
+
 const adminNavigation: NavItem[] = [
   { name: "Dashboard Estratégico", icon: Globe, href: "/admin/dashboard-icca", managerOnly: true, section: "Governança" },
   { name: "Dashboard Executivo", icon: LayoutDashboard, href: "/admin/dashboard", managerOnly: true },
@@ -73,12 +81,12 @@ interface SidebarContentProps {
 
 export function SidebarContent({ collapsed, onToggleCollapse, isMobile }: SidebarContentProps) {
   const location = useLocation();
-  const { hasManagerAccess, isAdmin, loading } = useUserRole();
+  const { hasManagerAccess, isAdmin, isAuditor, loading } = useUserRole();
   const unreadMessages = useUnreadMessages();
 
-  const baseNavigation = hasManagerAccess ? adminNavigation : scholarNavigation;
+  const baseNavigation = hasManagerAccess ? adminNavigation : isAuditor ? auditorNavigation : scholarNavigation;
 
-  const secondaryNavigation: NavItem[] = hasManagerAccess
+  const secondaryNavigation: NavItem[] = hasManagerAccess || isAuditor
     ? []
     : [
         { name: "Configurações", icon: Settings, href: "/bolsista/configuracoes" },
@@ -135,11 +143,11 @@ export function SidebarContent({ collapsed, onToggleCollapse, isMobile }: Sideba
               <span
                 className={cn(
                   "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold",
-                  hasManagerAccess ? "bg-primary text-primary-foreground" : "bg-info text-white"
+                  hasManagerAccess ? "bg-primary text-primary-foreground" : isAuditor ? "bg-accent text-accent-foreground" : "bg-info text-white"
                 )}
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80" />
-                {hasManagerAccess ? "Gestor" : "Bolsista"}
+                {hasManagerAccess ? "Gestor" : isAuditor ? "Auditor" : "Bolsista"}
               </span>
             )}
           </div>

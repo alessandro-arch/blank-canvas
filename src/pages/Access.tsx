@@ -74,6 +74,9 @@ export default function Access() {
     if (hasManagerAccess) {
       return <Navigate to="/admin/dashboard" replace />;
     }
+    if (role === "auditor") {
+      return <Navigate to="/auditor/dashboard" replace />;
+    }
     if (role === "scholar") {
       return <Navigate to="/bolsista/painel" replace />;
     }
@@ -186,7 +189,7 @@ export default function Access() {
 
         {/* Access Cards Section */}
         <section id="acesso-cards" className="px-4 pb-20 scroll-mt-20">
-          <div className="grid md:grid-cols-2 gap-6 w-full max-w-4xl mx-auto">
+          <div className="grid md:grid-cols-3 gap-6 w-full max-w-5xl mx-auto">
             {/* Scholar Portal Card */}
             <div className="bg-white rounded-xl border border-border p-8 hover:shadow-lg transition-all duration-300 flex flex-col">
               <div className="flex items-center gap-3 mb-4">
@@ -226,6 +229,27 @@ export default function Access() {
               </Button>
               <p className="text-xs text-muted-foreground text-center">
                 Acesso restrito a administradores e gestores da organização.
+              </p>
+            </div>
+
+            {/* Auditor Portal Card */}
+            <div className="bg-white rounded-xl border border-border p-8 hover:shadow-lg transition-all duration-300 flex flex-col">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center">
+                  <Eye className="h-6 w-6 text-foreground" />
+                </div>
+                <h2 className="text-xl font-semibold text-foreground">Portal do Auditor</h2>
+              </div>
+              <p className="text-muted-foreground mb-6 flex-1 text-sm leading-relaxed">
+                Acompanhe a execução financeira, relatórios e projetos com acesso somente leitura.
+              </p>
+              <Button asChild variant="outline" size="lg" className="w-full mb-3 border-foreground text-foreground hover:bg-foreground hover:text-white">
+                <Link to="/auditor/login" replace>
+                  Acessar Portal do Auditor
+                </Link>
+              </Button>
+              <p className="text-xs text-muted-foreground text-center">
+                Acesso exclusivo para auditores de empresas parceiras.
               </p>
             </div>
           </div>

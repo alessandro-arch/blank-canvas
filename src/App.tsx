@@ -12,6 +12,7 @@ import { SupportCenterDrawer } from "@/components/support-center/SupportCenterDr
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ScholarProtectedRoute } from "@/components/auth/ScholarProtectedRoute";
 import { AdminProtectedRoute } from "@/components/auth/AdminProtectedRoute";
+import { AuditorProtectedRoute } from "@/components/auth/AuditorProtectedRoute";
 import { SessionGuard } from "@/components/auth/SessionGuard";
 import { AuthGate } from "@/components/auth/AuthGate";
 
@@ -20,6 +21,7 @@ import LandingPage from "./pages/LandingPage";
 import Access from "./pages/Access";
 import ScholarLogin from "./pages/ScholarLogin";
 import AdminLogin from "./pages/AdminLogin";
+import AuditorLogin from "./pages/AuditorLogin";
 import ManagerLogin from "./pages/ManagerLogin";
 import PasswordRecovery from "./pages/PasswordRecovery";
 import ScholarSignup from "./pages/ScholarSignup";
@@ -58,6 +60,7 @@ import AllUsers from "./pages/AllUsers";
 import InviteAccept from "./pages/InviteAccept";
 import Settings from "./pages/Settings";
 import PdfReports from "./pages/PdfReports";
+import AuditorDashboard from "./pages/AuditorDashboard";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -83,6 +86,7 @@ const App = () => (
               <Route path="/bolsista/login" element={<ScholarLogin />} />
               <Route path="/manager/login" element={<ManagerLogin />} />
               <Route path="/admin/login" element={<AdminLogin />} />
+              <Route path="/auditor/login" element={<AuditorLogin />} />
               <Route path="/recuperar-senha" element={<PasswordRecovery />} />
               <Route path="/criar-conta" element={<ScholarSignup />} />
               <Route path="/criar-conta-membro" element={<OrgMemberSignup />} />
@@ -246,6 +250,40 @@ const App = () => (
                 </AdminProtectedRoute>
               } />
               
+              {/* ==================== */}
+              {/* Auditor Portal Routes */}
+              {/* ==================== */}
+              <Route path="/auditor/dashboard" element={
+                <AuditorProtectedRoute>
+                  <AuditorDashboard />
+                </AuditorProtectedRoute>
+              } />
+              <Route path="/auditor/projetos-tematicos" element={
+                <AuditorProtectedRoute>
+                  <ThematicProjectsList />
+                </AuditorProtectedRoute>
+              } />
+              <Route path="/auditor/projetos-tematicos/:id" element={
+                <AuditorProtectedRoute>
+                  <ThematicProjectDetail />
+                </AuditorProtectedRoute>
+              } />
+              <Route path="/auditor/relatorios" element={
+                <AuditorProtectedRoute>
+                  <PdfReports />
+                </AuditorProtectedRoute>
+              } />
+              <Route path="/auditor/pagamentos" element={
+                <AuditorProtectedRoute>
+                  <PaymentsReports />
+                </AuditorProtectedRoute>
+              } />
+              <Route path="/auditor/gestao-financeira" element={
+                <AuditorProtectedRoute>
+                  <FinancialManagement />
+                </AuditorProtectedRoute>
+              } />
+
               {/* Legacy routes - redirect to new paths */}
               <Route path="/painel-gestor" element={<Navigate to="/admin/dashboard" replace />} />
               <Route path="/importar" element={<Navigate to="/admin/importar" replace />} />
