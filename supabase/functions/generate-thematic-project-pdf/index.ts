@@ -354,6 +354,20 @@ interface ConsolidatedData {
   generatedAt: string;
 }
 
+function sanitize(text: string): string {
+  return text
+    .replace(/[\u2713\u2714]/g, "OK")
+    .replace(/\u2716/g, "X")
+    .replace(/\u2022/g, "-")
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/\u2013/g, "-")
+    .replace(/\u2014/g, "--")
+    .replace(/\u2026/g, "...")
+    .replace(/\u00A0/g, " ")
+    .replace(/[^\x20-\x7E\xA0-\xFF]/g, "");
+}
+
 async function buildConsolidatedPdf(data: ConsolidatedData): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -369,8 +383,9 @@ async function buildConsolidatedPdf(data: ConsolidatedData): Promise<Uint8Array>
   let y = H - M;
 
   const txt = (text: string, x: number, yy: number, size = 9, f = font, color = rgb(0.1, 0.1, 0.12)) => {
+    const safe = sanitize(text);
     const maxChars = Math.floor((W - x - M) / (size * 0.48));
-    const t = text.length > maxChars ? text.substring(0, maxChars - 2) + "..." : text;
+    const t = safe.length > maxChars ? safe.substring(0, maxChars - 2) + "..." : safe;
     page.drawText(t, { x, y: yy, size, font: f, color });
   };
 
@@ -499,7 +514,7 @@ async function buildConsolidatedPdf(data: ConsolidatedData): Promise<Uint8Array>
 
     for (let i = 0; i < cellLines.length; i++) {
       for (let j = 0; j < cellLines[i].length; j++) {
-        page.drawText(cellLines[i][j], {
+        page.drawText(sanitize(cellLines[i][j]), {
           x: cols[i] + 4,
           y: y - j * (LH - 2),
           size: fontSize,
