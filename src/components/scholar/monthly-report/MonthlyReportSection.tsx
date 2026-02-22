@@ -3,6 +3,7 @@ import { useMonthlyReport } from "@/hooks/useMonthlyReport";
 import { MonthlyReportForm } from "./MonthlyReportForm";
 import { SubmitReportDialog } from "./SubmitReportDialog";
 import { ResubmitAlertBanner } from "./ResubmitAlertBanner";
+import { ScholarAIParecerPanel } from "./ScholarAIParecerPanel";
 import { Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -60,6 +61,8 @@ export function MonthlyReportSection({ projectId }: Props) {
     );
   }
 
+  const showAIParecer = report?.id && (report.status === "approved" || report.status === "returned");
+
   return (
     <>
       <ResubmitAlertBanner pendingResubmissions={pendingResubmissions} />
@@ -82,6 +85,10 @@ export function MonthlyReportSection({ projectId }: Props) {
         onSubmit={() => setShowSubmitDialog(true)}
         onReopen={reopenReport}
       />
+
+      {showAIParecer && (
+        <ScholarAIParecerPanel reportId={report.id} />
+      )}
 
       <SubmitReportDialog
         open={showSubmitDialog}
