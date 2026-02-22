@@ -51,9 +51,11 @@ interface PaymentMobileCardProps {
   onMarkAsPaid: (payment: PaymentRecord, scholar: ScholarPaymentRow) => void;
   onAttachReceipt: (payment: PaymentRecord, scholar: ScholarPaymentRow) => void;
   onSendReminder: (scholar: ScholarPaymentRow) => void;
+  readOnly?: boolean;
+  onViewReceipt?: (payment: PaymentRecord, scholar: ScholarPaymentRow) => void;
 }
 
-export function PaymentMobileCard({ scholar, onMarkAsPaid, onAttachReceipt, onSendReminder }: PaymentMobileCardProps) {
+export function PaymentMobileCard({ scholar, onMarkAsPaid, onAttachReceipt, onSendReminder, readOnly = false, onViewReceipt }: PaymentMobileCardProps) {
   const [detailOpen, setDetailOpen] = useState(false);
 
   const payment = scholar.current_payment;
@@ -105,13 +107,19 @@ export function PaymentMobileCard({ scholar, onMarkAsPaid, onAttachReceipt, onSe
             <Eye className="w-4 h-4 mr-1.5" />
             Ver detalhes
           </Button>
-          {payment?.status === "eligible" && (
+          {!readOnly && payment?.status === "eligible" && (
             <Button size="sm" className="flex-1 min-h-[44px] text-sm" onClick={() => onMarkAsPaid(payment, scholar)}>
               <CheckCircle className="w-4 h-4 mr-1.5" />
               Pagar
             </Button>
           )}
-          {payment?.status === "paid" && (
+          {payment?.status === "paid" && readOnly && (
+            <Button variant="outline" size="sm" className="flex-1 min-h-[44px] text-sm" onClick={() => onViewReceipt?.(payment, scholar)}>
+              <Eye className="w-4 h-4 mr-1.5" />
+              Ver Comprovante
+            </Button>
+          )}
+          {payment?.status === "paid" && !readOnly && (
             <Button variant="outline" size="sm" className="flex-1 min-h-[44px] text-sm" onClick={() => onAttachReceipt(payment, scholar)}>
               <Paperclip className="w-4 h-4 mr-1.5" />
               Comprovante
